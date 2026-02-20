@@ -1,0 +1,36 @@
+{
+  "name": "neo-mofox-launcher",
+  "version": "1.0.0",
+  "description": "Neo-MoFox Launcher - Material Design 3 Style",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "dev": "electron . --dev"
+  },
+  "author": "MoFox Studio",
+  "license": "AGPL-3.0",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "tree-kill": "^1.2.2"
+  },
+  "build": {
+    "appId": "com.mofox.neo-mofox-launcher",
+    "productName": "Neo-MoFox Launcher",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

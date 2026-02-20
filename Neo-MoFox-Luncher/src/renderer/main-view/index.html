@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>Neo-MoFox Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+
+  <!-- ═══ 自定义标题栏 ═══ -->
+  <header class="titlebar" id="titlebar">
+    <div class="titlebar-drag">
+      <div class="titlebar-brand">
+        <div class="brand-icon">
+          <span class="material-symbols-rounded">pets</span>
+        </div>
+        <span class="brand-text">Neo-MoFox</span>
+        <span class="brand-badge">Launcher</span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button class="tb-btn" id="btn-minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button class="tb-btn" id="btn-maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button class="tb-btn tb-btn-close" id="btn-close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ 主内容区域 ═══ -->
+  <main class="main-container">
+
+    <!-- ─── 顶部 Hero 区域 ─── -->
+    <section class="hero-section">
+      <div class="hero-card">
+        <div class="hero-content">
+          <div class="hero-greeting">
+            <h1>欢迎回来，开发者</h1>
+            <p>准备好创造什么了吗？</p>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-item">
+              <span class="stat-value" id="total-runs">0</span>
+              <span class="stat-label">运行次数</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value" id="active-instances">0</span>
+              <span class="stat-label">活跃实例</span>
+            </div>
+          </div>
+        </div>
+        <div class="hero-quote">
+          <span class="material-symbols-rounded quote-icon">format_quote</span>
+          <p class="quote-text" id="quote-text">代码是写给人看的，附带能在机器上运行。</p>
+          <p class="quote-author" id="quote-author">— Harold Abelson</p>
+        </div>
+        <div class="hero-background-pattern"></div>
+      </div>
+    </section>
+
+    <!-- ─── 实例列表区域 ─── -->
+    <section class="instances-section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="material-symbols-rounded">grid_view</span>
+          <h2>我的实例</h2>
+          <span class="instance-count-badge" id="instance-count">0</span>
+        </div>
+        <div class="section-actions">
+           <!-- 这里的按钮移除了，改为卡片形式添加 -->
+        </div>
+      </div>
+
+      <div class="instances-grid" id="instances-grid">
+        <!-- 添加实例卡片 (始终显示) -->
+        <div class="instance-card add-card" id="btn-add-instance">
+          <div class="add-card-content">
+            <div class="add-icon-wrapper">
+              <span class="material-symbols-rounded">add</span>
+            </div>
+            <h3>新建实例</h3>
+            <p>创建一个新的 Neo-MoFox 环境</p>
+          </div>
+        </div>
+
+        <!-- 实例卡片将在这里动态生成 -->
+        <!-- 
+        <div class="instance-card-empty">
+          <div class="empty-icon">
+            <span class="material-symbols-rounded">add_circle</span>
+          </div>
+          <h3>还没有实例</h3>
+          <p>点击"新建实例"卡片创建你的第一个 Neo-MoFox 实例</p>
+        </div> 
+        -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══ 编辑实例对话框 ═══ -->
+  <div class="modal-overlay hidden" id="edit-instance-modal">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <span class="material-symbols-rounded">edit</span>
+        <h3 id="edit-modal-title">编辑实例</h3>
+        <button class="icon-btn" id="btn-close-edit-modal">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-section">
+          <div class="form-group">
+            <label class="form-label">实例名称</label>
+            <input type="text" class="form-input" id="edit-instance-name" placeholder="我的 Neo-MoFox">
+          </div>
+          <div class="form-group">
+            <label class="form-label">项目路径</label>
+            <div class="path-input-group">
+              <input type="text" class="form-input" id="edit-instance-path" placeholder="选择项目目录" readonly>
+              <button class="md3-btn md3-btn-tonal" id="btn-browse-path">
+                <span class="material-symbols-rounded">folder_open</span>
+                <span>浏览</span>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">描述</label>
+            <textarea class="form-textarea" id="edit-instance-desc" placeholder="可选：为这个实例添加一些描述" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">配置</label>
+            <div class="config-editor-container">
+              <textarea class="config-editor" id="edit-instance-config" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="md3-btn md3-btn-text" id="btn-cancel-edit">取消</button>
+        <button class="md3-btn md3-btn-danger" id="btn-delete-instance">
+          <span class="material-symbols-rounded">delete</span>
+          <span>删除实例</span>
+        </button>
+        <button class="md3-btn md3-btn-primary" id="btn-save-instance">
+          <span class="material-symbols-rounded">save</span>
+          <span>保存</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 环境检测向导全屏覆盖层 ═══ -->
+  <div class="oobe-overlay hidden" id="oobe-overlay">
+    <div class="oobe-container">
+
+      <!-- 标题区域 -->
+      <div class="oobe-header">
+        <div class="oobe-hero-icon">
+          <span class="material-symbols-rounded">build_circle</span>
+        </div>
+        <h1>环境预检</h1>
+        <p class="oobe-desc">正在检测运行 Neo-MoFox 所需的环境依赖...</p>
+      </div>
+
+      <!-- 检测项目列表 -->
+      <div class="oobe-content">
+        <div class="env-check-list" id="env-check-list">
+
+          <!-- Python 检测 -->
+          <div class="env-check-item" id="check-python">
+            <div class="check-icon">
+              <span class="material-symbols-rounded spinning">sync</span>
+            </div>
+            <div class="check-info">
+              <div class="check-name">Python</div>
+              <div class="check-requirement">版本要求: >= 3.11</div>
+              <div class="check-status" id="check-python-status">检测中...</div>
+            </div>
+            <div class="check-result" id="check-python-result"></div>
+          </div>
+
+          <!-- uv 检测 -->
+          <div class="env-check-item" id="check-uv">
+            <div class="check-icon">
+              <span class="material-symbols-rounded spinning">sync</span>
+            </div>
+            <div class="check-info">
+              <div class="check-name">uv (Python 包管理器)</div>
+              <div class="check-requirement">状态: 已安装</div>
+              <div class="check-status" id="check-uv-status">检测中...</div>
+            </div>
+            <div class="check-result" id="check-uv-result"></div>
+          </div>
+
+          <!-- Git 检测 -->
+          <div class="env-check-item" id="check-git">
+            <div class="check-icon">
+              <span class="material-symbols-rounded spinning">sync</span>
+            </div>
+            <div class="check-info">
+              <div class="check-name">Git</div>
+              <div class="check-requirement">状态: 已安装</div>
+              <div class="check-status" id="check-git-status">检测中...</div>
+            </div>
+            <div class="check-result" id="check-git-result"></div>
+          </div>
+
+        </div>
+
+        <!-- 检测结果摘要 -->
+        <div class="env-check-summary hidden" id="env-check-summary">
+          <div class="summary-icon" id="summary-icon">
+            <span class="material-symbols-rounded">check_circle</span>
+          </div>
+          <h2 id="summary-title">环境检测通过</h2>
+          <p id="summary-desc">所有依赖项均已正确安装，您可以开始使用 Neo-MoFox。</p>
+        </div>
+
+        <!-- 安装提示区域 (失败时显示) -->
+        <div class="env-install-hints hidden" id="env-install-hints">
+          <h3>缺失的依赖项</h3>
+          <div class="install-hints-list" id="install-hints-list"></div>
+        </div>
+      </div>
+
+      <!-- 底部导航 -->
+      <div class="oobe-nav">
+        <div></div>
+        <div class="oobe-nav-right">
+          <button class="md3-btn md3-btn-tonal" id="oobe-btn-recheck" disabled>
+            <span class="material-symbols-rounded">refresh</span>
+            <span>重新检测</span>
+          </button>
+          <button class="md3-btn md3-btn-primary" id="oobe-btn-continue" disabled>
+            <span>继续</span>
+            <span class="material-symbols-rounded">arrow_forward</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

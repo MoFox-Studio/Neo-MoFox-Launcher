@@ -1,0 +1,630 @@
+/* ─── Install Wizard Styles ─────────────────────────────────────────── */
+
+:root {
+  --wizard-sidebar-width: 280px;
+  --wizard-bg: #0f0f17;
+  --wizard-surface: #1a1a24;
+  --wizard-surface-variant: #252532;
+  --wizard-primary: #7c4dff;
+  --wizard-primary-container: #4a148c;
+  --wizard-on-primary: #ffffff;
+  --wizard-success: #4caf50;
+  --wizard-error: #f44336;
+  --wizard-warning: #ff9800;
+  --wizard-on-surface: #e0e0e0;
+  --wizard-on-surface-variant: #9e9e9e;
+  --wizard-outline: #404050;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: var(--wizard-bg);
+  color: var(--wizard-on-surface);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.wizard-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────────── */
+
+.wizard-sidebar {
+  width: var(--wizard-sidebar-width);
+  background: var(--wizard-surface);
+  border-right: 1px solid var(--wizard-outline);
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.wizard-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+}
+
+.wizard-logo .material-symbols-rounded {
+  font-size: 32px;
+  color: var(--wizard-primary);
+}
+
+.wizard-logo .logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--wizard-on-surface);
+}
+
+.wizard-steps {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  cursor: default;
+  transition: background 0.2s;
+}
+
+.step-item.active {
+  background: var(--wizard-surface-variant);
+}
+
+.step-item.completed .step-indicator {
+  background: var(--wizard-success);
+}
+
+.step-item.completed .step-number {
+  display: none;
+}
+
+.step-item.completed .step-check {
+  display: block;
+}
+
+.step-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--wizard-outline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.step-item.active .step-indicator {
+  background: var(--wizard-primary);
+}
+
+.step-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wizard-on-surface);
+}
+
+.step-check {
+  display: none;
+  font-size: 18px;
+  color: white;
+}
+
+.step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wizard-on-surface);
+}
+
+.step-desc {
+  font-size: 12px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.wizard-footer {
+  padding-top: 24px;
+  border-top: 1px solid var(--wizard-outline);
+}
+
+.wizard-footer .version {
+  font-size: 12px;
+  color: var(--wizard-on-surface-variant);
+}
+
+/* ─── Main Content ──────────────────────────────────────────────────── */
+
+.wizard-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 48px;
+  overflow-y: auto;
+}
+
+.wizard-phase {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  max-width: 720px;
+}
+
+.wizard-phase.hidden {
+  display: none;
+}
+
+.phase-header {
+  margin-bottom: 32px;
+}
+
+.phase-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.phase-header p {
+  font-size: 14px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.phase-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 32px;
+}
+
+/* ─── Environment Check ─────────────────────────────────────────────── */
+
+.env-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.env-check-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--wizard-surface);
+  border-radius: 12px;
+  border: 1px solid var(--wizard-outline);
+}
+
+.check-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.check-icon .material-symbols-rounded {
+  font-size: 28px;
+}
+
+.check-icon .loading {
+  color: var(--wizard-primary);
+  animation: spin 1s linear infinite;
+}
+
+.check-icon .success {
+  color: var(--wizard-success);
+}
+
+.check-icon .error {
+  color: var(--wizard-error);
+}
+
+.check-icon .hidden {
+  display: none;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.check-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.check-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.check-requirement {
+  font-size: 12px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.check-status {
+  text-align: right;
+}
+
+.status-text {
+  font-size: 13px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.env-check-result {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.env-check-result.hidden {
+  display: none;
+}
+
+.result-success {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid var(--wizard-success);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--wizard-success);
+}
+
+.result-success.hidden {
+  display: none;
+}
+
+.result-error {
+  background: rgba(244, 67, 54, 0.15);
+  border: 1px solid var(--wizard-error);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--wizard-error);
+}
+
+.result-error.hidden {
+  display: none;
+}
+
+/* ─── Config Form ───────────────────────────────────────────────────── */
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+}
+
+.form-row.two-cols .form-group {
+  flex: 1;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wizard-on-surface);
+}
+
+.form-group input,
+.form-group select {
+  padding: 12px 16px;
+  font-size: 14px;
+  background: var(--wizard-surface);
+  border: 1px solid var(--wizard-outline);
+  border-radius: 8px;
+  color: var(--wizard-on-surface);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--wizard-primary);
+}
+
+.form-group input::placeholder {
+  color: var(--wizard-on-surface-variant);
+}
+
+.form-group select {
+  cursor: pointer;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.input-with-btn {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-btn input {
+  flex: 1;
+}
+
+.btn-toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 32px;
+  background: none;
+  border: none;
+  color: var(--wizard-on-surface-variant);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.btn-toggle-password:hover {
+  color: var(--wizard-on-surface);
+}
+
+.validation-errors {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: rgba(244, 67, 54, 0.15);
+  border: 1px solid var(--wizard-error);
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--wizard-error);
+}
+
+.validation-errors.hidden {
+  display: none;
+}
+
+.validation-errors .material-symbols-rounded {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.error-list {
+  list-style: none;
+  font-size: 13px;
+}
+
+.error-list li {
+  margin-bottom: 4px;
+}
+
+/* ─── Install Progress ──────────────────────────────────────────────── */
+
+.install-progress {
+  margin-bottom: 24px;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--wizard-surface);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--wizard-primary);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.install-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--wizard-surface);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.install-step-item .step-icon {
+  font-size: 20px;
+  color: var(--wizard-on-surface-variant);
+}
+
+.install-step-item.active .step-icon {
+  color: var(--wizard-primary);
+  animation: spin 1s linear infinite;
+}
+
+.install-step-item.active .step-icon::before {
+  content: 'progress_activity';
+}
+
+.install-step-item.completed .step-icon {
+  color: var(--wizard-success);
+}
+
+.install-step-item.completed .step-icon::before {
+  content: 'check_circle';
+}
+
+.install-step-item.error .step-icon {
+  color: var(--wizard-error);
+}
+
+.install-step-item.error .step-icon::before {
+  content: 'cancel';
+}
+
+.install-log {
+  background: var(--wizard-surface);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--wizard-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn-toggle-log {
+  background: none;
+  border: none;
+  color: var(--wizard-on-surface-variant);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.log-content {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  color: var(--wizard-on-surface-variant);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-content.collapsed {
+  max-height: 0;
+  padding: 0 16px;
+}
+
+.install-result {
+  text-align: center;
+  padding: 32px;
+}
+
+.install-result.hidden {
+  display: none;
+}
+
+.install-result .result-success,
+.install-result .result-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+}
+
+.install-result .material-symbols-rounded {
+  font-size: 64px;
+}
+
+.install-result h2 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.install-result p {
+  font-size: 14px;
+  color: var(--wizard-on-surface-variant);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────────── */
+
+.md3-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.md3-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.md3-btn-filled {
+  background: var(--wizard-primary);
+  color: var(--wizard-on-primary);
+}
+
+.md3-btn-filled:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.md3-btn-tonal {
+  background: var(--wizard-surface-variant);
+  color: var(--wizard-on-surface);
+}
+
+.md3-btn-tonal:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.md3-btn-text {
+  background: transparent;
+  color: var(--wizard-primary);
+}
+
+.md3-btn-text:hover:not(:disabled) {
+  background: rgba(124, 77, 255, 0.1);
+}
+
+.md3-btn .material-symbols-rounded {
+  font-size: 18px;
+}
