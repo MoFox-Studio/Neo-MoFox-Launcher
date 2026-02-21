@@ -4,6 +4,14 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 
+// 强制 stdout/stderr 使用 UTF-8 输出，解决 Windows 终端中文乱码
+if (process.stdout && typeof process.stdout.setEncoding === 'function') {
+  process.stdout.setEncoding('utf-8');
+}
+if (process.stderr && typeof process.stderr.setEncoding === 'function') {
+  process.stderr.setEncoding('utf-8');
+}
+
 let mainWindow;
 let mofoxProcess = null;
 let mofoxStatus = 'stopped'; // stopped | starting | running | stopping | error
