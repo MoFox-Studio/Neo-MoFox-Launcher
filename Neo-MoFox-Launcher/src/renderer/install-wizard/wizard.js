@@ -148,6 +148,8 @@ async function runEnvCheck() {
     // Update Python
     if (result.checks.python.valid) {
       updateCheckItem('check-python', 'success', result.checks.python.version);
+      // 保存检测到的 python 命令
+      state.pythonCmd = result.checks.python.cmd;
     } else {
       updateCheckItem('check-python', 'error', result.checks.python.version || '未安装');
     }
@@ -219,6 +221,7 @@ function collectInputs() {
     installDir: el.inputInstallDir.value.trim(),
     installNapcat: installNapcat,
     installSteps: installSteps, // 传递给后端的步骤配置
+    pythonCmd: state.pythonCmd, // 传递检测到的 python 命令
   };
   return state.inputs;
 }

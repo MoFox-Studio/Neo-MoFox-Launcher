@@ -52,6 +52,10 @@ function createWindow() {
 
 // ─── 应用生命周期 ───────────────────────────────────
 app.whenReady().then(() => {
+  // 设置全局环境变量，确保所有子进程都使用 UTF-8
+  process.env.PYTHONIOENCODING = 'utf-8';
+  process.env.PYTHONUNBUFFERED = '1';
+  
   createWindow();
   loadSettings();
 });
@@ -165,6 +169,7 @@ function startMofox() {
   }
 
   try {
+    // 强制使用 UTF-8 编码输出，避免中文乱码
     mofoxProcess = spawn(cmd, args, {
       cwd: projectPath,
       env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
@@ -175,7 +180,7 @@ function startMofox() {
     sendLog('info', `  PID: ${mofoxProcess.pid}`);
 
     mofoxProcess.stdout.on('data', (data) => {
-      const lines = data.toString('utf-8').split('\n');
+      const lines = new TextDecoder('utf-8').decode(data).split('\n');
       lines.forEach(line => {
         if (line.trim()) {
           sendLog('stdout', line);
@@ -188,7 +193,7 @@ function startMofox() {
     });
 
     mofoxProcess.stderr.on('data', (data) => {
-      const lines = data.toString('utf-8').split('\n');
+      const lines = new TextDecoder('utf-8').decode(data).split('\n');
       lines.forEach(line => {
         if (line.trim()) {
           sendLog('stderr', line);
@@ -854,6 +859,7 @@ async function startInstanceInternal(instanceId, instance) {
     sendInstanceLog(instanceId, 'mofox', '使用 uv run 启动', 'info');
   }
   
+  // 强制使用 UTF-8 编码输出，避免中文乱码
   const mofoxProc = spawn(cmd, args, {
     cwd: mofoxPath,
     env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
@@ -866,7 +872,7 @@ async function startInstanceInternal(instanceId, instance) {
   sendInstanceLog(instanceId, 'mofox', `MoFox PID: ${mofoxProc.pid}`, 'info');
   
   mofoxProc.stdout.on('data', (data) => {
-    const lines = data.toString('utf-8').split('\n');
+    const lines = new TextDecoder('utf-8').decode(data).split('\n');
     lines.forEach(line => {
       if (line.trim()) {
         sendInstanceLog(instanceId, 'mofox', line, 'info');
@@ -875,7 +881,7 @@ async function startInstanceInternal(instanceId, instance) {
   });
   
   mofoxProc.stderr.on('data', (data) => {
-    const lines = data.toString('utf-8').split('\n');
+    const lines = new TextDecoder('utf-8').decode(data).split('\n');
     lines.forEach(line => {
       if (line.trim()) {
         sendInstanceLog(instanceId, 'mofox', line, 'warning');
