@@ -32,6 +32,7 @@ const CONFIG_DETECT_TIMEOUT = 60000; // 60 秒
 class InstallWizardService {
   constructor() {
     this._progressCallback = null;
+    this._outputCallback = null;
     this._currentInstance = null;
   }
 
@@ -40,6 +41,13 @@ class InstallWizardService {
    */
   setProgressCallback(callback) {
     this._progressCallback = callback;
+  }
+
+  /**
+   * 设置输出回调
+   */
+  setOutputCallback(callback) {
+    this._outputCallback = callback;
   }
 
   /**
@@ -52,6 +60,16 @@ class InstallWizardService {
       this._progressCallback(progress);
     }
     return progress;
+  }
+
+  /**
+   * 发送输出日志
+   */
+  _emitOutput(output) {
+    console.log(`[InstallWizard Output] ${output}`);
+    if (this._outputCallback) {
+      this._outputCallback(output);
+    }
   }
 
   // ─── Phase 1: 环境预检 ─────────────────────────────────────────────────
@@ -203,9 +221,9 @@ class InstallWizardService {
   /**
    * 校验 QQ 号
    */
-  validateQQNumber(qq) {
+  validateQQNumber(qq, fieldLabel = 'QQ 号') {
     if (!qq || !/^\d{5,12}$/.test(qq)) {
-      return { valid: false, error: 'QQ 号应为 5-12 位纯数字' };
+      return { valid: false, error: `${fieldLabel}应为 5-12 位纯数字` };
     }
     return { valid: true };
   }
@@ -275,10 +293,10 @@ class InstallWizardService {
     const nameResult = this.validateInstanceName(inputs.instanceName);
     if (!nameResult.valid) errors.push({ field: 'instanceName', error: nameResult.error });
 
-    const qqResult = this.validateQQNumber(inputs.qqNumber);
+    const qqResult = this.validateQQNumber(inputs.qqNumber, 'Bot QQ 号');
     if (!qqResult.valid) errors.push({ field: 'qqNumber', error: qqResult.error });
 
-    const ownerResult = this.validateQQNumber(inputs.ownerQQNumber);
+    const ownerResult = this.validateQQNumber(inputs.ownerQQNumber, '管理员 QQ 号');
     if (!ownerResult.valid) errors.push({ field: 'ownerQQNumber', error: ownerResult.error });
 
     const apiKeyResult = this.validateApiKey(inputs.apiKey);
@@ -359,9 +377,24 @@ class InstallWizardService {
   }
 
   /**
+   * 获取 Git 仓库的当前 commit ID
+   */
+  async _getGitCommitId(repoDir) {
+    try {
+      const { stdout } = await this._execCommand('git', ['rev-parse', 'HEAD'], {
+        cwd: repoDir,
+      });
+      return stdout.trim();
+    } catch (e) {
+      console.error('[InstallWizard] 获取 commit ID 失败:', e);
+      return null;
+    }
+  }
+
+  /**
    * 3.1 克隆 Neo-MoFox 仓库
    */
-  async cloneRepository(installDir, instanceId, channel, onProgress) {
+  async cloneRepository(installDir, instanceId, channel) {
     const targetDir = path.join(installDir, instanceId, 'neo-mofox');
     const urls = REPO_URLS[channel] || REPO_URLS.main;
     const branch = channel === 'dev' ? 'dev' : 'main';
@@ -377,8 +410,8 @@ class InstallWizardService {
         }
 
         await this._execCommand('git', args, {
-          onStdout: (data) => onProgress && onProgress(data),
-          onStderr: (data) => onProgress && onProgress(data),
+          onStdout: (data) => this._emitOutput(data),
+          onStderr: (data) => this._emitOutput(data),
         });
 
         this._emitProgress('clone', 100, '仓库克隆完成');
@@ -409,13 +442,13 @@ class InstallWizardService {
   /**
    * 3.3 安装 Python 依赖
    */
-  async installDependencies(neoMofoxDir, onProgress) {
+  async installDependencies(neoMofoxDir) {
     this._emitProgress('deps', 0, '正在安装依赖...');
 
     await this._execCommand('uv', ['sync'], {
       cwd: neoMofoxDir,
-      onStdout: (data) => onProgress && onProgress(data),
-      onStderr: (data) => onProgress && onProgress(data),
+      onStdout: (data) => this._emitOutput(data),
+      onStderr: (data) => this._emitOutput(data),
     });
 
     this._emitProgress('deps', 100, '依赖安装完成');
@@ -433,6 +466,10 @@ class InstallWizardService {
       const coreToml = path.join(configDir, 'core.toml');
       const modelToml = path.join(configDir, 'model.toml');
 
+      this._emitOutput(`[gen-config] 工作目录: ${neoMofoxDir}`);
+      this._emitOutput(`[gen-config] 配置目录: ${configDir}`);
+      this._emitOutput(`[gen-config] 启动命令: uv run python main.py`);
+
       const proc = spawn('uv', ['run', 'python', 'main.py'], {
         cwd: neoMofoxDir,
         shell: true,
@@ -440,7 +477,28 @@ class InstallWizardService {
         env: { ...process.env, PYTHONUNBUFFERED: '1' },
       });
 
+      this._emitOutput(`[gen-config] 进程 PID: ${proc.pid}`);
+
       let killed = false;
+      let stdoutData = '';
+      let stderrData = '';
+
+      // 捕获进程输出
+      if (proc.stdout) {
+        proc.stdout.on('data', (data) => {
+          const output = data.toString();
+          stdoutData += output;
+          this._emitOutput(output);
+        });
+      }
+
+      if (proc.stderr) {
+        proc.stderr.on('data', (data) => {
+          const output = data.toString();
+          stderrData += output;
+          this._emitOutput(output);
+        });
+      }
       const checkInterval = setInterval(() => {
         if (fs.existsSync(coreToml) && fs.existsSync(modelToml)) {
           clearInterval(checkInterval);
@@ -475,18 +533,51 @@ class InstallWizardService {
       proc.on('error', (err) => {
         clearInterval(checkInterval);
         clearTimeout(timeout);
-        reject(err);
+        let errorMsg = `启动进程失败: ${err.message}`;
+        if (stderrData) {
+          errorMsg += `\n错误输出: ${stderrData}`;
+        }
+        reject(new Error(errorMsg));
       });
 
-      proc.on('close', () => {
+      proc.on('close', (code) => {
         clearInterval(checkInterval);
         clearTimeout(timeout);
+        
+        this._emitOutput(`[gen-config] 进程退出，退出码: ${code}`);
+        this._emitOutput(`[gen-config] 检查配置文件...`);
+        this._emitOutput(`[gen-config] core.toml 路径: ${coreToml}`);
+        this._emitOutput(`[gen-config] model.toml 路径: ${modelToml}`);
+        this._emitOutput(`[gen-config] core.toml 存在: ${fs.existsSync(coreToml)}`);
+        this._emitOutput(`[gen-config] model.toml 存在: ${fs.existsSync(modelToml)}`);
+        
+        // 检查配置目录是否存在
+        if (fs.existsSync(configDir)) {
+          try {
+            const files = fs.readdirSync(configDir);
+            this._emitOutput(`[gen-config] 配置目录内容: ${files.join(', ')}`);
+          } catch (err) {
+            this._emitOutput(`[gen-config] 无法读取配置目录: ${err.message}`);
+          }
+        } else {
+          this._emitOutput(`[gen-config] 配置目录不存在: ${configDir}`);
+        }
+        
         // 再检查一次配置文件
         if (fs.existsSync(coreToml) && fs.existsSync(modelToml)) {
           this._emitProgress('gen-config', 100, '配置文件生成完成');
           resolve({ success: true, configDir });
         } else if (!killed) {
-          reject(new Error('进程退出但配置文件未生成'));
+          // 构建详细的错误信息
+          let errorMsg = `进程退出但配置文件未生成 (退出码: ${code})`;
+          if (stderrData) {
+            errorMsg += `\n错误输出: ${stderrData.substring(0, 500)}`;
+          }
+          if (stdoutData) {
+            errorMsg += `\n标准输出: ${stdoutData.substring(0, 500)}`;
+          }
+          this._emitOutput(`[ERROR] ${errorMsg}`);
+          reject(new Error(errorMsg));
         }
       });
     });
@@ -549,7 +640,7 @@ class InstallWizardService {
   /**
    * 3.7 下载并安装 NapCat（暂时跳过，由用户手动安装）
    */
-  async installNapCat(installDir, instanceId, onProgress) {
+  async installNapCat(installDir, instanceId) {
     this._emitProgress('napcat', 0, 'NapCat 安装暂时跳过，请手动安装...');
     
     const napcatDir = path.join(installDir, instanceId, 'napcat');
@@ -623,10 +714,13 @@ class InstallWizardService {
     this._emitProgress('register', 0, '正在注册实例...');
 
     const instanceId = this._generateInstanceId(inputs.qqNumber);
-    const now = new Date().toISOString();
 
-    const instance = {
-      id: instanceId,
+    // 获取 Neo-MoFox 的 commit ID
+    const neomofoxVersion = await this._getGitCommitId(neoMofoxDir);
+    this._emitOutput(`Neo-MoFox 版本: ${neomofoxVersion || '未知'}`);
+
+    // 更新现有实例，标记为安装完成
+    const updates = {
       displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
       channel: inputs.channel || 'main',
@@ -634,15 +728,14 @@ class InstallWizardService {
       neomofoxDir: neoMofoxDir,
       napcatDir: napcatDir,
       wsPort: parseInt(inputs.wsPort, 10),
-      createdAt: now,
       lastStartedAt: null,
       napcatVersion: null,
-      neomofoxVersion: null,
+      neomofoxVersion: neomofoxVersion,
       installCompleted: true,
       installProgress: null,
     };
 
-    storageService.addInstance(instance);
+    const instance = storageService.updateInstance(instanceId, updates);
 
     this._emitProgress('register', 100, '实例注册完成');
     return { success: true, instance };
@@ -651,7 +744,12 @@ class InstallWizardService {
   /**
    * 执行完整安装流程
    */
-  async runInstall(inputs, onProgress) {
+  async runInstall(inputs, outputCallback) {
+    // 设置输出回调
+    if (outputCallback) {
+      this.setOutputCallback(outputCallback);
+    }
+
     const instanceId = this._generateInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
@@ -687,7 +785,7 @@ class InstallWizardService {
 
     try {
       // 3.1 克隆仓库
-      await this.cloneRepository(inputs.installDir, instanceId, inputs.channel, onProgress);
+      await this.cloneRepository(inputs.installDir, instanceId, inputs.channel);
       storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
 
       // 3.2 创建虚拟环境
@@ -695,7 +793,7 @@ class InstallWizardService {
       storageService.updateInstance(instanceId, { installProgress: { step: 'deps', substep: 0 } });
 
       // 3.3 安装依赖
-      await this.installDependencies(neoMofoxDir, onProgress);
+      await this.installDependencies(neoMofoxDir);
       storageService.updateInstance(instanceId, { installProgress: { step: 'gen-config', substep: 0 } });
 
       // 3.4 生成配置文件
@@ -711,7 +809,7 @@ class InstallWizardService {
       storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
 
       // 3.7 安装 NapCat
-      await this.installNapCat(inputs.installDir, instanceId, onProgress);
+      await this.installNapCat(inputs.installDir, instanceId);
       storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
 
       // 3.8 写入 NapCat 配置

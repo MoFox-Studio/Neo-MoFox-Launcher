@@ -190,7 +190,7 @@ function openEditModal(instance) {
   // 由于模块化限制，这里可能需要重构。
   // 假设 main.js 处理了 UI 逻辑，或者 instances.js 处理。
   // 之前的代码是在 modules/instances.js 里的，所以可以直接调用 state
-  state.currentEditingInstance = instance;
+  state.currentEditingInstance = instance.id; // 修复：保存 ID 而不是整个对象
   
   // 填充表单 (假设 element 存在)
   document.getElementById('edit-instance-name').value = instance.name || '';
@@ -328,7 +328,12 @@ export async function saveInstance() {
 // ─── Delete Instance ──────────────────────────────────────────────────
 
 export async function deleteInstance() {
-  if (!state.currentEditingInstance) return;
+  if (!state.currentEditingInstance) {
+    alert('无法删除：未选择实例');
+    return;
+  }
+  
+  console.log('准备删除实例，ID:', state.currentEditingInstance, '类型:', typeof state.currentEditingInstance);
   
   if (!confirm('确定要删除这个实例吗？这个操作不可撤销。')) {
     return;
@@ -336,16 +341,25 @@ export async function deleteInstance() {
   
   try {
     // 调用后端 API 删除实例
+    console.log('调用后端 API 删除实例...', state.currentEditingInstance);
     await window.mofoxAPI.deleteInstance(state.currentEditingInstance);
     
     // 重新加载实例列表
     await loadInstances();
+    
+    // 重置当前编辑实例状态
+    state.currentEditingInstance = null;
+    
+    // 删除成功后才关闭模态框
+    el.editInstanceModal.classList.add('hidden');
+    
+    // 显示成功提示
+    console.log('实例删除成功');
   } catch (error) {
     console.error('删除实例失败:', error);
     alert('删除失败: ' + error.message);
+    // 出错时不关闭模态框，让用户可以重试或取消
   }
-  
-  el.editInstanceModal.classList.add('hidden');
 }
 
 // ─── Browse Path ──────────────────────────────────────────────────────

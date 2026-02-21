@@ -199,9 +199,18 @@ class StorageService {
    * 删除实例
    */
   deleteInstance(instanceId) {
+    console.log(`[StorageService] 删除实例: ${instanceId}`);
     const instances = this.getInstances();
+    const originalCount = instances.length;
     const filtered = instances.filter(i => i.id !== instanceId);
+    
+    if (filtered.length === originalCount) {
+      console.warn(`[StorageService] 实例不存在: ${instanceId}`);
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+    
     this.writeInstances(filtered);
+    console.log(`[StorageService] 实例删除成功，剩余 ${filtered.length} 个实例`);
     return filtered;
   }
 

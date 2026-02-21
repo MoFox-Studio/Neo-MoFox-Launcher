@@ -20,33 +20,30 @@
       <nav class="wizard-steps">
         <div class="step-item active" data-step="1">
           <div class="step-indicator">
-            <span class="step-number">1</span>
             <span class="step-check material-symbols-rounded">check</span>
           </div>
           <div class="step-content">
-            <span class="step-title">环境检测</span>
+            <span class="step-title">1. 环境检测</span>
             <span class="step-desc">检查必要工具</span>
           </div>
         </div>
         
         <div class="step-item" data-step="2">
           <div class="step-indicator">
-            <span class="step-number">2</span>
             <span class="step-check material-symbols-rounded">check</span>
           </div>
           <div class="step-content">
-            <span class="step-title">配置信息</span>
+            <span class="step-title">2. 配置信息</span>
             <span class="step-desc">填写 Bot 参数</span>
           </div>
         </div>
         
         <div class="step-item" data-step="3">
           <div class="step-indicator">
-            <span class="step-number">3</span>
             <span class="step-check material-symbols-rounded">check</span>
           </div>
           <div class="step-content">
-            <span class="step-title">安装执行</span>
+            <span class="step-title">3. 安装执行</span>
             <span class="step-desc">克隆与配置</span>
           </div>
         </div>
@@ -171,11 +168,13 @@
           <div class="form-row">
             <div class="form-group">
               <label for="input-api-key">API Key *</label>
-              <input type="password" id="input-api-key" placeholder="输入你的 API Key" required>
+              <div class="input-wrapper">
+                <input type="password" id="input-api-key" placeholder="输入你的 API Key" required>
+                <button type="button" class="btn-toggle-password" id="btn-toggle-api-key">
+                  <span class="material-symbols-rounded">visibility</span>
+                </button>
+              </div>
               <span class="form-hint">大模型 API 密钥</span>
-              <button type="button" class="btn-toggle-password" id="btn-toggle-api-key">
-                <span class="material-symbols-rounded">visibility</span>
-              </button>
             </div>
           </div>
           
@@ -188,10 +187,14 @@
             
             <div class="form-group">
               <label for="input-channel">更新通道</label>
-              <select id="input-channel">
-                <option value="main" selected>稳定版 (main)</option>
-                <option value="dev">开发版 (dev)</option>
-              </select>
+              <div class="custom-select" id="custom-select-channel">
+                <div class="select-selected" id="selected-channel">稳定版 (main)</div>
+                <div class="select-items select-hide" id="options-channel">
+                  <div data-value="main" class="same-as-selected">稳定版 (main)</div>
+                  <div data-value="dev">开发版 (dev)</div>
+                </div>
+                <input type="hidden" id="input-channel" value="main">
+              </div>
               <span class="form-hint">选择跟踪的 GitHub 分支</span>
             </div>
           </div>
@@ -199,9 +202,9 @@
           <div class="form-row">
             <div class="form-group">
               <label for="input-install-dir">安装目录 *</label>
-              <div class="input-with-btn">
+              <div class="input-group">
                 <input type="text" id="input-install-dir" value="D:\Neo-MoFox_Bots" required>
-                <button type="button" class="md3-btn md3-btn-tonal" id="btn-browse-dir">
+                <button type="button" class="md3-btn md3-btn-tonal btn-icon" id="btn-browse-dir">
                   <span class="material-symbols-rounded">folder_open</span>
                 </button>
               </div>
@@ -219,6 +222,10 @@
           <button class="md3-btn md3-btn-text" id="btn-back-2">
             <span class="material-symbols-rounded">arrow_back</span>
             上一步
+          </button>
+          <button class="md3-btn md3-btn-text" id="btn-reset-form">
+            <span class="material-symbols-rounded">refresh</span>
+            重置表单
           </button>
           <button class="md3-btn md3-btn-filled" id="btn-next-2">
             开始安装

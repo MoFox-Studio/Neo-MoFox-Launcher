@@ -14,7 +14,7 @@ const state = {
     apiKey: '',
     wsPort: 8095,
     channel: 'main',
-    installDir: 'D:\\Neo-MoFox_Bots',
+    installDir: '',
   },
   installing: false,
   installSuccess: false,
@@ -52,6 +52,7 @@ const el = {
   btnBrowseDir: document.getElementById('btn-browse-dir'),
   validationErrors: document.getElementById('validation-errors'),
   btnBack2: document.getElementById('btn-back-2'),
+  btnResetForm: document.getElementById('btn-reset-form'),
   btnNext2: document.getElementById('btn-next-2'),
   
   // Phase 3
@@ -217,6 +218,51 @@ function hideValidationErrors() {
   el.validationErrors.classList.add('hidden');
 }
 
+function resetFormInputs() {
+  // Clear all form inputs
+  el.inputInstanceName.value = '';
+  el.inputQqNumber.value = '';
+  el.inputOwnerQq.value = '';
+  el.inputApiKey.value = '';
+  el.inputWsPort.value = '8095';
+  el.inputChannel.value = 'main';
+  
+  // Reset custom select display
+  const selectedChannel = document.getElementById('selected-channel');
+  if (selectedChannel) {
+    selectedChannel.textContent = '稳定版 (main)';
+  }
+  
+  // Update custom select active class
+  const optionsChannel = document.getElementById('options-channel');
+  if (optionsChannel) {
+    optionsChannel.querySelectorAll('div').forEach(item => {
+      item.classList.remove('same-as-selected');
+      if (item.getAttribute('data-value') === 'main') {
+        item.classList.add('same-as-selected');
+      }
+    });
+  }
+  
+  // Remove disabled state from inputs
+  el.inputInstanceName.disabled = false;
+  el.inputQqNumber.disabled = false;
+  el.inputOwnerQq.disabled = false;
+  el.inputApiKey.disabled = false;
+  el.inputWsPort.disabled = false;
+  
+  // Reset state
+  state.inputs = {
+    instanceName: '',
+    qqNumber: '',
+    ownerQQNumber: '',
+    apiKey: '',
+    wsPort: 8095,
+    channel: 'main',
+    installDir: el.inputInstallDir.value.trim(),
+  };
+}
+
 async function validateAndProceed() {
   hideValidationErrors();
   
@@ -282,15 +328,23 @@ function clearLog() {
 }
 
 async function startInstall() {
+  console.log('[DEBUG] === startInstall 开始 ===');
+  console.log('[DEBUG] state.installing:', state.installing);
+  console.log('[DEBUG] state.installSuccess:', state.installSuccess);
+  
   state.installing = true;
   state.installSuccess = false;
   
   // Reset UI
+  console.log('[DEBUG] 重置 UI，隐藏所有按钮和结果');
   clearLog();
   el.installResult.classList.add('hidden');
+  el.installResult.querySelector('.result-success').classList.add('hidden');
+  el.installResult.querySelector('.result-error').classList.add('hidden');
   el.btnRetry.classList.add('hidden');
   el.btnCleanup.classList.add('hidden');
   el.btnFinish.classList.add('hidden');
+  console.log('[DEBUG] 按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
   
   // Reset all steps
   const steps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'register'];
@@ -312,13 +366,25 @@ async function startInstall() {
   };
   
   let currentStep = null;
+  const completedSteps = new Set(); // 记录已完成的步骤
   
   window.mofoxAPI.onInstallProgress((progress) => {
     const { step, percent, message, error } = progress;
+    console.log('[DEBUG] 进度更新 -', { step, percent, message, error });
+    
+    // 忽略已完成步骤的更新（防止步骤倒退）
+    if (completedSteps.has(step) && step !== 'error') {
+      console.log('[DEBUG] 忽略已完成步骤:', step);
+      if (message) {
+        appendLog(`[${step}] ${message}`);
+      }
+      return;
+    }
     
     // Mark previous step as completed
     if (currentStep && currentStep !== step) {
       updateInstallStep(currentStep, 'completed');
+      completedSteps.add(currentStep);
     }
     
     // Update current step
@@ -348,53 +414,129 @@ async function startInstall() {
   });
   
   try {
+    console.log('[DEBUG] 开始调用 installRun API');
     const result = await window.mofoxAPI.installRun(state.inputs);
+    console.log('[DEBUG] installRun API 返回成功:', result);
     
     state.installing = false;
     state.installSuccess = true;
+    console.log('[DEBUG] 设置状态 - installing: false, installSuccess: true');
+    
+    // Mark current step as completed (if any)
+    if (currentStep) {
+      console.log('[DEBUG] 标记当前步骤为完成:', currentStep);
+      updateInstallStep(currentStep, 'completed');
+    }
     
     // Mark all steps as completed
+    console.log('[DEBUG] 标记所有步骤为完成');
     steps.forEach(step => updateInstallStep(step, 'completed'));
     updateProgress(100, '安装完成');
     
     // Show success result
+    console.log('[DEBUG] 显示成功结果');
     el.installResult.classList.remove('hidden');
     el.installResult.querySelector('.result-success').classList.remove('hidden');
     el.installResult.querySelector('.result-error').classList.add('hidden');
+    
+    // 只显示完成按钮，隐藏其他按钮
+    console.log('[DEBUG] 设置按钮状态：只显示完成按钮');
     el.btnFinish.classList.remove('hidden');
+    el.btnRetry.classList.add('hidden');
+    el.btnCleanup.classList.add('hidden');
+    console.log('[DEBUG] 最终按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
     
   } catch (error) {
-    console.error('安装失败:', error);
+    console.error('[DEBUG] 安装失败，捕获错误:', error);
     
     state.installing = false;
     state.installSuccess = false;
+    console.log('[DEBUG] 设置状态 - installing: false, installSuccess: false');
     
     // Mark current step as error
     if (currentStep) {
+      console.log('[DEBUG] 标记当前步骤为错误:', currentStep);
       updateInstallStep(currentStep, 'error');
     }
     
+    // 简化错误消息
+    let errorMsg = error.message || '未知错误';
+    console.log('[DEBUG] 原始错误消息:', errorMsg);
+    
+    // 提取主要错误信息（去除冗长的技术细节）
+    if (errorMsg.includes('Error:')) {
+      // 提取第一个 Error: 后面的主要信息
+      const match = errorMsg.match(/Error:\s*([^错标]+)/);
+      if (match && match[1]) {
+        errorMsg = match[1].trim();
+        console.log('[DEBUG] 简化后的错误消息:', errorMsg);
+      }
+    }
+    
+    // 限制错误消息长度
+    if (errorMsg.length > 150) {
+      errorMsg = errorMsg.substring(0, 150) + '...';
+      console.log('[DEBUG] 截断后的错误消息:', errorMsg);
+    }
+    
     // Show error result
+    console.log('[DEBUG] 显示错误结果');
     el.installResult.classList.remove('hidden');
     el.installResult.querySelector('.result-success').classList.add('hidden');
     el.installResult.querySelector('.result-error').classList.remove('hidden');
-    el.installResult.querySelector('.error-message').textContent = error.message;
+    el.installResult.querySelector('.error-message').textContent = errorMsg;
+    
+    // 只显示重试和清理按钮，确保完成按钮隐藏
+    console.log('[DEBUG] 设置按钮状态：显示重试和清理，隐藏完成');
     el.btnRetry.classList.remove('hidden');
     el.btnCleanup.classList.remove('hidden');
+    el.btnFinish.classList.add('hidden');
+    console.log('[DEBUG] 最终按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
   }
+  
+  console.log('[DEBUG] === startInstall 结束 ===');
 }
 
 async function cleanupAndRestart() {
-  // TODO: Get instance ID from state
+  console.log('[DEBUG] === cleanupAndRestart 开始 ===');
   const instanceId = `bot-${state.inputs.qqNumber}`;
+  
+  appendLog('[INFO] 开始清理安装文件...');
+  console.log('[DEBUG] 清理实例 ID:', instanceId);
   
   try {
     await window.mofoxAPI.installCleanup(instanceId);
-    goToPhase(2);
+    appendLog('[INFO] 清理完成，准备重新安装...');
+    console.log('[DEBUG] 清理成功');
+    
+    // 隐藏结果和按钮
+    console.log('[DEBUG] 隐藏所有按钮和结果');
+    el.installResult.classList.add('hidden');
+    el.btnRetry.classList.add('hidden');
+    el.btnCleanup.classList.add('hidden');
+    el.btnFinish.classList.add('hidden');
+    console.log('[DEBUG] 按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
+    
+    // 重新开始安装（使用已有的配置）
+    console.log('[DEBUG] 500ms 后重新调用 startInstall');
+    setTimeout(() => {
+      startInstall();
+    }, 500);
+    
   } catch (error) {
-    console.error('清理失败:', error);
+    console.error('[DEBUG] 清理失败:', error);
     appendLog(`[ERROR] 清理失败: ${error.message}`);
+    
+    // 显示错误结果
+    console.log('[DEBUG] 显示清理错误结果');
+    el.installResult.classList.remove('hidden');
+    el.installResult.querySelector('.result-success').classList.add('hidden');
+    el.installResult.querySelector('.result-error').classList.remove('hidden');
+    el.installResult.querySelector('.error-message').textContent = '清理失败: ' + error.message;
+    console.log('[DEBUG] 按钮状态（清理失败后） - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
   }
+  
+  console.log('[DEBUG] === cleanupAndRestart 结束 ===');
 }
 
 // ─── Event Listeners ───────────────────────────────────────────────────
@@ -433,9 +575,54 @@ function bindEvents() {
       el.inputInstallDir.value = path;
     }
   });
+
+  // Custom Select Logic
+  const customSelect = document.getElementById('custom-select-channel');
+  if (customSelect) {
+    const selected = customSelect.querySelector('.select-selected');
+    const items = customSelect.querySelector('.select-items');
+    const input = customSelect.querySelector('input');
+    
+    selected.addEventListener('click', (e) => {
+      e.stopPropagation();
+      items.classList.toggle('select-hide');
+      selected.classList.toggle('select-arrow-active');
+    });
+
+    items.querySelectorAll('div').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const val = item.getAttribute('data-value');
+        // Update hidden input
+        input.value = val;
+        // Update display text
+        selected.textContent = item.textContent;
+        // Update active class
+        items.querySelectorAll('div').forEach(i => i.classList.remove('same-as-selected'));
+        item.classList.add('same-as-selected');
+        // Close dropdown
+        items.classList.add('select-hide');
+        selected.classList.remove('select-arrow-active');
+      });
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (!customSelect.contains(e.target)) {
+        items.classList.add('select-hide');
+        selected.classList.remove('select-arrow-active');
+      }
+    });
+  }
   
   el.btnBack2.addEventListener('click', () => {
     goToPhase(1);
+  });
+  
+  el.btnResetForm.addEventListener('click', () => {
+    if (confirm('确定要清空所有表单内容吗？')) {
+      resetFormInputs();
+      hideValidationErrors();
+    }
   });
   
   el.btnNext2.addEventListener('click', validateAndProceed);
@@ -447,11 +634,18 @@ function bindEvents() {
     icon.textContent = el.installLogContent.classList.contains('collapsed') ? 'expand_more' : 'expand_less';
   });
   
-  el.btnRetry.addEventListener('click', startInstall);
+  el.btnRetry.addEventListener('click', () => {
+    console.log('[DEBUG] 点击重试按钮');
+    startInstall();
+  });
   
-  el.btnCleanup.addEventListener('click', cleanupAndRestart);
+  el.btnCleanup.addEventListener('click', () => {
+    console.log('[DEBUG] 点击清理按钮');
+    cleanupAndRestart();
+  });
   
   el.btnFinish.addEventListener('click', () => {
+    console.log('[DEBUG] 点击完成按钮，返回主界面');
     window.location.href = '../index.html';
   });
 }
@@ -460,6 +654,9 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  
+  // Reset form inputs to ensure clean state
+  resetFormInputs();
   
   // Load default install dir from state
   try {
