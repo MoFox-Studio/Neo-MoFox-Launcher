@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>实例管理 - Neo-MoFox Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  <!-- 同步主题注入 -->
+  <script src="../theme-init.js"></script>
+  <link rel="stylesheet" href="instance.css">
+  <!-- Toast 组件 -->
+  <script src="../components/toast.js"></script>
+</head>
+<body>
+
+  <!-- ═══ 主容器 ═══ -->
+  <div class="instance-container">
+    
+    <!-- ─── 顶部控制栏 ─── -->
+    <header class="instance-header">
+      <div class="header-left">
+        <button class="icon-button back-button" id="btnBack" title="返回主界面">
+          <span class="material-symbols-rounded">arrow_back</span>
+        </button>
+        <div class="instance-info">
+          <h1 class="instance-title" id="instanceTitle">实例名称</h1>
+          <div class="instance-status">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-text" id="statusText">未运行</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="icon-button" id="btnSettings" title="实例设置">
+          <span class="material-symbols-rounded">settings</span>
+        </button>
+        <div class="control-buttons">
+          <button class="control-button start-button" id="btnStart">
+            <span class="material-symbols-rounded">play_arrow</span>
+            启动
+          </button>
+          <button class="control-button stop-button" id="btnStop" disabled>
+            <span class="material-symbols-rounded">stop</span>
+            停止
+          </button>
+          <button class="control-button restart-button" id="btnRestart" disabled>
+            <span class="material-symbols-rounded">refresh</span>
+            重启
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── 日志窗口区域 ─── -->
+    <main class="logs-container">
+      
+      <!-- 标签页导航 -->
+      <div class="tabs-nav">
+        <button class="tab-button active" data-tab="mofox">
+          <span class="material-symbols-rounded">smart_toy</span>
+          <span class="tab-label">MoFox</span>
+          <span class="log-count" id="mofoxLogCount">0</span>
+        </button>
+        <button class="tab-button" data-tab="napcat">
+          <span class="material-symbols-rounded">terminal</span>
+          <span class="tab-label">Napcat</span>
+          <span class="log-count" id="napcatLogCount">0</span>
+        </button>
+        
+        <!-- 日志工具栏 -->
+        <div class="logs-toolbar">
+          <div class="toolbar-actions">
+            <button class="icon-button" id="btnSearch" title="搜索日志">
+              <span class="material-symbols-rounded">search</span>
+            </button>
+            <button class="icon-button" id="btnAutoScroll" title="自动滚动">
+              <span class="material-symbols-rounded">vertical_align_bottom</span>
+            </button>
+            <button class="icon-button" id="btnClearLogs" title="清空日志">
+              <span class="material-symbols-rounded">delete_sweep</span>
+            </button>
+            <button class="icon-button" id="btnExportLogs" title="导出日志">
+              <span class="material-symbols-rounded">download</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 搜索栏 -->
+      <div class="search-bar hidden" id="searchBar">
+        <span class="material-symbols-rounded">search</span>
+        <input type="text" placeholder="搜索日志内容..." id="searchInput">
+        <button class="icon-button small" id="btnCloseSearch">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+
+      <!-- 标签页内容 -->
+      <div class="tabs-content">
+        
+        <!-- MoFox 日志 -->
+        <div class="tab-pane active" data-tab="mofox">
+          <div class="log-header">
+            <div class="log-stats">
+              <span class="stat-item">
+                <span class="material-symbols-rounded">schedule</span>
+                运行时间: <span id="mofoxUptime">00:00:00</span>
+              </span>
+            </div>
+          </div>
+          <div class="log-content" id="mofoxLogs">
+            <div class="log-empty">
+              <span class="material-symbols-rounded">inbox</span>
+              <p>暂无日志</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Napcat 日志 -->
+        <div class="tab-pane" data-tab="napcat">
+          <div class="log-header">
+            <div class="log-stats">
+              <span class="stat-item">
+                <span class="material-symbols-rounded">schedule</span>
+                运行时间: <span id="napcatUptime">00:00:00</span>
+              </span>
+            </div>
+          </div>
+          <div class="log-content" id="napcatLogs">
+            <div class="log-empty">
+              <span class="material-symbols-rounded">inbox</span>
+              <p>暂无日志</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <script src="instance.js"></script>
+</body>
+</html>

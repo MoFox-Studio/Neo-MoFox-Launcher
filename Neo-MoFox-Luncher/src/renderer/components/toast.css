@@ -1,0 +1,72 @@
+/* ═══ Toast 消息提示组件 ═══ */
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-level3);
+  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10000;
+  min-width: 200px;
+  max-width: 500px;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast .material-symbols-rounded {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* Toast 类型变体 */
+.toast-info {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.toast-info .material-symbols-rounded {
+  color: var(--md-sys-color-primary);
+}
+
+.toast-success {
+  background-color: #1b5e20;
+  color: #fff;
+}
+
+.toast-success .material-symbols-rounded {
+  color: #4caf50;
+}
+
+.toast-warning {
+  background-color: #f57c00;
+  color: #fff;
+}
+
+.toast-warning .material-symbols-rounded {
+  color: #ffb74d;
+}
+
+.toast-error {
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.toast-error .material-symbols-rounded {
+  color: var(--md-sys-color-error);
+}

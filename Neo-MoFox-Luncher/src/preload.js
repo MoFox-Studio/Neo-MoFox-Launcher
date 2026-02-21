@@ -60,6 +60,15 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   installRun: (inputs) => ipcRenderer.invoke('install-run', inputs),
   installCleanup: (instanceId) => ipcRenderer.invoke('install-cleanup', instanceId),
 
+  // ─── 实例进程控制 ───────────────────────────────────────────────────────────
+  startInstance: (instanceId) => ipcRenderer.invoke('instance-start', instanceId),
+  stopInstance: (instanceId) => ipcRenderer.invoke('instance-stop', instanceId),
+  restartInstance: (instanceId) => ipcRenderer.invoke('instance-restart', instanceId),
+  getInstanceStatus: (instanceId) => ipcRenderer.invoke('instance-status', instanceId),
+  getInstanceStats: (instanceId) => ipcRenderer.invoke('instance-stats', instanceId),
+  clearInstanceLogs: (instanceId, type) => ipcRenderer.invoke('instance-clear-logs', instanceId, type),
+  exportInstanceLogs: (instanceId, type, logs) => ipcRenderer.invoke('instance-export-logs', instanceId, type, logs),
+
   // 事件监听
   onLogOutput: (callback) => {
     ipcRenderer.on('log-output', (_event, data) => callback(data));
@@ -75,6 +84,15 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   },
   onInstallOutput: (callback) => {
     ipcRenderer.on('install-output', (_event, data) => callback(data));
+  },
+  onInstanceStatusChange: (callback) => {
+    ipcRenderer.on('instance-status-change', (_event, data) => callback(data));
+  },
+  onInstanceLog: (callback) => {
+    ipcRenderer.on('instance-log', (_event, data) => callback(data));
+  },
+  onInstanceStatsUpdate: (callback) => {
+    ipcRenderer.on('instance-stats-update', (_event, data) => callback(data));
   },
 
   // ─── 用户设置 ───────────────────────────────────────────────────────────

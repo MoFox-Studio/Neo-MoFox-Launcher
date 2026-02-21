@@ -168,8 +168,8 @@ export function renderInstances() {
       const btnOpen = card.querySelector('.btn-open-instance');
       btnOpen.addEventListener('click', (e) => {
         e.stopPropagation();
-        // TODO: 打开实例逻辑
-        console.log('Open instance', instance.id);
+        // 跳转到实例视图页面
+        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });
       
       const btnEdit = card.querySelector('.btn-edit-instance-card');
