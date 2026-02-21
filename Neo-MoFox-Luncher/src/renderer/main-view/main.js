@@ -14,7 +14,7 @@ async function init() {
   // 检查 API 是否可用
   if (!window.mofoxAPI) {
     console.error('mofoxAPI is not available!');
-    alert('窗口 API 未加载，请重启应用');
+    await window.customAlert('窗口 API 未加载，请重启应用', '错误');
     return;
   }
   
@@ -29,23 +29,6 @@ async function init() {
 }
 
 init();
-
-// ─── Window Controls ──────────────────────────────────────────────────
-
-el.btnMinimize?.addEventListener('click', () => {
-  console.log('Minimize clicked');
-  window.mofoxAPI?.windowMinimize();
-});
-
-el.btnMaximize?.addEventListener('click', () => {
-  console.log('Maximize clicked');
-  window.mofoxAPI?.windowMaximize();
-});
-
-el.btnClose?.addEventListener('click', () => {
-  console.log('Close clicked');
-  window.mofoxAPI?.windowClose();
-});
 
 // ─── Instance Actions ─────────────────────────────────────────────────
 

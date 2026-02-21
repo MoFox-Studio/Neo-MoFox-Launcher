@@ -1,0 +1,215 @@
+/**
+ * Custom Dialog Styles - Material Design 3
+ */
+
+.dialog-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.dialog-container.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease;
+}
+
+.dialog-card {
+  position: relative;
+  background: var(--md-sys-color-surface-container-high, #ffffff);
+  border-radius: 28px;
+  min-width: 280px;
+  max-width: 560px;
+  box-shadow: 
+    0 8px 12px rgba(0, 0, 0, 0.12),
+    0 4px 8px rgba(0, 0, 0, 0.08);
+  animation: dialogSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.dialog-header {
+  padding: 24px 24px 16px;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface, #1d1b20);
+  letter-spacing: 0.01em;
+}
+
+.dialog-content {
+  padding: 0 24px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.dialog-message {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--md-sys-color-on-surface-variant, #49454f);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px 24px;
+}
+
+.dialog-actions .btn-text {
+  padding: 10px 24px;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-primary, #6750a4);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.dialog-actions .btn-text::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+}
+
+.dialog-actions .btn-text:hover {
+  background: rgba(103, 80, 164, 0.08);
+}
+
+.dialog-actions .btn-text:active::before {
+  width: 100%;
+  height: 100%;
+  opacity: 0.12;
+  transition: 0s;
+}
+
+.dialog-actions .btn-text:focus {
+  outline: none;
+  background: rgba(103, 80, 164, 0.12);
+  box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.2);
+}
+
+.dialog-actions .dialog-confirm {
+  color: var(--md-sys-color-primary, #6750a4);
+  font-weight: 600;
+}
+
+.dialog-actions .dialog-cancel {
+  color: var(--md-sys-color-on-surface-variant, #49454f);
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .dialog-card {
+    background: var(--md-sys-color-surface-container-high, #2b2930);
+    box-shadow: 
+      0 8px 12px rgba(0, 0, 0, 0.3),
+      0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .dialog-title {
+    color: var(--md-sys-color-on-surface, #e6e1e5);
+  }
+
+  .dialog-message {
+    color: var(--md-sys-color-on-surface-variant, #cac4d0);
+  }
+
+  .dialog-actions .btn-text {
+    color: var(--md-sys-color-primary, #d0bcff);
+  }
+
+  .dialog-actions .btn-text:hover {
+    background: rgba(208, 188, 255, 0.08);
+  }
+
+  .dialog-actions .dialog-cancel {
+    color: var(--md-sys-color-on-surface-variant, #cac4d0);
+  }
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialogSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 滚动条样式 */
+.dialog-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dialog-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dialog-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.dialog-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .dialog-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .dialog-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}

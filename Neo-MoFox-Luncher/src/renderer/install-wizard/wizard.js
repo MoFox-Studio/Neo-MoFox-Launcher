@@ -80,7 +80,13 @@ function goToPhase(phase) {
   
   // Show target phase
   if (phase === 1) el.phase1.classList.remove('hidden');
-  if (phase === 2) el.phase2.classList.remove('hidden');
+  if (phase === 2) {
+    el.phase2.classList.remove('hidden');
+    // 在下一帧设置焦点，确保 DOM 已完成渲染
+    requestAnimationFrame(() => {
+      el.inputInstanceName.focus();
+    });
+  }
   if (phase === 3) el.phase3.classList.remove('hidden');
   
   // Update step indicators
@@ -244,13 +250,6 @@ function resetFormInputs() {
     });
   }
   
-  // Remove disabled state from inputs
-  el.inputInstanceName.disabled = false;
-  el.inputQqNumber.disabled = false;
-  el.inputOwnerQq.disabled = false;
-  el.inputApiKey.disabled = false;
-  el.inputWsPort.disabled = false;
-  
   // Reset state
   state.inputs = {
     instanceName: '',
@@ -261,6 +260,14 @@ function resetFormInputs() {
     channel: 'main',
     installDir: el.inputInstallDir.value.trim(),
   };
+  
+  // 强制重绘表单，确保焦点能正常工作
+  requestAnimationFrame(() => {
+    // 触发重排
+    void el.phase2.offsetHeight;
+    // 设置焦点到第一个输入框
+    el.inputQqNumber.click();
+  });
 }
 
 async function validateAndProceed() {
@@ -618,8 +625,8 @@ function bindEvents() {
     goToPhase(1);
   });
   
-  el.btnResetForm.addEventListener('click', () => {
-    if (confirm('确定要清空所有表单内容吗？')) {
+  el.btnResetForm.addEventListener('click', async () => {
+    if (await window.customConfirm('确定要清空所有表单内容吗？', '确认重置')) {
       resetFormInputs();
       hideValidationErrors();
     }

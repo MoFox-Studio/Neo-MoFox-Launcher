@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -18,10 +18,8 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    frame: false,
     transparent: false,
     backgroundColor: '#0f0f17',
-    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -30,6 +28,7 @@ function createWindow() {
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
   });
 
+  Menu.setApplicationMenu(null);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   mainWindow.on('closed', () => {

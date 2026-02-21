@@ -1,0 +1,95 @@
+/* ═══ Custom Titlebar Component Styles ═══ */
+
+:root {
+  --titlebar-height: 48px;
+}
+
+/* ─── Titlebar Container ─────────────────────────────────────────────── */
+.titlebar {
+  height: var(--titlebar-height);
+  background-color: var(--md-sys-color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  z-index: 1000;
+  flex-shrink: 0;
+}
+
+/* ─── Draggable Area ─────────────────────────────────────────────────── */
+.titlebar-drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+}
+
+/* ─── Brand Content ──────────────────────────────────────────────────── */
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.brand-icon span {
+  font-size: 18px;
+  color: var(--md-sys-color-primary);
+}
+
+.brand-text {
+  font-weight: 500;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.brand-badge {
+  font-size: 10px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ─── Window Controls ────────────────────────────────────────────────── */
+.titlebar-controls {
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+
+.tb-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-sys-color-on-surface-variant);
+  width: 46px;
+  height: var(--titlebar-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tb-btn span {
+  font-size: 16px;
+}
+
+.tb-btn:hover {
+  background: var(--md-sys-color-surface-variant);
+}
+
+.tb-btn-close:hover {
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+}
+
+.tb-btn:active {
+  opacity: 0.7;
+}

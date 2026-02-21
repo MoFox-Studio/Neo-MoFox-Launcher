@@ -121,13 +121,13 @@ export function renderInstances() {
       const btnDelete = card.querySelector('.btn-delete-incomplete');
       btnDelete.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (confirm('确定要删除这个未完成的实例吗？已下载的文件也会被清理。')) {
+        if (await window.customConfirm('确定要删除这个未完成的实例吗？已下载的文件也会被清理。', '确认删除')) {
           try {
             await window.mofoxAPI.installCleanup(instance.id);
             await loadInstances(); // 重新加载列表
           } catch (err) {
             console.error('清理失败:', err);
-            alert('清理失败: ' + err.message);
+            await window.customAlert('清理失败: ' + err.message, '错误');
           }
         }
       });
@@ -279,7 +279,7 @@ export async function saveInstance() {
   const configText = el.editInstanceConfig.value.trim();
   
   if (!name || !path) {
-    alert('请填写实例名称和路径');
+    await window.customAlert('请填写实例名称和路径', '提示');
     return;
   }
   
@@ -287,7 +287,7 @@ export async function saveInstance() {
   try {
     config = JSON.parse(configText);
   } catch (error) {
-    alert('配置格式错误，请检查 JSON 格式');
+    await window.customAlert('配置格式错误，请检查 JSON 格式', '格式错误');
     return;
   }
   
@@ -319,7 +319,7 @@ export async function saveInstance() {
     await loadInstances();
   } catch (error) {
     console.error('保存实例失败:', error);
-    alert('保存失败: ' + error.message);
+    await window.customAlert('保存失败: ' + error.message, '错误');
   }
   
   el.editInstanceModal.classList.add('hidden');
@@ -329,13 +329,13 @@ export async function saveInstance() {
 
 export async function deleteInstance() {
   if (!state.currentEditingInstance) {
-    alert('无法删除：未选择实例');
+    await window.customAlert('无法删除：未选择实例', '提示');
     return;
   }
   
   console.log('准备删除实例，ID:', state.currentEditingInstance, '类型:', typeof state.currentEditingInstance);
   
-  if (!confirm('确定要删除这个实例吗？这个操作不可撤销。')) {
+  if (!await window.customConfirm('确定要删除这个实例吗？这个操作不可撤销。', '确认删除')) {
     return;
   }
   
@@ -357,7 +357,7 @@ export async function deleteInstance() {
     console.log('实例删除成功');
   } catch (error) {
     console.error('删除实例失败:', error);
-    alert('删除失败: ' + error.message);
+    await window.customAlert('删除失败: ' + error.message, '错误');
     // 出错时不关闭模态框，让用户可以重试或取消
   }
 }
