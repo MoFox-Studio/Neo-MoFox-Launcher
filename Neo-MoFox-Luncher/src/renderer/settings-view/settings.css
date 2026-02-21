@@ -1,0 +1,510 @@
+/* ═══ Settings View Styles ═══ */
+@import url('../styles.css');
+
+/* ─── Layout ─────────────────────────────────────────────────────────── */
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-background);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ─── Top Bar ────────────────────────────────────────────────────────── */
+.settings-topbar {
+  height: 56px;
+  background: var(--md-sys-color-surface-container-high);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 12px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.topbar-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+
+.save-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--status-running);
+  animation: fadeInThenOut 2.5s ease forwards;
+}
+
+.save-hint.hidden {
+  display: none;
+}
+
+.save-hint .material-symbols-rounded {
+  font-size: 18px;
+}
+
+@keyframes fadeInThenOut {
+  0%   { opacity: 0; transform: translateY(-4px); }
+  20%  { opacity: 1; transform: translateY(0); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ─── Main Layout ────────────────────────────────────────────────────── */
+.settings-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ─── Nav ────────────────────────────────────────────────────────────── */
+.settings-nav {
+  width: 220px;
+  min-width: 180px;
+  background: var(--md-sys-color-surface);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 28px;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  text-align: left;
+}
+
+.nav-item .material-symbols-rounded {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.nav-item:hover {
+  background: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-on-surface);
+}
+
+.nav-item.active {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.nav-item.active .material-symbols-rounded {
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* ─── Content ────────────────────────────────────────────────────────── */
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 40px;
+}
+
+.settings-section {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+  animation: sectionFadeIn 0.2s ease;
+}
+
+.settings-section.active {
+  display: flex;
+}
+
+@keyframes sectionFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.section-heading h2 {
+  font-size: 1.375rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+
+.section-heading .material-symbols-rounded {
+  font-size: 24px;
+  color: var(--md-sys-color-primary);
+}
+
+/* ─── Settings Cards ─────────────────────────────────────────────────── */
+.settings-card {
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden; /* 防止内容溢出圆角边界 */
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.settings-card-danger {
+  border-color: var(--md-sys-color-error-container);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.settings-card-header > .material-symbols-rounded {
+  font-size: 22px;
+  color: var(--md-sys-color-primary);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 2px;
+}
+
+.card-desc {
+  font-size: 0.813rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.4;
+}
+
+/* ─── Theme Options ──────────────────────────────────────────────────── */
+.theme-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+  min-width: 100px;
+}
+
+.theme-option:hover {
+  border-color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.theme-option.selected {
+  border-color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+}
+
+.theme-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 18px;
+  color: var(--md-sys-color-primary);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.theme-option.selected .theme-check {
+  opacity: 1;
+}
+
+.theme-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.theme-option.selected .theme-label {
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* Theme mini previews */
+.theme-preview {
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-preview-dark {
+  background: #1e1e24;
+}
+.theme-preview-dark .tp-bar {
+  height: 10px;
+  background: #2d2d35;
+  border-bottom: 1px solid #49454f;
+}
+.theme-preview-dark .tp-content {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+.theme-preview-dark .tp-card {
+  flex: 1;
+  background: #27272e;
+  border-radius: 3px;
+}
+
+.theme-preview-light {
+  background: #fffbfe;
+}
+.theme-preview-light .tp-bar {
+  height: 10px;
+  background: #ece6f0;
+  border-bottom: 1px solid #cac4d0;
+}
+.theme-preview-light .tp-content {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+.theme-preview-light .tp-card {
+  flex: 1;
+  background: #f3edf7;
+  border-radius: 3px;
+}
+
+.theme-preview-auto {
+  background: #1e1e24;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+.tp-half {
+  flex: 1;
+  height: 100%;
+}
+.tp-half-dark  { background: #1e1e24; }
+.tp-half-light { background: #fffbfe; border-left: 1px solid #cac4d0; }
+
+/* ─── Accent Color ────────────────────────────────────────────────────── */
+.accent-presets {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.accent-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.2s;
+  position: relative;
+  outline: none;
+}
+
+.accent-swatch:hover {
+  transform: scale(1.15);
+}
+
+.accent-swatch.selected {
+  border-color: var(--md-sys-color-on-surface);
+  transform: scale(1.1);
+}
+
+.accent-swatch.selected::after {
+  content: 'check';
+  font-family: 'Material Symbols Rounded';
+  font-size: 18px;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.accent-custom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.accent-custom-label {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.color-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-picker-input {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.color-picker-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 50%;
+}
+.color-picker-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+.color-hex-value {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ─── General Inputs ─────────────────────────────────────────────────── */
+.path-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.settings-input {
+  flex: 1;
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.settings-input:focus {
+  border-color: var(--md-sys-color-primary);
+}
+
+.settings-select {
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  color: var(--md-sys-color-on-surface);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  appearance: auto;
+}
+
+.settings-select:focus {
+  border-color: var(--md-sys-color-primary);
+}
+
+/* Button overrides */
+.settings-card .md3-btn {
+  align-self: flex-start;
+}
+
+/* ─── About Card ─────────────────────────────────────────────────────── */
+.about-card {
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  gap: 12px;
+}
+
+.about-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: var(--md-sys-color-primary-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.about-logo .material-symbols-rounded {
+  font-size: 44px;
+  color: var(--md-sys-color-primary);
+}
+
+.about-name {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.about-version {
+  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-variant);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.about-desc {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.about-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}

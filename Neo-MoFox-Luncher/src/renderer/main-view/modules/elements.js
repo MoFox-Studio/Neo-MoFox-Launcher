@@ -13,6 +13,7 @@ export const el = {
   instanceCount: document.getElementById('instance-count'),
   instancesGrid: document.getElementById('instances-grid'),
   btnAddInstance: document.getElementById('btn-add-instance'),
+  btnOpenSettings: document.getElementById('btn-open-settings'),
 
   // Edit Instance Modal
   editInstanceModal: document.getElementById('edit-instance-modal'),

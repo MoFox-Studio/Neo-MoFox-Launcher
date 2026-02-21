@@ -11,7 +11,6 @@ const TOML = require('@iarna/toml');
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
 const INSTANCES_VERSION = 1;
-const STATE_FILE = 'state.json';
 const INSTANCES_FILE = 'instances.json';
 
 // ─── StorageService 类 ──────────────────────────────────────────────────
@@ -98,33 +97,6 @@ class StorageService {
   _writeJsonFile(filePath, data) {
     const content = JSON.stringify(data, null, 2);
     this._atomicWriteFile(filePath, content);
-  }
-
-  // ─── state.json 操作 ──────────────────────────────────────────────────
-
-  /**
-   * 读取全局状态
-   */
-  readState() {
-    this.init();
-    const statePath = path.join(this.getDataDir(), STATE_FILE);
-    const defaultState = {
-      launcherVersion: '1.0.0',
-      defaultInstallDir: 'D:\\Neo-MoFox_Bots',
-    };
-    return this._readJsonFile(statePath, defaultState);
-  }
-
-  /**
-   * 更新全局状态（合并更新）
-   */
-  writeState(patch) {
-    this.init();
-    const statePath = path.join(this.getDataDir(), STATE_FILE);
-    const currentState = this.readState();
-    const newState = { ...currentState, ...patch };
-    this._writeJsonFile(statePath, newState);
-    return newState;
   }
 
   // ─── instances.json 操作 ───────────────────────────────────────────────

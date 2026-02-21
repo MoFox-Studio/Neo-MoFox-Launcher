@@ -76,4 +76,12 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   onInstallOutput: (callback) => {
     ipcRenderer.on('install-output', (_event, data) => callback(data));
   },
+
+  // ─── 用户设置 ───────────────────────────────────────────────────────────
+  settingsRead: () => ipcRenderer.invoke('settings-read'),
+  settingsWrite: (patch) => ipcRenderer.invoke('settings-write', patch),
+  settingsReset: (key) => ipcRenderer.invoke('settings-reset', key),
+  /** 同步读取设置，仅在 <head> 中应用主题时使用，避免 FOUC */
+  settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
+  openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
 });

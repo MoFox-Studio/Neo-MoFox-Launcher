@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  <!-- 同步主题注入：必须在一切 CSS 前最早执行，消灭主题闪烁（FOUC） -->
+  <script src="../theme-init.js"></script>
   <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="../components/dialog.css">
 </head>
@@ -54,7 +56,9 @@
           <span class="instance-count-badge" id="instance-count">0</span>
         </div>
         <div class="section-actions">
-           <!-- 这里的按钮移除了，改为卡片形式添加 -->
+          <button class="icon-btn" id="btn-open-settings" title="设置">
+            <span class="material-symbols-rounded">settings</span>
+          </button>
         </div>
       </div>
 

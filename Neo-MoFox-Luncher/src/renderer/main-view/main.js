@@ -1,5 +1,6 @@
 import { el } from './modules/elements.js';
 import { updateQuotes } from './modules/quotes.js';
+import { initTheme } from '../theme.js';
 import {
   loadInstances,
   createNewInstance,
@@ -17,7 +18,10 @@ async function init() {
     await window.customAlert('窗口 API 未加载，请重启应用', '错误');
     return;
   }
-  
+
+  // 应用主题（第一时间执行，避免闪烁）
+  await initTheme();
+
   // 更新名言
   updateQuotes();
   
@@ -36,6 +40,12 @@ el.btnAddInstance?.addEventListener('click', () => {
   // 跳转到安装向导
   window.location.href = '../install-wizard/wizard.html';
 });
+
+// 设置 → 设置页
+(el.btnOpenSettings ?? document.getElementById('btn-open-settings'))
+  ?.addEventListener('click', () => {
+    window.location.href = '../settings-view/settings.html';
+  });
 
 // ─── Edit Instance Modal ──────────────────────────────────────────────
 

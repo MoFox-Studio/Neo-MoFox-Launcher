@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -30,6 +30,16 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools();
+      }
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -368,7 +378,7 @@ ipcMain.handle('open-project-folder', () => {
 });
 
 ipcMain.handle('open-github', () => {
-  shell.openExternal('https://github.com/MoFox-Studio/Neo-MoFox');
+  shell.openExternal('https://github.com/MoFox-Studio/Neo-MoFox-Launcher');
 });
 
 ipcMain.handle('get-project-info', () => {
@@ -668,4 +678,32 @@ ipcMain.handle('install-run', async (event, inputs) => {
 
 ipcMain.handle('install-cleanup', async (event, instanceId) => {
   return await installWizardService.cleanupFailedInstall(instanceId);
+});
+
+// ─── 用户设置 IPC ──────────────────────────────────────────────────────────
+const { settingsService } = require('./services/settings/SettingsService');
+
+ipcMain.handle('settings-read', () => {
+  return settingsService.readSettings();
+});
+
+ipcMain.handle('settings-write', (event, patch) => {
+  return settingsService.set(patch);
+});
+
+ipcMain.handle('settings-reset', (event, key) => {
+  return settingsService.reset(key ?? null);
+});
+
+// 打开日志文件夹
+ipcMain.handle('open-logs-dir', () => {
+  const logsDir = path.join(storageService.getDataDir(), 'logs');
+  // 确保目录存在
+  fs.mkdirSync(logsDir, { recursive: true });
+  shell.openPath(logsDir);
+});
+
+// 同步读取（用于页面加载时立即应用主题，避免 FOUC）
+ipcMain.on('settings-read-sync', (event) => {
+  event.returnValue = settingsService.readSettings();
 });

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>设置 - Neo-MoFox Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  <!-- 同步主题注入 -->
+  <script src="../theme-init.js"></script>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+
+  <!-- ═══ 顶部栏 ═══ -->
+  <header class="settings-topbar">
+    <div class="topbar-left">
+      <button class="icon-btn" id="btn-back" title="返回">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </button>
+      <span class="topbar-title">设置</span>
+    </div>
+    <div class="topbar-right">
+      <span class="save-hint hidden" id="save-hint">
+        <span class="material-symbols-rounded">check_circle</span>
+        已保存
+      </span>
+    </div>
+  </header>
+
+  <!-- ═══ 主区域 ═══ -->
+  <div class="settings-layout">
+
+    <!-- ─── 左侧导航 ─── -->
+    <nav class="settings-nav">
+      <button class="nav-item active" data-section="appearance">
+        <span class="material-symbols-rounded">palette</span>
+        <span>外观</span>
+      </button>
+      <button class="nav-item" data-section="general">
+        <span class="material-symbols-rounded">tune</span>
+        <span>通用</span>
+      </button>
+      <button class="nav-item" data-section="about">
+        <span class="material-symbols-rounded">info</span>
+        <span>关于</span>
+      </button>
+    </nav>
+
+    <!-- ─── 内容区域 ─── -->
+    <main class="settings-content">
+
+      <!-- ══ 外观 ══ -->
+      <section class="settings-section active" id="section-appearance">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">palette</span>
+          <h2>外观</h2>
+        </div>
+
+        <!-- 主题选择 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">dark_mode</span>
+            <div>
+              <div class="card-title">主题</div>
+              <div class="card-desc">选择界面的明暗风格</div>
+            </div>
+          </div>
+          <div class="theme-options">
+            <button class="theme-option" data-theme="dark" id="theme-dark">
+              <div class="theme-preview theme-preview-dark">
+                <div class="tp-bar"></div>
+                <div class="tp-content">
+                  <div class="tp-card"></div>
+                  <div class="tp-card"></div>
+                </div>
+              </div>
+              <span class="theme-label">深色</span>
+              <span class="material-symbols-rounded theme-check">check_circle</span>
+            </button>
+            <button class="theme-option" data-theme="light" id="theme-light">
+              <div class="theme-preview theme-preview-light">
+                <div class="tp-bar"></div>
+                <div class="tp-content">
+                  <div class="tp-card"></div>
+                  <div class="tp-card"></div>
+                </div>
+              </div>
+              <span class="theme-label">浅色</span>
+              <span class="material-symbols-rounded theme-check">check_circle</span>
+            </button>
+            <button class="theme-option" data-theme="auto" id="theme-auto">
+              <div class="theme-preview theme-preview-auto">
+                <div class="tp-half tp-half-dark"></div>
+                <div class="tp-half tp-half-light"></div>
+              </div>
+              <span class="theme-label">跟随系统</span>
+              <span class="material-symbols-rounded theme-check">check_circle</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 强调色 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">color_lens</span>
+            <div>
+              <div class="card-title">强调色</div>
+              <div class="card-desc">界面主色调，所有按钮和高亮元素均受此影响</div>
+            </div>
+          </div>
+          <div class="accent-presets" id="accent-presets">
+            <!-- 预设颜色将由 JS 生成 -->
+          </div>
+          <div class="accent-custom-row">
+            <span class="accent-custom-label">自定义颜色</span>
+            <div class="color-input-wrapper">
+              <input type="color" id="accent-color-picker" class="color-picker-input">
+              <span class="color-hex-value" id="accent-hex-display">#7c6bbd</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ══ 通用 ══ -->
+      <section class="settings-section" id="section-general">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">tune</span>
+          <h2>通用</h2>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">folder</span>
+            <div>
+              <div class="card-title">默认安装目录</div>
+              <div class="card-desc">新建实例的默认安装路径</div>
+            </div>
+          </div>
+          <div class="path-row">
+            <input type="text" class="settings-input" id="default-install-dir" placeholder="D:\Neo-MoFox_Bots">
+            <button class="md3-btn md3-btn-tonal" id="btn-browse-install-dir">
+              <span class="material-symbols-rounded">folder_open</span>
+              <span>浏览</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-card settings-card-danger">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">restart_alt</span>
+            <div>
+              <div class="card-title">重置设置</div>
+              <div class="card-desc">将所有设置恢复为默认值（不影响已安装的实例）</div>
+            </div>
+          </div>
+          <button class="md3-btn md3-btn-danger" id="btn-reset-all">
+            <span class="material-symbols-rounded">restore</span>
+            <span>恢复默认设置</span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- ══ 关于 ══ -->
+      <section class="settings-section" id="section-about">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">info</span>
+          <h2>关于</h2>
+        </div>
+
+        <div class="settings-card about-card">
+          <div class="about-logo">
+            <span class="material-symbols-rounded">android</span>
+          </div>
+          <div class="about-name">Neo-MoFox Launcher</div>
+          <div class="about-version" id="about-version">v0.1.0</div>
+          <div class="about-desc">Neo-MoFox 的桌面启动管理器，基于 Electron 构建。</div>
+          <div class="about-links">
+            <button class="action-chip" id="btn-open-github">
+              <span class="material-symbols-rounded">open_in_new</span>
+              <span>GitHub</span>
+            </button>
+            <button class="action-chip" id="btn-open-logs">
+              <span class="material-symbols-rounded">description</span>
+              <span>查看日志文件夹</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>
