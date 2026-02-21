@@ -405,7 +405,7 @@ body {
 }
 
 .result-success, .result-error {
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-radius: var(--border-radius-medium);
   display: flex;
   align-items: center;
@@ -956,8 +956,9 @@ select option {
 }
 
 .install-result {
-  text-align: center;
-  padding: 32px 24px;
+  text-align: left;
+  padding: 0;
+  margin-bottom: 16px;
   animation: zoomIn 0.5s ease-out;
   flex-shrink: 0;
 }
@@ -968,17 +969,21 @@ select option {
 }
 
 .install-result .material-symbols-rounded {
-  font-size: 64px;
-  margin-bottom: 16px;
+  font-size: 32px;
+  margin-bottom: 0;
 }
 
 .install-result h2 {
-  font-size: 24px;
-  margin-bottom: 8px;
+  font-size: 20px;
+  margin-bottom: 0;
+  margin-right: 8px;
+  white-space: nowrap;
 }
 
 .install-result p {
   font-size: 14px;
+  margin: 0;
+  opacity: 0.9;
 }
 
 /*  Buttons  */
