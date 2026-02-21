@@ -9,6 +9,7 @@ const state = {
   instanceId: '',
   instanceName: '',
   instanceStatus: 'stopped',
+  hasNapcat: true, // 是否安装了 NapCat，默认 true，从实例数据中加载
   logs: {
     mofox: [],
     napcat: []
@@ -66,8 +67,8 @@ const el = {
 
 // ─── 初始化 ───────────────────────────────────────────────────────────
 
-function init() {
-  loadInstanceData();
+async function init() {
+  await loadInstanceData();
   setupEventListeners();
   setupIPCListeners();
   startStatsUpdate();
@@ -78,7 +79,7 @@ function init() {
 
 // ─── 加载实例数据 ─────────────────────────────────────────────────────
 
-function loadInstanceData() {
+async function loadInstanceData() {
   // 从 URL 参数获取实例信息
   const urlParams = new URLSearchParams(window.location.search);
   const instanceId = urlParams.get('instanceId');
@@ -94,8 +95,62 @@ function loadInstanceData() {
   
   el.instanceTitle.textContent = state.instanceName;
   
-  // TODO: 从主进程加载实例详细配置
-  // const instanceData = await window.mofoxAPI.getInstanceData(state.instanceId);
+  // 从主进程加载实例详细配置，检测是否安装了 NapCat
+  try {
+    if (window.mofoxAPI?.getInstance) {
+      const instanceData = await window.mofoxAPI.getInstance(state.instanceId);
+      if (instanceData) {
+        // 通过 napcatDir 是否存在判断是否安装了 NapCat（更简单直接）
+        state.hasNapcat = !!(instanceData.napcatDir);
+        
+        console.log('[Instance] 实例数据:', instanceData);
+        console.log('[Instance] NapCat 路径:', instanceData.napcatDir);
+        console.log('[Instance] 是否安装 NapCat:', state.hasNapcat);
+        
+        // 如果没有 NapCat，隐藏相关 UI
+        if (!state.hasNapcat) {
+          hideNapcatUI();
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[Instance] 无法加载实例数据:', error);
+    // 默认保持 hasNapcat = true 以兼容旧数据
+  }
+}
+
+// ─── 隐藏 NapCat UI ──────────────────────────────────────
+
+function hideNapcatUI() {
+  // 隐藏 NapCat 标签页
+  const napcatTab = document.querySelector('.tab-button[data-tab="napcat"]');
+  if (napcatTab) {
+    napcatTab.style.display = 'none';
+  }
+  
+  // 如果当前在 napcat 标签，切换到 mofox
+  if (state.currentTab === 'napcat') {
+    switchTab('mofox');
+  }
+  
+  console.log('[Instance] 已隐藏 NapCat UI');
+}
+
+// ─── 隐藏 NapCat UI ──────────────────────────────────────────────────
+
+function hideNapcatUI() {
+  // 隐藏 NapCat 标签页
+  const napcatTab = document.querySelector('.tab-button[data-tab="napcat"]');
+  if (napcatTab) {
+    napcatTab.style.display = 'none';
+  }
+  
+  // 如果当前在 napcat 标签，切换到 mofox
+  if (state.currentTab === 'napcat') {
+    switchTab('mofox');
+  }
+  
+  console.log('[Instance] 已隐藏 NapCat UI');
 }
 
 // ─── 事件监听器 ───────────────────────────────────────────────────────
@@ -427,7 +482,8 @@ function updateStats(stats) {
     el.mofoxUptime.textContent = formatUptime(stats.mofox.uptime);
   }
 
-  if (stats.napcat) {
+  // 只在安装了 NapCat 时更新其统计信息
+  if (state.hasNapcat && stats.napcat) {
     state.stats.napcat = stats.napcat;
     el.napcatUptime.textContent = formatUptime(stats.napcat.uptime);
   }
@@ -438,10 +494,13 @@ function startStatsUpdate() {
   setInterval(() => {
     if (state.instanceStatus === 'running') {
       state.stats.mofox.uptime += 1;
-      state.stats.napcat.uptime += 1;
-      
       el.mofoxUptime.textContent = formatUptime(state.stats.mofox.uptime);
-      el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
+      
+      // 只在安装了 NapCat 时更新
+      if (state.hasNapcat) {
+        state.stats.napcat.uptime += 1;
+        el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
+      }
     }
   }, 1000);
 }

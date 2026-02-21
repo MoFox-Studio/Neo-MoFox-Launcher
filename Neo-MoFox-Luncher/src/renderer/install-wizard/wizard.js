@@ -15,6 +15,7 @@ const state = {
     wsPort: 8095,
     channel: 'main',
     installDir: '',
+    installNapcat: true, // 是否安装 NapCat
   },
   installing: false,
   installSuccess: false,
@@ -49,6 +50,7 @@ const el = {
   inputWsPort: document.getElementById('input-ws-port'),
   inputChannel: document.getElementById('input-channel'),
   inputInstallDir: document.getElementById('input-install-dir'),
+  inputInstallNapcat: document.getElementById('input-install-napcat'),
   btnToggleApiKey: document.getElementById('btn-toggle-api-key'),
   btnBrowseDir: document.getElementById('btn-browse-dir'),
   validationErrors: document.getElementById('validation-errors'),
@@ -196,6 +198,17 @@ async function runEnvCheck() {
 // ─── Phase 2: Input Collection ─────────────────────────────────────────
 
 function collectInputs() {
+  const installNapcat = el.inputInstallNapcat.checked;
+  
+  // 根据是否安装 NapCat 构建安装步骤列表
+  const baseSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model'];
+  const napcatSteps = ['napcat', 'napcat-config'];
+  const finalSteps = ['register'];
+  
+  const installSteps = installNapcat 
+    ? [...baseSteps, ...napcatSteps, ...finalSteps]
+    : [...baseSteps, ...finalSteps];
+  
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
     qqNumber: el.inputQqNumber.value.trim(),
@@ -204,6 +217,8 @@ function collectInputs() {
     wsPort: parseInt(el.inputWsPort.value, 10) || 8095,
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
+    installNapcat: installNapcat,
+    installSteps: installSteps, // 传递给后端的步骤配置
   };
   return state.inputs;
 }
@@ -233,6 +248,7 @@ function resetFormInputs() {
   el.inputApiKey.value = '';
   el.inputWsPort.value = '8095';
   el.inputChannel.value = 'main';
+  el.inputInstallNapcat.checked = true;
   
   // Reset custom select display
   const selectedChannel = document.getElementById('selected-channel');
@@ -260,6 +276,7 @@ function resetFormInputs() {
     wsPort: 8095,
     channel: 'main',
     installDir: el.inputInstallDir.value.trim(),
+    installNapcat: true,
   };
   
   // 强制重绘表单，确保焦点能正常工作
@@ -354,14 +371,26 @@ async function startInstall() {
   el.btnFinish.classList.add('hidden');
   console.log('[DEBUG] 按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
   
-  // Reset all steps
-  const steps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
-  steps.forEach(step => updateInstallStep(step, 'pending'));
+  // 根据 installSteps 配置显示/隐藏步骤
+  const configuredSteps = state.inputs.installSteps || [];
+  const allSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
+  
+  allSteps.forEach(step => {
+    const stepItem = el.installSteps.querySelector(`[data-step="${step}"]`);
+    if (stepItem) {
+      if (configuredSteps.includes(step)) {
+        stepItem.classList.remove('hidden');
+        updateInstallStep(step, 'pending');
+      } else {
+        stepItem.classList.add('hidden');
+      }
+    }
+  });
   
   // 续装模式：预先将已完成的步骤标记为 completed
-  if (state.resumeFromStep && steps.includes(state.resumeFromStep)) {
-    const startIdx = steps.indexOf(state.resumeFromStep);
-    steps.slice(0, startIdx).forEach(step => updateInstallStep(step, 'completed'));
+  if (state.resumeFromStep && configuredSteps.includes(state.resumeFromStep)) {
+    const startIdx = configuredSteps.indexOf(state.resumeFromStep);
+    configuredSteps.slice(0, startIdx).forEach(step => updateInstallStep(step, 'completed'));
   }
   
   // Set up progress listener
@@ -444,7 +473,7 @@ async function startInstall() {
     
     // Mark all steps as completed
     console.log('[DEBUG] 标记所有步骤为完成');
-    steps.forEach(step => updateInstallStep(step, 'completed'));
+    configuredSteps.forEach(step => updateInstallStep(step, 'completed'));
     updateProgress(100, '安装完成');
     
     // Show success result
@@ -692,6 +721,10 @@ async function init() {
         }
         
         // 将实例数据直接写入 state.inputs，跳过表单填写
+        // 从实例的 installSteps 判断是否包含 NapCat
+        const hasNapcat = instance.installSteps && 
+          (instance.installSteps.includes('napcat') || instance.installSteps.includes('napcat-config'));
+        
         state.inputs = {
           instanceName: instance.displayName || '',
           qqNumber: instance.qqNumber || '',
@@ -700,6 +733,8 @@ async function init() {
           wsPort: instance.wsPort || 8095,
           channel: instance.channel || 'main',
           installDir: installDir,
+          installNapcat: hasNapcat !== false, // 默认 true，除非明确不包含
+          installSteps: instance.installSteps, // 直接使用保存的步骤配置
         };
         
         // 保存续装起点，供 startInstall() 预标记已完成步骤

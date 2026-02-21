@@ -63,6 +63,12 @@ export function renderInstances() {
     countBadge.textContent = state.instances.length.toString();
   }
   
+  // 更新活跃实例数
+  const activeInstancesEl = document.getElementById('active-instances');
+  if (activeInstancesEl) {
+    activeInstancesEl.textContent = state.instances.length.toString();
+  }
+  
   // 如果没有实例，不需要显示 Empty State，因为 Add Card 就在那里
   
   // 渲染实例

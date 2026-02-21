@@ -785,12 +785,14 @@ function updateInstanceStats(instanceId) {
 async function startInstanceInternal(instanceId, instance) {
   const mofoxPath = instance.neomofoxDir;
   const napcatPath = instance.napcatDir;
+  const hasNapcat = !!(napcatPath); // 检查是否安装了 NapCat
   
   if (!mofoxPath || !fs.existsSync(mofoxPath)) {
     throw new Error('MoFox 路径无效: ' + mofoxPath);
   }
   
-  if (!napcatPath || !fs.existsSync(napcatPath)) {
+  // 只在安装了 NapCat 时才检查路径
+  if (hasNapcat && !fs.existsSync(napcatPath)) {
     throw new Error('Napcat 路径无效: ' + napcatPath);
   }
   
@@ -818,7 +820,11 @@ async function startInstanceInternal(instanceId, instance) {
   updateInstanceStatus(instanceId, 'starting');
   
   sendInstanceLog(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
-  sendInstanceLog(instanceId, 'napcat', '正在启动 Napcat...', 'info');
+  if (hasNapcat) {
+    sendInstanceLog(instanceId, 'napcat', '正在启动 Napcat...', 'info');
+  } else {
+    sendInstanceLog(instanceId, 'mofox', '未安装 NapCat，仅启动 MoFox 核心', 'info');
+  }
   
   // ── 启动 MoFox ──────────────────────────────────────────────────────
   // 查找 Python 可执行文件
@@ -880,8 +886,9 @@ async function startInstanceInternal(instanceId, instance) {
   mofoxProc.on('close', (code) => {
     sendInstanceLog(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code})`, 'info');
     instanceData.mofoxProcess = null;
-    // 检查两个进程是否都停止了
-    if (!instanceData.napcatProcess) {
+    // 检查是否需要等待 NapCat 进程（只在安装了 NapCat 时）
+    const shouldWaitForNapcat = hasNapcat && instanceData.napcatProcess;
+    if (!shouldWaitForNapcat) {
       instanceData.process = null;
       if (instanceData.status !== 'stopping') {
         updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
@@ -899,11 +906,13 @@ async function startInstanceInternal(instanceId, instance) {
   });
   
   // ── 启动 Napcat ────────────────────────────────────────────────────
-  // 查找 Napcat 启动脚本
-  const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
-  const napcatShellPath = napcatShellDirs.length > 0 
-    ? path.join(napcatPath, napcatShellDirs[0]) 
-    : napcatPath;
+  // 只在安装了 NapCat 时才启动
+  if (hasNapcat) {
+    // 查找 Napcat 启动脚本
+    const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
+    const napcatShellPath = napcatShellDirs.length > 0 
+      ? path.join(napcatPath, napcatShellDirs[0]) 
+      : napcatPath;
   
   const napcatBat = path.join(napcatShellPath, `start_napcat_${instance.qqNumber}.bat`);
   const napcatExe = path.join(napcatShellPath, 'NapCatWinBootMain.exe');
@@ -972,11 +981,13 @@ async function startInstanceInternal(instanceId, instance) {
       instanceData.napcatProcess = null;
     });
   }
+  } // hasNapcat 条件结束
+  // ── Napcat 启动结束 ───────────────────────────────────
   
   // 延迟检测启动状态
   setTimeout(() => {
     const mofoxRunning = instanceData.mofoxProcess && !instanceData.mofoxProcess.killed;
-    const napcatRunning = instanceData.napcatProcess && !instanceData.napcatProcess.killed;
+    const napcatRunning = hasNapcat && instanceData.napcatProcess && !instanceData.napcatProcess.killed;
     
     if ((mofoxRunning || napcatRunning) && instanceData.status === 'starting') {
       updateInstanceStatus(instanceId, 'running');

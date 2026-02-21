@@ -29,6 +29,22 @@ const REPO_URLS = {
 const MAX_RETRY = 3;
 const CONFIG_DETECT_TIMEOUT = 60000; // 60 秒
 
+// 所有可用的安装步骤
+const AVAILABLE_STEPS = [
+  'clone',         // 克隆 Neo-MoFox 仓库
+  'venv',          // 创建 Python 虚拟环境
+  'deps',          // 安装 Python 依赖
+  'gen-config',    // 生成配置文件
+  'write-core',    // 写入 core.toml
+  'write-model',   // 写入 model.toml
+  'napcat',        // 安装 NapCat
+  'napcat-config', // 写入 NapCat 配置
+  'register',      // 注册实例
+];
+
+// 默认安装步骤（全部）
+const DEFAULT_INSTALL_STEPS = [...AVAILABLE_STEPS];
+
 // ─── InstallWizardService 类 ──────────────────────────────────────────
 
 class InstallWizardService {
@@ -287,6 +303,72 @@ class InstallWizardService {
   }
 
   /**
+   * 校验安装步骤配置
+   */
+  validateInstallSteps(installSteps) {
+    // 如果未提供，使用默认步骤
+    if (!installSteps) {
+      return { valid: true, steps: DEFAULT_INSTALL_STEPS };
+    }
+
+    if (!Array.isArray(installSteps)) {
+      return { valid: false, error: 'installSteps 必须是数组' };
+    }
+
+    if (installSteps.length === 0) {
+      return { valid: false, error: '至少需要选择一个安装步骤' };
+    }
+
+    // 检查是否有无效步骤
+    const invalidSteps = installSteps.filter(s => !AVAILABLE_STEPS.includes(s));
+    if (invalidSteps.length > 0) {
+      return {
+        valid: false,
+        error: `无效的安装步骤: ${invalidSteps.join(', ')}`,
+        availableSteps: AVAILABLE_STEPS,
+      };
+    }
+
+    // 检查步骤依赖关系
+    const stepSet = new Set(installSteps);
+    const errors = [];
+
+    // write-core 和 write-model 依赖 gen-config
+    if ((stepSet.has('write-core') || stepSet.has('write-model')) && !stepSet.has('gen-config')) {
+      errors.push('write-core/write-model 依赖 gen-config 步骤');
+    }
+
+    // gen-config 依赖 deps
+    if (stepSet.has('gen-config') && !stepSet.has('deps')) {
+      errors.push('gen-config 依赖 deps 步骤');
+    }
+
+    // deps 依赖 venv
+    if (stepSet.has('deps') && !stepSet.has('venv')) {
+      errors.push('deps 依赖 venv 步骤');
+    }
+
+    // venv 依赖 clone
+    if (stepSet.has('venv') && !stepSet.has('clone')) {
+      errors.push('venv 依赖 clone 步骤');
+    }
+
+    // napcat-config 依赖 napcat
+    if (stepSet.has('napcat-config') && !stepSet.has('napcat')) {
+      errors.push('napcat-config 依赖 napcat 步骤');
+    }
+
+    if (errors.length > 0) {
+      return {
+        valid: false,
+        error: '步骤依赖关系不满足:\n' + errors.join('\n'),
+      };
+    }
+
+    return { valid: true, steps: installSteps };
+  }
+
+  /**
    * 校验所有必填字段
    */
   async validateInputs(inputs) {
@@ -309,6 +391,12 @@ class InstallWizardService {
 
     const dirResult = this.validateInstallDir(inputs.installDir);
     if (!dirResult.valid) errors.push({ field: 'installDir', error: dirResult.error });
+
+    // 校验安装步骤配置
+    const stepsResult = this.validateInstallSteps(inputs.installSteps);
+    if (!stepsResult.valid) {
+      errors.push({ field: 'installSteps', error: stepsResult.error });
+    }
 
     if (errors.length > 0) {
       return { valid: false, errors };
@@ -824,7 +912,7 @@ class InstallWizardService {
     }
 
     this._emitProgress('napcat', 100, 'NapCat 安装完成');
-    return { success: true, path: napcatDir, shellPath: shellPath || napcatDir };
+    return { success: true, path: napcatDir, shellPath: shellPath || napcatDir, version: release.tag_name };
   }
 
   /**
@@ -902,7 +990,7 @@ class InstallWizardService {
   /**
    * 3.9 & 3.10 注册实例并标记完成
    */
-  async registerInstance(inputs, neoMofoxDir, napcatDir) {
+  async registerInstance(inputs, neoMofoxDir, napcatDir, installSteps, napcatVersion = null) {
     this._emitProgress('register', 0, '正在注册实例...');
 
     const instanceId = this._generateInstanceId(inputs.qqNumber);
@@ -910,6 +998,12 @@ class InstallWizardService {
     // 获取 Neo-MoFox 的 commit ID
     const neomofoxVersion = await this._getGitCommitId(neoMofoxDir);
     this._emitOutput(`Neo-MoFox 版本: ${neomofoxVersion || '未知'}`);
+    if (napcatVersion) {
+      this._emitOutput(`NapCat 版本: ${napcatVersion}`);
+    }
+
+    // 检查是否安装了 NapCat
+    const hasNapcat = installSteps.includes('napcat') || installSteps.includes('napcat-config');
 
     // 更新现有实例，标记为安装完成
     const updates = {
@@ -920,13 +1014,13 @@ class InstallWizardService {
       channel: inputs.channel || 'main',
       enabled: true,
       neomofoxDir: neoMofoxDir,
-      napcatDir: napcatDir,
+      napcatDir: hasNapcat ? napcatDir : null, // 只在安装了 NapCat 时设置路径
       wsPort: parseInt(inputs.wsPort, 10),
-      lastStartedAt: null,
-      napcatVersion: null,
+      napcatVersion: napcatVersion, // 保存 NapCat 版本号
       neomofoxVersion: neomofoxVersion,
       installCompleted: true,
       installProgress: null,
+      installSteps: installSteps, // 保存安装步骤配置
     };
 
     const instance = storageService.updateInstance(instanceId, updates);
@@ -938,6 +1032,8 @@ class InstallWizardService {
   /**
   /**
    * 执行完整安装流程（支持断点续装）
+   * @param {Object} inputs - 安装配置
+   * @param {string[]} inputs.installSteps - 可选，要执行的安装步骤数组，默认执行全部步骤
    */
   async runInstall(inputs, outputCallback) {
     // 设置输出回调
@@ -947,12 +1043,21 @@ class InstallWizardService {
 
     const instanceId = this._generateInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
-    const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
-    // shellPath 指向 NapCat.*.Shell 工作目录，安装后确定，Resume 时从磁盘查找
+    
+    // 只在需要安装 NapCat 时定义相关路径
+    let napcatDir = null;
     let napcatShellPath = null;
+    let napcatVersion = null; // NapCat 版本号
 
-    // 步骤顺序
-    const stepOrder = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
+    // 获取要执行的步骤（使用用户自定义或默认全部步骤）
+    const stepsResult = this.validateInstallSteps(inputs.installSteps);
+    if (!stepsResult.valid) {
+      throw new Error(`安装步骤配置无效: ${stepsResult.error}`);
+    }
+    const configuredSteps = stepsResult.steps;
+    const stepOrder = AVAILABLE_STEPS.filter(s => configuredSteps.includes(s));
+
+    this._emitOutput(`[安装步骤] 将执行以下步骤: ${stepOrder.join(', ')}`);
 
     // 检查是否已存在相同 ID 的实例，确定续装起点
     const existing = storageService.getInstance(instanceId);
@@ -968,7 +1073,8 @@ class InstallWizardService {
       }
     }
     const startIndex = stepOrder.indexOf(resumeStep);
-    const shouldRun = (step) => stepOrder.indexOf(step) >= startIndex;
+    // 检查步骤是否需要执行：1. 在配置的步骤中 2. 在续装起点之后
+    const shouldRun = (step) => configuredSteps.includes(step) && stepOrder.indexOf(step) >= startIndex;
 
     // 创建/更新实例记录（保留 createdAt）
     const instanceData = {
@@ -984,6 +1090,7 @@ class InstallWizardService {
       wsPort: parseInt(inputs.wsPort, 10),
       installCompleted: false,
       installProgress: { step: resumeStep, substep: 0 },
+      installSteps: configuredSteps, // 保存步骤配置
     };
 
     if (existing) {
@@ -1033,14 +1140,23 @@ class InstallWizardService {
 
       // 3.7 安装 NapCat
       if (shouldRun('napcat')) {
+        // 首次定义 napcatDir（只在需要时）
+        if (!napcatDir) {
+          napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
+        }
         storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
         const napResult = await this.installNapCat(inputs.installDir, instanceId);
         napcatShellPath = napResult.shellPath || null;
+        napcatVersion = napResult.version || null; // 保存版本号
       }
 
       // 3.8 写入 NapCat 配置
       if (shouldRun('napcat-config')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
+        // 确保 napcatDir 已定义（续装场景）
+        if (!napcatDir) {
+          napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
+        }
         // Resume 时 napcat 步骤已跳过，从磁盘重新查找 Shell 目录
         if (!napcatShellPath) {
           napcatShellPath = this._getNapCatShellPath(napcatDir);
@@ -1051,7 +1167,7 @@ class InstallWizardService {
 
       // 3.9 & 3.10 注册实例
       storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
-      const result = await this.registerInstance(inputs, neoMofoxDir, napcatDir);
+      const result = await this.registerInstance(inputs, neoMofoxDir, napcatDir, configuredSteps, napcatVersion);
 
       this._emitProgress('complete', 100, '安装完成！');
       return result;

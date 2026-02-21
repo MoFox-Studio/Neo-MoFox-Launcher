@@ -585,6 +585,68 @@ body {
   color: var(--wizard-primary) !important;
 }
 
+/* Checkbox Group */
+
+.checkbox-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+  margin-left: 0 !important; /* Override label margin */
+  font-weight: normal !important; /* Override label font-weight */
+}
+
+.checkbox-group input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--wizard-outline);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0 !important; /* Override input padding */
+}
+
+.checkbox-group input[type="checkbox"]:hover {
+  border-color: var(--wizard-primary);
+  background: rgba(208, 188, 255, 0.05);
+}
+
+.checkbox-group input[type="checkbox"]:checked {
+  background: var(--wizard-primary);
+  border-color: var(--wizard-primary);
+}
+
+.checkbox-group input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 6px;
+  height: 10px;
+  border: solid var(--wizard-on-primary);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-group input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(208, 188, 255, 0.2);
+}
+
+.checkbox-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wizard-on-surface);
+  line-height: 1.5;
+}
+
 .validation-errors.hidden {
   display: none !important;
 }
@@ -756,6 +818,10 @@ select option {
   border-radius: var(--border-radius-small);
   font-size: 13px;
   transition: all 0.3s;
+}
+
+.install-step-item.hidden {
+  display: none;
 }
 
 .install-step-item.active {
