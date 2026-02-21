@@ -849,16 +849,63 @@ select option {
   flex-direction: column;
   flex-shrink: 0;
   margin-bottom: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.install-log.fullscreen {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  margin: 0;
+  border-radius: var(--border-radius-large);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .log-header {
-  padding: 12px 20px;
+  padding: 8px 16px;
   background: rgba(255,255,255,0.05);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: var(--wizard-on-surface);
+}
+
+.log-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.md3-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--wizard-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  padding: 0;
+}
+
+.md3-icon-btn:hover {
+  background: var(--wizard-surface-variant);
+  color: var(--wizard-on-surface);
+}
+
+.md3-icon-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.md3-icon-btn .material-symbols-rounded {
+  font-size: 24px;
 }
 
 .log-content {
@@ -874,7 +921,13 @@ select option {
   white-space: pre-wrap;
   word-wrap: break-word;
   line-height: 1.5;
-  transition: max-height 0.3s ease;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.install-log.fullscreen .log-content {
+  max-height: none;
+  min-height: 0;
+  flex: 1;
 }
 
 .log-content.collapsed {

@@ -65,6 +65,7 @@ const el = {
   installSteps: document.getElementById('install-steps'),
   installLogContent: document.getElementById('install-log-content'),
   btnToggleLog: document.getElementById('btn-toggle-log'),
+  btnFullscreenLog: document.getElementById('btn-fullscreen-log'),
   installResult: document.getElementById('install-result'),
   btnRetry: document.getElementById('btn-retry'),
   btnCleanup: document.getElementById('btn-cleanup'),
@@ -678,6 +679,20 @@ function bindEvents() {
     el.installLogContent.classList.toggle('collapsed');
     const icon = el.btnToggleLog.querySelector('.material-symbols-rounded');
     icon.textContent = el.installLogContent.classList.contains('collapsed') ? 'expand_more' : 'expand_less';
+  });
+
+  el.btnFullscreenLog.addEventListener('click', () => {
+    const logContainer = el.installLogContent.closest('.install-log');
+    logContainer.classList.toggle('fullscreen');
+    const icon = el.btnFullscreenLog.querySelector('.material-symbols-rounded');
+    icon.textContent = logContainer.classList.contains('fullscreen') ? 'fullscreen_exit' : 'fullscreen';
+    
+    // 如果全屏时日志是折叠的，自动展开
+    if (logContainer.classList.contains('fullscreen') && el.installLogContent.classList.contains('collapsed')) {
+      el.installLogContent.classList.remove('collapsed');
+      const toggleIcon = el.btnToggleLog.querySelector('.material-symbols-rounded');
+      toggleIcon.textContent = 'expand_less';
+    }
   });
   
   el.btnRetry.addEventListener('click', () => {
