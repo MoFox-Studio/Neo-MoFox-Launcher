@@ -7,6 +7,8 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
+const https = require('https');
+const http = require('http');
 const { storageService } = require('./StorageService');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
@@ -377,6 +379,109 @@ class InstallWizardService {
   }
 
   /**
+   * 获取 NapCat 最新 Release 信息（支持 GitHub API 镜像回退）
+   */
+  async _fetchLatestNapCatRelease() {
+    const apiUrls = [
+      'https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
+      'https://ghproxy.com/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
+    ];
+
+    let lastError = null;
+    for (const apiUrl of apiUrls) {
+      try {
+        const data = await this._httpsGet(apiUrl, {
+          'User-Agent': 'Neo-MoFox-Launcher',
+          'Accept': 'application/vnd.github.v3+json',
+        });
+        const release = JSON.parse(data);
+        if (!release.assets) throw new Error('Release 数据无效');
+        return release;
+      } catch (e) {
+        lastError = e;
+        this._emitOutput(`[napcat] 尝试 ${apiUrl} 失败: ${e.message}`);
+      }
+    }
+    throw new Error(`获取 NapCat Release 信息失败: ${lastError?.message}`);
+  }
+
+  /**
+   * HTTPS GET 请求（支持重定向）
+   */
+  _httpsGet(url, headers = {}) {
+    return new Promise((resolve, reject) => {
+      const doGet = (reqUrl, redirectCount = 0) => {
+        if (redirectCount > 5) return reject(new Error('重定向次数过多'));
+        const client = reqUrl.startsWith('https') ? https : http;
+        const opts = new URL(reqUrl);
+        client.get(
+          { hostname: opts.hostname, path: opts.pathname + opts.search, headers },
+          (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+              return doGet(res.headers.location, redirectCount + 1);
+            }
+            if (res.statusCode !== 200) {
+              return reject(new Error(`HTTP ${res.statusCode}: ${reqUrl}`));
+            }
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => resolve(data));
+          }
+        ).on('error', reject);
+      };
+      doGet(url);
+    });
+  }
+
+  /**
+   * 下载文件到本地路径，支持重定向和进度回调
+   * @param {string} url
+   * @param {string} destPath
+   * @param {(downloaded: number, total: number) => void} [onProgress]
+   */
+  _downloadFile(url, destPath, onProgress) {
+    return new Promise((resolve, reject) => {
+      const doDownload = (reqUrl, redirectCount = 0) => {
+        if (redirectCount > 5) return reject(new Error('重定向次数过多'));
+        const client = reqUrl.startsWith('https') ? https : http;
+        client.get(reqUrl, { headers: { 'User-Agent': 'Neo-MoFox-Launcher' } }, (res) => {
+          if (res.statusCode === 301 || res.statusCode === 302) {
+            return doDownload(res.headers.location, redirectCount + 1);
+          }
+          if (res.statusCode !== 200) {
+            return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
+          }
+          const total = parseInt(res.headers['content-length'] || '0', 10);
+          let downloaded = 0;
+          const file = fs.createWriteStream(destPath);
+          res.on('data', (chunk) => {
+            downloaded += chunk.length;
+            if (onProgress) onProgress(downloaded, total);
+          });
+          res.pipe(file);
+          file.on('finish', () => { file.close(); resolve(); });
+          file.on('error', (err) => { try { fs.unlinkSync(destPath); } catch (_) {} reject(err); });
+        }).on('error', reject);
+      };
+      doDownload(url);
+    });
+  }
+
+  /**
+   * 从 napcatDir 内查找 NapCat Shell 子目录（NapCat.*.Shell 格式）
+   */
+  _getNapCatShellPath(napcatDir) {
+    try {
+      if (!fs.existsSync(napcatDir)) return null;
+      const entries = fs.readdirSync(napcatDir);
+      const shellDir = entries.find((e) => /^NapCat\..+\.Shell$/i.test(e));
+      return shellDir ? path.join(napcatDir, shellDir) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
    * 获取 Git 仓库的当前 commit ID
    */
   async _getGitCommitId(repoDir) {
@@ -638,31 +743,103 @@ class InstallWizardService {
   }
 
   /**
-   * 3.7 下载并安装 NapCat（暂时跳过，由用户手动安装）
+   * 3.7 下载并安装 NapCat（Windows OneKey 无头绿色版）
+   * 特殊说明：一键版仅适用 Windows AMD64，无需单独安装 QQ，NapCat 已内置
    */
   async installNapCat(installDir, instanceId) {
-    this._emitProgress('napcat', 0, 'NapCat 安装暂时跳过，请手动安装...');
-    
     const napcatDir = path.join(installDir, instanceId, 'napcat');
     fs.mkdirSync(napcatDir, { recursive: true });
-    
-    // TODO: 实现 NapCat 自动下载安装
-    // 目前仅创建目录，由用户手动安装
-    
-    this._emitProgress('napcat', 100, 'NapCat 目录已创建');
-    return { success: true, path: napcatDir };
+
+    // 非 Windows 平台跳过，返回目录供用户手动安装
+    if (process.platform !== 'win32') {
+      this._emitProgress('napcat', 100, '非 Windows 平台，跳过 NapCat 自动安装，请手动安装');
+      return { success: true, path: napcatDir, shellPath: null };
+    }
+
+    // ── Step 1: 获取最新 Release ────────────────────────────────────────
+    this._emitProgress('napcat', 5, '正在获取 NapCat 最新版本信息...');
+    const release = await this._fetchLatestNapCatRelease();
+
+    const ASSET_NAME = 'NapCat.Shell.Windows.OneKey.zip';
+    const asset = release.assets.find((a) => a.name === ASSET_NAME);
+    if (!asset) {
+      throw new Error(`在 ${release.tag_name} 中未找到 ${ASSET_NAME}，请前往 https://github.com/NapNeko/NapCatQQ/releases 手动下载`);
+    }
+
+    this._emitOutput(`[napcat] 版本: ${release.tag_name}`);
+    this._emitOutput(`[napcat] 资源: ${asset.name} (${(asset.size / 1024 / 1024).toFixed(1)} MB)`);
+    this._emitOutput(`[napcat] 下载地址: ${asset.browser_download_url}`);
+
+    // ── Step 2: 下载 ZIP ────────────────────────────────────────────────
+    const zipPath = path.join(napcatDir, ASSET_NAME);
+    this._emitProgress('napcat', 10, `正在下载 NapCat ${release.tag_name}...`);
+
+    await this._downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
+      const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
+      const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+      const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
+      this._emitProgress('napcat', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
+    });
+
+    this._emitOutput(`[napcat] 下载完成: ${zipPath}`);
+
+    // ── Step 3: 解压 ────────────────────────────────────────────────────
+    this._emitProgress('napcat', 68, '正在解压...');
+    await this._execCommand(
+      'powershell',
+      ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${napcatDir}" -Force`],
+      { onStderr: (d) => this._emitOutput(d) }
+    );
+    this._emitOutput('[napcat] 解压完成');
+
+    // 删除 ZIP 释放空间
+    try { fs.unlinkSync(zipPath); } catch (_) {}
+
+    // ── Step 4: 运行 NapCatInstaller.exe 自动化配置 ───────────────────
+    const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
+    if (fs.existsSync(installerPath)) {
+      this._emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
+      this._emitOutput('[napcat] 启动 NapCatInstaller.exe，等待配置完成...');
+      // 使用 cmd /c "echo.|exe" 自动对 "Press any key to continue" 输入回车，避免阻塞
+      await this._execCommand(
+        'cmd',
+        ['/c', `echo.|"${installerPath}"`],
+        {
+          cwd: napcatDir,
+          onStdout: (d) => this._emitOutput(d),
+          onStderr: (d) => this._emitOutput(d),
+        }
+      );
+      this._emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
+    } else {
+      this._emitOutput(`[napcat] 未找到 NapCatInstaller.exe，跳过自动化配置步骤`);
+    }
+
+    // ── Step 5: 定位 NapCat.*.Shell 目录 ───────────────────────────────
+    const shellPath = this._getNapCatShellPath(napcatDir);
+    if (shellPath) {
+      this._emitOutput(`[napcat] Shell 目录: ${shellPath}`);
+    } else {
+      this._emitOutput('[napcat] 警告: 未找到 NapCat.*.Shell 子目录，将使用根目录');
+    }
+
+    this._emitProgress('napcat', 100, 'NapCat 安装完成');
+    return { success: true, path: napcatDir, shellPath: shellPath || napcatDir };
   }
 
   /**
    * 3.8 写入 NapCat 配置
+   * @param {string} shellDir  NapCat Shell 工作目录（NapCat.*.Shell 或 napcat 根目录）
+   * @param {string} qqNumber  Bot QQ 号
+   * @param {number|string} wsPort  WebSocket 端口
    */
-  async writeNapCatConfig(napcatDir, qqNumber, wsPort) {
+  async writeNapCatConfig(shellDir, qqNumber, wsPort) {
     this._emitProgress('napcat-config', 0, '正在写入 NapCat 配置...');
 
-    const configDir = path.join(napcatDir, 'config');
+    const configDir = path.join(shellDir, 'config');
     fs.mkdirSync(configDir, { recursive: true });
 
-    // onebot11 配置
+    // onebot11 配置 —— 配置 WebSocket 客户端连接到 Neo-MoFox
     const onebot11Config = {
       network: {
         httpServers: [],
@@ -685,7 +862,7 @@ class InstallWizardService {
       parseMultMsg: false,
     };
 
-    // napcat 配置
+    // napcat 日志配置
     const napcatConfig = {
       fileLog: true,
       consoleLog: true,
@@ -693,15 +870,30 @@ class InstallWizardService {
       consoleLogLevel: 'info',
     };
 
-    fs.writeFileSync(
-      path.join(configDir, `onebot11_${qqNumber}.json`),
-      JSON.stringify(onebot11Config, null, 2)
-    );
+    const onebot11Path = path.join(configDir, `onebot11_${qqNumber}.json`);
+    const napcatCfgPath = path.join(configDir, `napcat_${qqNumber}.json`);
 
-    fs.writeFileSync(
-      path.join(configDir, `napcat_${qqNumber}.json`),
-      JSON.stringify(napcatConfig, null, 2)
-    );
+    fs.writeFileSync(onebot11Path, JSON.stringify(onebot11Config, null, 2));
+    fs.writeFileSync(napcatCfgPath, JSON.stringify(napcatConfig, null, 2));
+
+    this._emitOutput(`[napcat-config] onebot11 配置: ${onebot11Path}`);
+    this._emitOutput(`[napcat-config] napcat 配置: ${napcatCfgPath}`);
+
+    // 生成快速启动 bat（Windows 一键版）
+    // 命令格式: NapCatWinBootMain.exe <QQ号>
+    if (process.platform === 'win32') {
+      const batContent = [
+        '@echo off',
+        `chcp 65001 >nul`,
+        `echo 正在启动 NapCat (QQ: ${qqNumber})...`,
+        `NapCatWinBootMain.exe ${qqNumber}`,
+        'pause',
+      ].join('\r\n');
+
+      const batPath = path.join(shellDir, `start_napcat_${qqNumber}.bat`);
+      fs.writeFileSync(batPath, batContent, 'utf8');
+      this._emitOutput(`[napcat-config] 启动脚本: ${batPath}`);
+    }
 
     this._emitProgress('napcat-config', 100, 'NapCat 配置写入完成');
     return { success: true };
@@ -756,6 +948,8 @@ class InstallWizardService {
     const instanceId = this._generateInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
+    // shellPath 指向 NapCat.*.Shell 工作目录，安装后确定，Resume 时从磁盘查找
+    let napcatShellPath = null;
 
     // 步骤顺序
     const stepOrder = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
@@ -840,13 +1034,19 @@ class InstallWizardService {
       // 3.7 安装 NapCat
       if (shouldRun('napcat')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
-        await this.installNapCat(inputs.installDir, instanceId);
+        const napResult = await this.installNapCat(inputs.installDir, instanceId);
+        napcatShellPath = napResult.shellPath || null;
       }
 
       // 3.8 写入 NapCat 配置
       if (shouldRun('napcat-config')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
-        await this.writeNapCatConfig(napcatDir, inputs.qqNumber, inputs.wsPort);
+        // Resume 时 napcat 步骤已跳过，从磁盘重新查找 Shell 目录
+        if (!napcatShellPath) {
+          napcatShellPath = this._getNapCatShellPath(napcatDir);
+        }
+        const configTarget = napcatShellPath || napcatDir;
+        await this.writeNapCatConfig(configTarget, inputs.qqNumber, inputs.wsPort);
       }
 
       // 3.9 & 3.10 注册实例
