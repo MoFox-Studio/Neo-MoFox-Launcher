@@ -18,6 +18,7 @@ const state = {
   },
   installing: false,
   installSuccess: false,
+  resumeFromStep: null, // 续装起点步骤名，null 表示全新安装
 };
 
 // ─── DOM Elements ──────────────────────────────────────────────────────
@@ -354,8 +355,14 @@ async function startInstall() {
   console.log('[DEBUG] 按钮状态 - 重试:', !el.btnRetry.classList.contains('hidden'), '清理:', !el.btnCleanup.classList.contains('hidden'), '完成:', !el.btnFinish.classList.contains('hidden'));
   
   // Reset all steps
-  const steps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'register'];
+  const steps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
   steps.forEach(step => updateInstallStep(step, 'pending'));
+  
+  // 续装模式：预先将已完成的步骤标记为 completed
+  if (state.resumeFromStep && steps.includes(state.resumeFromStep)) {
+    const startIdx = steps.indexOf(state.resumeFromStep);
+    steps.slice(0, startIdx).forEach(step => updateInstallStep(step, 'completed'));
+  }
   
   // Set up progress listener
   const stepMap = {
@@ -665,15 +672,51 @@ async function init() {
   // Reset form inputs to ensure clean state
   resetFormInputs();
   
-  // Load default install dir from state
-  try {
-    const globalState = await window.mofoxAPI.readState();
-    if (globalState.defaultInstallDir) {
-      el.inputInstallDir.value = globalState.defaultInstallDir;
-      state.inputs.installDir = globalState.defaultInstallDir;
+  // 检测是否为"继续安装"模式（从实例卡片跳转过来）
+  const urlParams = new URLSearchParams(window.location.search);
+  const resumeInstanceId = urlParams.get('instanceId');
+  const isResume = urlParams.get('resume') === '1';
+  
+  if (isResume && resumeInstanceId) {
+    // 继续安装模式：加载已有实例数据预填表单，直接进入第 2 步
+    try {
+      const instance = await window.mofoxAPI.getInstance(resumeInstanceId);
+      if (instance) {
+        console.log('[Resume] 加载实例数据:', instance);
+        
+        // 推导安装目录：neomofoxDir = <installDir>/<instanceId>/neo-mofox
+        let installDir = '';
+        if (instance.neomofoxDir) {
+          const parts = instance.neomofoxDir.replace(/[/\\]+$/, '').split(/[/\\]/);
+          installDir = parts.slice(0, -2).join('\\');
+        }
+        
+        // 将实例数据直接写入 state.inputs，跳过表单填写
+        state.inputs = {
+          instanceName: instance.displayName || '',
+          qqNumber: instance.qqNumber || '',
+          ownerQQNumber: instance.ownerQQNumber || '',
+          apiKey: instance.apiKey || '',
+          wsPort: instance.wsPort || 8095,
+          channel: instance.channel || 'main',
+          installDir: installDir,
+        };
+        
+        // 保存续装起点，供 startInstall() 预标记已完成步骤
+        const stepOrder = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
+        const savedStep = instance.installProgress?.step;
+        if (savedStep && stepOrder.includes(savedStep)) {
+          state.resumeFromStep = savedStep;
+        }
+        
+        // 直接跳到第 3 步开始安装，无需用户任何操作
+        goToPhase(3);
+        startInstall();
+        return;
+      }
+    } catch (e) {
+      console.warn('[Resume] 无法加载实例数据，回退到正常流程:', e);
     }
-  } catch (e) {
-    console.warn('无法加载全局状态:', e);
   }
   
   // Start environment check

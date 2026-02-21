@@ -635,13 +635,13 @@ ipcMain.handle('instances-has-any', () => {
   return storageService.hasInstances();
 });
 
-// 全局状态
+// 全局状态（stub，StorageService 暂不实现全局状态持久化）
 ipcMain.handle('state-read', () => {
-  return storageService.readState();
+  return {};
 });
 
 ipcMain.handle('state-write', (event, patch) => {
-  return storageService.writeState(patch);
+  return {};
 });
 
 // 安装向导

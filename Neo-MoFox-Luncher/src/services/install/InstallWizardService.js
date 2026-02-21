@@ -723,6 +723,8 @@ class InstallWizardService {
     const updates = {
       displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
+      ownerQQNumber: inputs.ownerQQNumber,
+      apiKey: inputs.apiKey,
       channel: inputs.channel || 'main',
       enabled: true,
       neomofoxDir: neoMofoxDir,
@@ -742,7 +744,8 @@ class InstallWizardService {
   }
 
   /**
-   * 执行完整安装流程
+  /**
+   * 执行完整安装流程（支持断点续装）
    */
   async runInstall(inputs, outputCallback) {
     // 设置输出回调
@@ -754,69 +757,100 @@ class InstallWizardService {
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
 
-    // 创建临时实例记录（用于断点续装）
-    const incompleteInstance = {
+    // 步骤顺序
+    const stepOrder = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
+
+    // 检查是否已存在相同 ID 的实例，确定续装起点
+    const existing = storageService.getInstance(instanceId);
+    let resumeStep = 'clone';
+    if (existing) {
+      if (existing.installCompleted) {
+        throw new Error(`实例 ${instanceId} 已存在且安装完成`);
+      }
+      // 读取上次保存的进度（installProgress.step 为当时正在执行/失败的步骤）
+      const savedStep = existing.installProgress?.step;
+      if (savedStep && savedStep !== 'error' && stepOrder.includes(savedStep)) {
+        resumeStep = savedStep;
+      }
+    }
+    const startIndex = stepOrder.indexOf(resumeStep);
+    const shouldRun = (step) => stepOrder.indexOf(step) >= startIndex;
+
+    // 创建/更新实例记录（保留 createdAt）
+    const instanceData = {
       id: instanceId,
       displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
+      ownerQQNumber: inputs.ownerQQNumber,
+      apiKey: inputs.apiKey,
       channel: inputs.channel || 'main',
       enabled: false,
       neomofoxDir: neoMofoxDir,
       napcatDir: napcatDir,
       wsPort: parseInt(inputs.wsPort, 10),
-      createdAt: new Date().toISOString(),
       installCompleted: false,
-      installProgress: { step: 'clone', substep: 0 },
+      installProgress: { step: resumeStep, substep: 0 },
     };
 
-    // 检查是否已存在相同 ID 的实例
-    const existing = storageService.getInstance(instanceId);
     if (existing) {
-      if (existing.installCompleted) {
-        throw new Error(`实例 ${instanceId} 已存在且安装完成`);
-      }
-      // 断点续装
-      storageService.updateInstance(instanceId, incompleteInstance);
+      storageService.updateInstance(instanceId, instanceData);
     } else {
-      storageService.addInstance(incompleteInstance);
+      storageService.addInstance({ ...instanceData, createdAt: new Date().toISOString() });
     }
 
-    this._currentInstance = incompleteInstance;
+    this._currentInstance = instanceData;
 
     try {
       // 3.1 克隆仓库
-      await this.cloneRepository(inputs.installDir, instanceId, inputs.channel);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
+      if (shouldRun('clone')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'clone', substep: 0 } });
+        await this.cloneRepository(inputs.installDir, instanceId, inputs.channel);
+      }
 
       // 3.2 创建虚拟环境
-      await this.createVenv(neoMofoxDir);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'deps', substep: 0 } });
+      if (shouldRun('venv')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
+        await this.createVenv(neoMofoxDir);
+      }
 
       // 3.3 安装依赖
-      await this.installDependencies(neoMofoxDir);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'gen-config', substep: 0 } });
+      if (shouldRun('deps')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'deps', substep: 0 } });
+        await this.installDependencies(neoMofoxDir);
+      }
 
       // 3.4 生成配置文件
-      await this.generateConfig(neoMofoxDir);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'write-core', substep: 0 } });
+      if (shouldRun('gen-config')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'gen-config', substep: 0 } });
+        await this.generateConfig(neoMofoxDir);
+      }
 
       // 3.5 写入 core.toml
-      await this.writeCoreToml(neoMofoxDir, inputs.ownerQQNumber);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'write-model', substep: 0 } });
+      if (shouldRun('write-core')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'write-core', substep: 0 } });
+        await this.writeCoreToml(neoMofoxDir, inputs.ownerQQNumber);
+      }
 
       // 3.6 写入 model.toml
-      await this.writeModelToml(neoMofoxDir, inputs.apiKey);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
+      if (shouldRun('write-model')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'write-model', substep: 0 } });
+        await this.writeModelToml(neoMofoxDir, inputs.apiKey);
+      }
 
       // 3.7 安装 NapCat
-      await this.installNapCat(inputs.installDir, instanceId);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
+      if (shouldRun('napcat')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
+        await this.installNapCat(inputs.installDir, instanceId);
+      }
 
       // 3.8 写入 NapCat 配置
-      await this.writeNapCatConfig(napcatDir, inputs.qqNumber, inputs.wsPort);
-      storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
+      if (shouldRun('napcat-config')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
+        await this.writeNapCatConfig(napcatDir, inputs.qqNumber, inputs.wsPort);
+      }
 
       // 3.9 & 3.10 注册实例
+      storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
       const result = await this.registerInstance(inputs, neoMofoxDir, napcatDir);
 
       this._emitProgress('complete', 100, '安装完成！');
@@ -824,9 +858,7 @@ class InstallWizardService {
 
     } catch (e) {
       this._emitProgress('error', 0, e.message, e);
-      storageService.updateInstance(instanceId, {
-        installProgress: { step: 'error', error: e.message },
-      });
+      // 不覆盖 installProgress，保留正在执行的步骤名，以便下次精确续装
       throw e;
     }
   }

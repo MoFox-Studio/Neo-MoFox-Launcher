@@ -6,7 +6,6 @@ import {
   createNewInstance,
   saveInstance,
   deleteInstance,
-  browsePath,
 } from './modules/instances.js';
 
 // ─── Initialization ───────────────────────────────────────────────────
@@ -56,8 +55,6 @@ el.btnCloseEditModal.addEventListener('click', () => {
 el.btnCancelEdit.addEventListener('click', () => {
   el.editInstanceModal.classList.add('hidden');
 });
-
-el.btnBrowsePath.addEventListener('click', browsePath);
 
 el.btnSaveInstance.addEventListener('click', saveInstance);
 

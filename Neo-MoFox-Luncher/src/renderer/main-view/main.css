@@ -328,14 +328,30 @@
   text-overflow: ellipsis; 
 }
 
+.instance-meta {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: var(--font-mono);
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
 .instance-desc {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--md-sys-color-on-surface-variant);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  opacity: 0.8;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: 6px;
+  border-left: 2px solid var(--md-sys-color-primary);
+  opacity: 0.9;
 }
 
 .instance-card-footer {

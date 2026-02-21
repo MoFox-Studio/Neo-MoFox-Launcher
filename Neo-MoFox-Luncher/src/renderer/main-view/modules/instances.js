@@ -19,7 +19,8 @@ export async function loadInstances() {
       id: instance.id,
       name: instance.displayName,
       path: instance.neomofoxDir,
-      description: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`,
+      description: instance.description || '', // 用户编辑的描述
+      autoInfo: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`, // 自动信息
       status: instance.enabled ? 'stopped' : 'disabled',
       branch: instance.channel,
       version: instance.neomofoxVersion || 'unknown',
@@ -113,8 +114,8 @@ export function renderInstances() {
       const btnContinue = card.querySelector('.btn-continue-install');
       btnContinue.addEventListener('click', (e) => {
         e.stopPropagation();
-        // 跳转到安装向导继续安装
-        window.location.href = '../install-wizard/wizard.html';
+        // 跳转到安装向导继续安装，传递 instanceId 以预填表单
+        window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
       });
       
       // 绑定删除按钮
@@ -134,7 +135,7 @@ export function renderInstances() {
       
       // 点击卡片也可以继续安装
       card.addEventListener('click', () => {
-        window.location.href = '../install-wizard/wizard.html';
+        window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
       });
       
     } else {
@@ -149,9 +150,8 @@ export function renderInstances() {
         <div class="instance-card-body">
           <div class="instance-name" title="${instance.name}">${instance.name}</div>
           <div class="instance-path" title="${instance.path}">${instance.path}</div>
-          <div class="instance-desc" title="${instance.description || ''}">
-            ${instance.description || '暂无描述'}
-          </div>
+          <div class="instance-meta">${instance.autoInfo}</div>
+          ${instance.description ? `<div class="instance-desc" title="${instance.description}">${instance.description}</div>` : ''}
         </div>
         
         <div class="instance-card-footer">
@@ -186,17 +186,23 @@ export function renderInstances() {
 }
 
 function openEditModal(instance) {
-  // 简单的重新实现，或者导出原本的逻辑
-  // 由于模块化限制，这里可能需要重构。
-  // 假设 main.js 处理了 UI 逻辑，或者 instances.js 处理。
-  // 之前的代码是在 modules/instances.js 里的，所以可以直接调用 state
-  state.currentEditingInstance = instance.id; // 修复：保存 ID 而不是整个对象
+  state.currentEditingInstance = instance.id;
   
-  // 填充表单 (假设 element 存在)
+  // 只填充名称和描述
   document.getElementById('edit-instance-name').value = instance.name || '';
-  document.getElementById('edit-instance-path').value = instance.path || '';
   document.getElementById('edit-instance-desc').value = instance.description || '';
-  document.getElementById('edit-instance-config').value = JSON.stringify(instance.config || {}, null, 2);
+  
+  // 设置模态框标题
+  const modalTitle = document.querySelector('#edit-instance-modal .modal-title');
+  if (modalTitle) {
+    modalTitle.textContent = '编辑实例';
+  }
+  
+  // 显示删除按钮
+  const deleteBtn = document.getElementById('btn-delete-instance');
+  if (deleteBtn) {
+    deleteBtn.style.display = 'flex';
+  }
   
   // 显示模态框
   document.getElementById('edit-instance-modal').classList.remove('hidden');
@@ -246,11 +252,15 @@ export function editInstance(instanceId) {
   if (!instance) return;
   
   state.currentEditingInstance = instanceId;
-  el.editModalTitle.textContent = '编辑实例';
+  
+  // 只填充名称和描述
   el.editInstanceName.value = instance.name;
-  el.editInstancePath.value = instance.path;
   el.editInstanceDesc.value = instance.description || '';
-  el.editInstanceConfig.value = JSON.stringify(instance.config || {}, null, 2);
+  
+  // 设置模态框标题
+  el.editModalTitle.textContent = '编辑实例';
+  
+  // 显示删除按钮
   el.btnDeleteInstance.style.display = 'flex';
   
   el.editInstanceModal.classList.remove('hidden');
@@ -261,10 +271,12 @@ export function editInstance(instanceId) {
 export function createNewInstance() {
   state.currentEditingInstance = null;
   el.editModalTitle.textContent = '新建实例';
+  
+  // 只清空名称和描述
   el.editInstanceName.value = '';
-  el.editInstancePath.value = '';
   el.editInstanceDesc.value = '';
-  el.editInstanceConfig.value = '{}';
+  
+  // 隐藏删除按钮
   el.btnDeleteInstance.style.display = 'none';
   
   el.editInstanceModal.classList.remove('hidden');
@@ -274,55 +286,41 @@ export function createNewInstance() {
 
 export async function saveInstance() {
   const name = el.editInstanceName.value.trim();
-  const path = el.editInstancePath.value.trim();
   const description = el.editInstanceDesc.value.trim();
-  const configText = el.editInstanceConfig.value.trim();
   
-  if (!name || !path) {
-    await window.customAlert('请填写实例名称和路径', '提示');
-    return;
-  }
-  
-  let config = {};
-  try {
-    config = JSON.parse(configText);
-  } catch (error) {
-    await window.customAlert('配置格式错误，请检查 JSON 格式', '格式错误');
+  // 验证：名称必填
+  if (!name) {
+    await window.customAlert('请填写实例名称', '提示');
     return;
   }
   
   try {
     if (state.currentEditingInstance) {
-      // 编辑现有实例 - 调用后端 API 更新
+      // 编辑现有实例 - 只更新名称和描述
+      console.log('保存实例:', state.currentEditingInstance, { displayName: name, description });
+      
       await window.mofoxAPI.updateInstance(state.currentEditingInstance, {
         displayName: name,
-        neomofoxDir: path,
+        description: description,
       });
+      
+      console.log('实例更新成功');
     } else {
-      // 创建新实例 - 这里不应该直接创建，应该通过安装向导
-      // 但保留基本的添加功能以便测试
-      const newInstance = {
-        id: `bot-${Date.now()}`,
-        displayName: name,
-        neomofoxDir: path,
-        qqNumber: '',
-        wsPort: 8095,
-        channel: 'main',
-        enabled: true,
-        installCompleted: false,
-        createdAt: new Date().toISOString(),
-      };
-      await window.mofoxAPI.addInstance(newInstance);
+      // 新建实例应该通过安装向导，这里给出提示
+      await window.customAlert('请通过安装向导创建新实例', '提示');
+      return;
     }
     
-    // 重新加载实例列表
+    // 关闭模态框
+    el.editInstanceModal.classList.add('hidden');
+    
+    // 重新加载实例列表以显示最新数据
     await loadInstances();
+    
   } catch (error) {
     console.error('保存实例失败:', error);
     await window.customAlert('保存失败: ' + error.message, '错误');
   }
-  
-  el.editInstanceModal.classList.add('hidden');
 }
 
 // ─── Delete Instance ──────────────────────────────────────────────────
@@ -359,14 +357,5 @@ export async function deleteInstance() {
     console.error('删除实例失败:', error);
     await window.customAlert('删除失败: ' + error.message, '错误');
     // 出错时不关闭模态框，让用户可以重试或取消
-  }
-}
-
-// ─── Browse Path ──────────────────────────────────────────────────────
-
-export async function browsePath() {
-  const path = await window.mofoxAPI.selectProjectPath();
-  if (path) {
-    el.editInstancePath.value = path;
   }
 }
