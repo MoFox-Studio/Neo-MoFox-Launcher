@@ -806,6 +806,16 @@ select option {
   gap: 12px;
   margin-bottom: 24px;
   flex-shrink: 0;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 500px; /* 足够大的高度以容纳所有步骤 */
+  opacity: 1;
+  overflow: hidden;
+}
+
+.install-steps.collapsed {
+  max-height: 0;
+  margin-bottom: 0;
+  opacity: 0;
 }
 
 .install-step-item {

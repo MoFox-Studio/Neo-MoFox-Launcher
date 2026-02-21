@@ -486,6 +486,15 @@ async function startInstall() {
     el.installResult.querySelector('.result-success').classList.remove('hidden');
     el.installResult.querySelector('.result-error').classList.add('hidden');
     
+    // 收起安装步骤和日志
+    console.log('[DEBUG] 收起安装步骤和日志');
+    el.installSteps.classList.add('collapsed');
+    if (!el.installLogContent.classList.contains('collapsed')) {
+      el.installLogContent.classList.add('collapsed');
+      const icon = el.btnToggleLog.querySelector('.material-symbols-rounded');
+      icon.textContent = 'expand_more';
+    }
+    
     // 只显示完成按钮，隐藏其他按钮
     console.log('[DEBUG] 设置按钮状态：只显示完成按钮');
     el.btnFinish.classList.remove('hidden');
