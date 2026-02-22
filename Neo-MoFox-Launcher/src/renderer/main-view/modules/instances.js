@@ -161,28 +161,36 @@ export function renderInstances() {
         </div>
         
         <div class="instance-card-footer">
-          <button class="md3-btn md3-btn-text md3-btn-sm btn-edit-instance-card">
-            设置
+          <button class="md3-btn md3-btn-text md3-btn-sm btn-settings-instance" title="管理实例">
+            <span class="material-symbols-rounded">settings</span>
+            管理
           </button>
-          <button class="md3-btn md3-btn-tonal md3-btn-sm btn-open-instance">
+          <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动">
+            <span class="material-symbols-rounded">play_arrow</span>
             启动
           </button>
         </div>
       `;
       
-      // 事件绑定
-      const btnOpen = card.querySelector('.btn-open-instance');
-      btnOpen.addEventListener('click', (e) => {
+      // 事件绑定 - 管理按钮 (原启动/打开实例)
+      const btnSettings = card.querySelector('.btn-settings-instance');
+      btnSettings.addEventListener('click', (e) => {
         e.stopPropagation();
         // 跳转到实例视图页面
         window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });
-      
-      const btnEdit = card.querySelector('.btn-edit-instance-card');
-      btnEdit.addEventListener('click', (e) => {
+
+      // 事件绑定 - 启动按钮 (新增逻辑)
+      const btnStart = card.querySelector('.btn-start-instance');
+      btnStart.addEventListener('click', (e) => {
         e.stopPropagation();
-        // 打开编辑模态框
-        openEditModal(instance);
+        // 跳转到实例视图页面，并带上自动启动参数
+        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}&autoStart=true`;
+      });
+      
+      // 整个卡片点击也进入管理页面
+      card.addEventListener('click', () => {
+         window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });
     }
     

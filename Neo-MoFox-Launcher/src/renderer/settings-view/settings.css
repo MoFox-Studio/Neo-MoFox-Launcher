@@ -22,7 +22,7 @@ body {
   justify-content: space-between;
   padding: 0 20px 0 12px;
   flex-shrink: 0;
-  -webkit-app-region: drag;
+  /* -webkit-app-region: drag; removed as we have a dedicated title bar now */
 }
 
 .topbar-left,
@@ -166,18 +166,24 @@ body {
 /* ─── Settings Cards ─────────────────────────────────────────────────── */
 .settings-card {
   background: var(--md-sys-color-surface-container-low);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 16px;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow: hidden; /* 防止内容溢出圆角边界 */
-  transition: background 0.3s, border-color 0.3s;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.settings-card:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .settings-card-danger {
-  border-color: var(--md-sys-color-error-container);
+  border-color: rgba(var(--md-sys-color-error-rgb, 242, 184, 181), 0.3);
 }
 
 .settings-card-header {
@@ -219,23 +225,26 @@ body {
   align-items: center;
   gap: 8px;
   padding: 12px;
-  border: 2px solid var(--md-sys-color-outline-variant);
+  border: 2px solid rgba(255, 255, 255, 0.05);
   border-radius: 16px;
   background: var(--md-sys-color-surface-container);
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
   position: relative;
   min-width: 100px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .theme-option:hover {
-  border-color: var(--md-sys-color-primary);
+  border-color: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.5);
   background: var(--md-sys-color-surface-container-high);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .theme-option.selected {
   border-color: var(--md-sys-color-primary);
-  background: var(--md-sys-color-primary-container);
+  background: rgba(var(--md-sys-color-primary-container-rgb, 79, 55, 139), 0.2);
 }
 
 .theme-check {

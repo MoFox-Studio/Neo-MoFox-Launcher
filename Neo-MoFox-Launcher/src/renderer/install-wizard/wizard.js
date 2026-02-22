@@ -65,6 +65,7 @@ const el = {
   installSteps: document.getElementById('install-steps'),
   installLogContent: document.getElementById('install-log-content'),
   btnToggleLog: document.getElementById('btn-toggle-log'),
+  btnFullscreenLog: document.getElementById('btn-fullscreen-log'),
   installResult: document.getElementById('install-result'),
   btnRetry: document.getElementById('btn-retry'),
   btnCleanup: document.getElementById('btn-cleanup'),
@@ -148,6 +149,8 @@ async function runEnvCheck() {
     // Update Python
     if (result.checks.python.valid) {
       updateCheckItem('check-python', 'success', result.checks.python.version);
+      // 保存检测到的 python 命令
+      state.pythonCmd = result.checks.python.cmd;
     } else {
       updateCheckItem('check-python', 'error', result.checks.python.version || '未安装');
     }
@@ -219,6 +222,7 @@ function collectInputs() {
     installDir: el.inputInstallDir.value.trim(),
     installNapcat: installNapcat,
     installSteps: installSteps, // 传递给后端的步骤配置
+    pythonCmd: state.pythonCmd, // 传递检测到的 python 命令
   };
   return state.inputs;
 }
@@ -482,6 +486,15 @@ async function startInstall() {
     el.installResult.querySelector('.result-success').classList.remove('hidden');
     el.installResult.querySelector('.result-error').classList.add('hidden');
     
+    // 收起安装步骤和日志
+    console.log('[DEBUG] 收起安装步骤和日志');
+    el.installSteps.classList.add('collapsed');
+    if (!el.installLogContent.classList.contains('collapsed')) {
+      el.installLogContent.classList.add('collapsed');
+      const icon = el.btnToggleLog.querySelector('.material-symbols-rounded');
+      icon.textContent = 'expand_more';
+    }
+    
     // 只显示完成按钮，隐藏其他按钮
     console.log('[DEBUG] 设置按钮状态：只显示完成按钮');
     el.btnFinish.classList.remove('hidden');
@@ -675,6 +688,20 @@ function bindEvents() {
     el.installLogContent.classList.toggle('collapsed');
     const icon = el.btnToggleLog.querySelector('.material-symbols-rounded');
     icon.textContent = el.installLogContent.classList.contains('collapsed') ? 'expand_more' : 'expand_less';
+  });
+
+  el.btnFullscreenLog.addEventListener('click', () => {
+    const logContainer = el.installLogContent.closest('.install-log');
+    logContainer.classList.toggle('fullscreen');
+    const icon = el.btnFullscreenLog.querySelector('.material-symbols-rounded');
+    icon.textContent = logContainer.classList.contains('fullscreen') ? 'fullscreen_exit' : 'fullscreen';
+    
+    // 如果全屏时日志是折叠的，自动展开
+    if (logContainer.classList.contains('fullscreen') && el.installLogContent.classList.contains('collapsed')) {
+      el.installLogContent.classList.remove('collapsed');
+      const toggleIcon = el.btnToggleLog.querySelector('.material-symbols-rounded');
+      toggleIcon.textContent = 'expand_less';
+    }
   });
   
   el.btnRetry.addEventListener('click', () => {

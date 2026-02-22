@@ -10,8 +10,26 @@
   <link rel="stylesheet" href="wizard.css">
   <link rel="stylesheet" href="../components/dialog.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <script src="../window-controls.js" defer></script>
 </head>
 <body>
+  <!-- ═══ Title Bar ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">安装向导 - Neo-MoFox Launcher</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
   <div class="wizard-container">
     <!-- 左侧步骤指示器 -->
     <aside class="wizard-sidebar">
@@ -302,9 +320,14 @@
         <div class="install-log">
           <div class="log-header">
             <span>安装日志</span>
-            <button class="btn-toggle-log" id="btn-toggle-log">
-              <span class="material-symbols-rounded">expand_less</span>
-            </button>
+            <div class="log-actions">
+              <button class="md3-icon-btn" id="btn-fullscreen-log" title="全屏显示">
+                <span class="material-symbols-rounded">fullscreen</span>
+              </button>
+              <button class="md3-icon-btn" id="btn-toggle-log" title="展开/折叠">
+                <span class="material-symbols-rounded">expand_less</span>
+              </button>
+            </div>
           </div>
           <div class="log-content" id="install-log-content"></div>
         </div>

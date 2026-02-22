@@ -13,8 +13,27 @@
   <script src="../theme-init.js"></script>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="settings.css">
+  <script src="../window-controls.js" defer></script>
 </head>
 <body>
+
+  <!-- ═══ Title Bar ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">设置 - Neo-MoFox Launcher</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
 
   <!-- ═══ 顶部栏 ═══ -->
   <header class="settings-topbar">

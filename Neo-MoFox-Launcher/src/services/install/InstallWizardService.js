@@ -97,7 +97,11 @@ class InstallWizardService {
    */
   async _checkCommand(command, args = ['--version']) {
     return new Promise((resolve) => {
-      const proc = spawn(command, args, { shell: true, timeout: 10000 });
+      const proc = spawn(command, args, { 
+        shell: true, 
+        timeout: 10000,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' }
+      });
       let stdout = '';
       let stderr = '';
 
@@ -124,19 +128,51 @@ class InstallWizardService {
   }
 
   /**
-   * 检查 Python 版本
+   * 检查 Python 版本（扫描 PATH 下所有 python，找到第一个 >= 3.11 的）
    */
   async checkPython() {
-    const result = await this._checkCommand('python', ['--version']);
-    if (result.installed && result.version) {
-      const [major, minor] = result.version.split('.').map(Number);
-      result.valid = major >= 3 && minor >= 11;
-      result.requirement = '>= 3.11';
-    } else {
-      result.valid = false;
-      result.requirement = '>= 3.11';
+    const MIN_MAJOR = 3;
+    const MIN_MINOR = 11;
+
+    // 收集 PATH 中所有 python 可执行文件
+    const pythonPaths = [];
+    const seen = new Set();
+    const exeName = process.platform === 'win32' ? 'python.exe' : 'python3';
+    const pathDirs = (process.env.PATH || '').split(path.delimiter);
+    for (const dir of pathDirs) {
+      try {
+        const pyExe = path.join(dir, exeName);
+        const resolved = fs.realpathSync ? pyExe : pyExe;
+        if (!seen.has(resolved) && fs.existsSync(pyExe)) {
+          seen.add(resolved);
+          pythonPaths.push(pyExe);
+        }
+      } catch (e) { /* ignore */ }
     }
-    return result;
+
+    // 逐个检查版本，找到第一个满足要求的
+    let firstFound = null;
+    for (const pyPath of pythonPaths) {
+      const result = await this._checkCommand(`"${pyPath}"`, ['--version']);
+      if (result.installed && result.version) {
+        if (!firstFound) firstFound = { ...result, cmd: `"${pyPath}"` };
+        const [major, minor] = result.version.split('.').map(Number);
+        if (major >= MIN_MAJOR && minor >= MIN_MINOR) {
+          result.valid = true;
+          result.requirement = '>= 3.11';
+          result.cmd = `"${pyPath}"`;
+          return result;
+        }
+      }
+    }
+
+    // 没有找到 >= 3.11 的
+    if (firstFound) {
+      firstFound.valid = false;
+      firstFound.requirement = '>= 3.11';
+      return firstFound;
+    }
+    return { installed: false, valid: false, version: null, requirement: '>= 3.11', error: 'Python 未安装' };
   }
 
   /**
@@ -456,8 +492,10 @@ class InstallWizardService {
    */
   _execCommand(command, args, options = {}) {
     return new Promise((resolve, reject) => {
+      // 强制使用 UTF-8 编码输出，避免中文乱码
       const proc = spawn(command, args, {
         shell: true,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },
         ...options,
       });
 
@@ -465,13 +503,15 @@ class InstallWizardService {
       let stderr = '';
 
       proc.stdout.on('data', (d) => {
-        stdout += d.toString();
-        if (options.onStdout) options.onStdout(d.toString());
+        const text = d.toString();
+        stdout += text;
+        if (options.onStdout) options.onStdout(text);
       });
 
       proc.stderr.on('data', (d) => {
-        stderr += d.toString();
-        if (options.onStderr) options.onStderr(d.toString());
+        const text = d.toString();
+        stderr += text;
+        if (options.onStderr) options.onStderr(text);
       });
 
       proc.on('close', (code) => {
@@ -643,10 +683,10 @@ class InstallWizardService {
   /**
    * 3.2 创建 Python 虚拟环境
    */
-  async createVenv(neoMofoxDir) {
+  async createVenv(neoMofoxDir, pythonCmd = 'python') {
     this._emitProgress('venv', 0, '正在创建虚拟环境...');
     
-    await this._execCommand('uv', ['venv'], {
+    await this._execCommand('uv', ['venv', '--python', pythonCmd], {
       cwd: neoMofoxDir,
     });
 
@@ -1133,7 +1173,9 @@ class InstallWizardService {
       // 3.2 创建虚拟环境
       if (shouldRun('venv')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
-        await this.createVenv(neoMofoxDir);
+        // 尝试获取之前检测到的 python 命令
+        const pythonCmd = inputs.pythonCmd || 'python';
+        await this.createVenv(neoMofoxDir, pythonCmd);
       }
 
       // 3.3 安装依赖
