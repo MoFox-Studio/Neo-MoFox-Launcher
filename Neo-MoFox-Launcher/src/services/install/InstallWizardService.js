@@ -690,6 +690,14 @@ class InstallWizardService {
       onStderr: (data) => this._emitOutput(data),
     });
 
+    this._emitProgress('deps', 50, '正在安装 Pillow...');
+    
+    await this._execCommand('uv', ['pip', 'install', 'pillow'], {
+      cwd: neoMofoxDir,
+      onStdout: (data) => this._emitOutput(data),
+      onStderr: (data) => this._emitOutput(data),
+    });
+
     this._emitProgress('deps', 100, '依赖安装完成');
     return { success: true };
   }
