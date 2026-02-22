@@ -30,8 +30,10 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    transparent: false,
-    backgroundColor: '#0f0f17',
+    frame: false, // 无边框窗口
+    titleBarStyle: 'hidden', // 隐藏原生标题栏但保留窗口控制（仅macOS，Windows下配合frame: false可确保完全移除）
+    transparent: true, // 开启透明，有时frame: false需要这就才能生效，或者为了圆角
+    backgroundColor: '#00000000', // 透明背景，配合 transparent: true
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -41,6 +43,7 @@ function createWindow() {
   });
 
   Menu.setApplicationMenu(null);
+  mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   mainWindow.webContents.on('before-input-event', (event, input) => {

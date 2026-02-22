@@ -13,8 +13,27 @@
   <script src="../theme-init.js"></script>
   <link rel="stylesheet" href="main.css">
   <link rel="stylesheet" href="../components/dialog.css">
+  <script src="../window-controls.js" defer></script>
 </head>
 <body>
+
+  <!-- ═══ Title Bar ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">Neo-MoFox Launcher</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
 
   <!-- ═══ 主内容区域 ═══ -->
   <main class="main-container">
@@ -24,7 +43,7 @@
       <div class="hero-card">
         <div class="hero-content">
           <div class="hero-greeting">
-            <h1>欢迎回来，开发者</h1>
+            <h1>欢迎回来 </h1>
             <p>准备好创造什么了吗？</p>
           </div>
           <div class="hero-stats">

@@ -75,6 +75,16 @@ async function init() {
   
   // 初始化状态显示
   updateStatus(state.instanceStatus);
+
+  // 检查是否需要自动启动
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('autoStart') === 'true') {
+     console.log('自动启动标志位已设置，正在启动实例...');
+     // 延迟一点点以确保UI加载完成
+     setTimeout(() => {
+        handleStartInstance();
+     }, 500);
+  }
 }
 
 // ─── 加载实例数据 ─────────────────────────────────────────────────────

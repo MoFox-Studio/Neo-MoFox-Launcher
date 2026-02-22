@@ -28,9 +28,11 @@
   align-items: center;
   padding: 16px 24px;
   background-color: var(--md-sys-color-surface-container);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   gap: 16px;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
 }
 
 .header-left {
@@ -474,39 +476,40 @@
 
 /* ─── 日志条目 - 终端风格 ──────────────────────────────────────────────────────── */
 .log-entry {
-  padding: 2px 0;
+  padding: 0 4px;
   margin: 0;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.3;
+  /* 使用 Consolas 和特定中文字体组合，通常能获得较好的对齐效果。
+     'Microsoft YaHei Mono' 如果存在最好，否则 'SimSun' (宋体) 或 'NSimSun' (新宋体) 是严格等宽的 */
+  font-family: 'Consolas', 'Menlo', 'Monaco', 'Courier New', 'Microsoft YaHei Mono', 'Malgun Gothic', 'SimSun-ExtB', 'SimSun', 'NSimSun', monospace;
+  font-size: 14px; /* 调整为偶数，减少亚像素渲染问题 */
+  line-height: 1.5;
   color: #c9d1d9;
-  white-space: pre;
+  white-space: pre; 
   word-wrap: normal;
   word-break: keep-all;
   overflow-x: visible;
   tab-size: 4;
+  
+  /* 禁用连字和字据调整，确保严格对齐 */
   font-variant-ligatures: none;
   font-feature-settings: normal;
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
-  text-rendering: geometricPrecision;
+  text-rendering: geometricPrecision; /* 强制几何精度，优先保证对齐而非美观 */
+  -webkit-font-smoothing: antialiased;
   letter-spacing: 0;
-  font-kerning: none;
-  unicode-bidi: isolate;
+  font-kerning: none; 
 }
+
+/* 针对 CJK 字符可能需要的微调，虽然 CSS 无法单独控制 CJK 宽度，但指定字体栈顺序很重要 */
 
 /* 支持内联样式和高亮 */
 .log-entry span {
   font-family: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-  font-variant-ligatures: inherit;
-  font-feature-settings: inherit;
+  white-space: pre; /* 确保 span 内部也不换行 */
 }
 
 .log-entry .highlight {
-  background-color: #bb800a;
-  color: #000;
+  background-color: rgba(187, 128, 10, 0.3); /* 半透明背景 */
+  color: #ffdf9e;
   padding: 0 2px;
   border-radius: 2px;
 }
@@ -520,8 +523,8 @@
 .log-message {
   color: inherit;
   font-family: inherit;
-  word-break: break-word;
-  white-space: pre-wrap;
+  word-break: keep-all; /* 防止单词断开 */
+  white-space: pre; /* 强制不换行 */
 }
 
 .log-message .highlight {

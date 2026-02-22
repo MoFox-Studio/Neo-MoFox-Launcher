@@ -39,43 +39,55 @@ function hslToHex(h, s, l) {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
+function hexToRgb(hex) {
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
 /**
  * 从 base hex 生成 MD3 风格的色调组
  */
 function generatePalette(hex, isDark) {
   const [h, s] = hexToHsl(hex);
+  const palette = {};
+
+  const p = (key, val) => { palette[key] = val; };
+  const prgb = (key, val) => { palette[key] = val; palette[`${key}-rgb`] = hexToRgb(val); };
 
   if (isDark) {
-    return {
-      '--md-sys-color-primary':               hslToHex(h, Math.min(s, 80), 80),
-      '--md-sys-color-on-primary':            hslToHex(h, s, 20),
-      '--md-sys-color-primary-container':     hslToHex(h, s, 30),
-      '--md-sys-color-on-primary-container':  hslToHex(h, Math.min(s, 60), 90),
-      '--md-sys-color-secondary':             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 78),
-      '--md-sys-color-on-secondary':          hslToHex((h + 30) % 360, s, 20),
-      '--md-sys-color-secondary-container':   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 28),
-      '--md-sys-color-on-secondary-container':hslToHex((h + 30) % 360, s, 88),
-      '--md-sys-color-tertiary':              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 78),
-      '--md-sys-color-on-tertiary':           hslToHex((h + 60) % 360, s, 18),
-      '--md-sys-color-tertiary-container':    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 28),
-      '--md-sys-color-on-tertiary-container': hslToHex((h + 60) % 360, s, 88),
-    };
+      prgb('--md-sys-color-primary',               hslToHex(h, Math.min(s, 80), 80));
+      p   ('--md-sys-color-on-primary',            hslToHex(h, s, 20));
+      p   ('--md-sys-color-primary-container',     hslToHex(h, s, 30));
+      p   ('--md-sys-color-on-primary-container',  hslToHex(h, Math.min(s, 60), 90));
+      
+      prgb('--md-sys-color-secondary',             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 78));
+      p   ('--md-sys-color-on-secondary',          hslToHex((h + 30) % 360, s, 20));
+      p   ('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 28));
+      p   ('--md-sys-color-on-secondary-container',hslToHex((h + 30) % 360, s, 88));
+      
+      prgb('--md-sys-color-tertiary',              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 78));
+      p   ('--md-sys-color-on-tertiary',           hslToHex((h + 60) % 360, s, 18));
+      p   ('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 28));
+      p   ('--md-sys-color-on-tertiary-container', hslToHex((h + 60) % 360, s, 88));
   } else {
-    return {
-      '--md-sys-color-primary':               hslToHex(h, s, 38),
-      '--md-sys-color-on-primary':            '#ffffff',
-      '--md-sys-color-primary-container':     hslToHex(h, Math.min(s, 60), 92),
-      '--md-sys-color-on-primary-container':  hslToHex(h, s, 12),
-      '--md-sys-color-secondary':             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 40),
-      '--md-sys-color-on-secondary':          '#ffffff',
-      '--md-sys-color-secondary-container':   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 90),
-      '--md-sys-color-on-secondary-container':hslToHex((h + 30) % 360, s, 12),
-      '--md-sys-color-tertiary':              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 40),
-      '--md-sys-color-on-tertiary':           '#ffffff',
-      '--md-sys-color-tertiary-container':    hslToHex((h + 60) % 360, Math.max(s - 10,20), 90),
-      '--md-sys-color-on-tertiary-container': hslToHex((h + 60) % 360, s, 12),
-    };
+      prgb('--md-sys-color-primary',               hslToHex(h, s, 38));
+      p   ('--md-sys-color-on-primary',            '#ffffff');
+      p   ('--md-sys-color-primary-container',     hslToHex(h, Math.min(s, 60), 92));
+      p   ('--md-sys-color-on-primary-container',  hslToHex(h, s, 12));
+      
+      prgb('--md-sys-color-secondary',             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 40));
+      p   ('--md-sys-color-on-secondary',          '#ffffff');
+      p   ('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 90));
+      p   ('--md-sys-color-on-secondary-container',hslToHex((h + 30) % 360, s, 12));
+      
+      prgb('--md-sys-color-tertiary',              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 40));
+      p   ('--md-sys-color-on-tertiary',           '#ffffff');
+      p   ('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 90));
+      p   ('--md-sys-color-on-tertiary-container', hslToHex((h + 60) % 360, s, 12));
   }
+  return palette;
 }
 
 // ─── 主题应用 ─────────────────────────────────────────────────────────────
