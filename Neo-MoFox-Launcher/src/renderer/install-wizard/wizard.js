@@ -20,6 +20,7 @@ const state = {
   installing: false,
   installSuccess: false,
   resumeFromStep: null, // 续装起点步骤名，null 表示全新安装
+  napcatAlreadyInstalled: false, // Linux 下系统已安装 NapCat
 };
 
 // ─── DOM Elements ──────────────────────────────────────────────────────
@@ -86,6 +87,8 @@ function goToPhase(phase) {
   if (phase === 1) el.phase1.classList.remove('hidden');
   if (phase === 2) {
     el.phase2.classList.remove('hidden');
+    // 检测系统是否已安装 NapCat（Linux）
+    checkNapcatInstalled();
     // 在下一帧设置焦点，确保 DOM 已完成渲染
     requestAnimationFrame(() => {
       el.inputInstanceName.focus();
@@ -103,6 +106,40 @@ function goToPhase(phase) {
       item.classList.add('active');
     }
   });
+}
+
+// ─── NapCat 已安装检测 ─────────────────────────────────────────────────
+
+/**
+ * 检测系统上是否已安装 NapCat（仅 Linux 有效）。
+ * 如果已安装，自动取消勾选并禁用安装选项，显示已安装提示。
+ */
+async function checkNapcatInstalled() {
+  try {
+    const result = await window.mofoxAPI.installCheckNapcatInstalled();
+    const hintEl = el.inputInstallNapcat.closest('.form-group').querySelector('.form-hint');
+    if (result && result.installed) {
+      // 已安装：禁用复选框并取消勾选
+      el.inputInstallNapcat.checked = false;
+      el.inputInstallNapcat.disabled = true;
+      state.inputs.installNapcat = false;
+      state.napcatAlreadyInstalled = true;
+      if (hintEl) {
+        hintEl.textContent = `✅ NapCat 已安装在系统中 (QQ ${result.qqVersion || '未知版本'})，无需重复安装`;
+        hintEl.style.color = 'var(--md-sys-color-primary, #6750a4)';
+      }
+    } else {
+      // 未安装：恢复正常状态
+      el.inputInstallNapcat.disabled = false;
+      state.napcatAlreadyInstalled = false;
+      if (hintEl) {
+        hintEl.textContent = '取消勾选则只安装 Neo-MoFox 核心，不安装 NapCat（适用于已有 NapCat 或使用其他适配器的情况）';
+        hintEl.style.color = '';
+      }
+    }
+  } catch (e) {
+    console.warn('检测 NapCat 安装状态失败:', e);
+  }
 }
 
 // ─── Phase 1: Environment Check ────────────────────────────────────────
@@ -208,7 +245,11 @@ function collectInputs() {
   const napcatSteps = ['napcat', 'napcat-config'];
   const finalSteps = ['register'];
   
-  const installSteps = installNapcat 
+  // 如果 NapCat 已在系统上安装（Linux），仍然保留 napcat + napcat-config 步骤
+  // 后端 installNapCat() 会检测到已安装并跳过下载，但 napcat-config 会正常写入实例配置
+  const needNapcatSteps = installNapcat || state.napcatAlreadyInstalled;
+  
+  const installSteps = needNapcatSteps
     ? [...baseSteps, ...napcatSteps, ...finalSteps]
     : [...baseSteps, ...finalSteps];
   
@@ -220,7 +261,7 @@ function collectInputs() {
     wsPort: parseInt(el.inputWsPort.value, 10) || 8095,
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
-    installNapcat: installNapcat,
+    installNapcat: needNapcatSteps,
     installSteps: installSteps, // 传递给后端的步骤配置
     pythonCmd: state.pythonCmd, // 传递检测到的 python 命令
   };
@@ -252,7 +293,7 @@ function resetFormInputs() {
   el.inputApiKey.value = '';
   el.inputWsPort.value = '8095';
   el.inputChannel.value = 'main';
-  el.inputInstallNapcat.checked = true;
+  el.inputInstallNapcat.checked = !state.napcatAlreadyInstalled;
   
   // Reset custom select display
   const selectedChannel = document.getElementById('selected-channel');

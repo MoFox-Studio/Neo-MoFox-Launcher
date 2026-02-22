@@ -888,8 +888,10 @@ class InstallWizardService {
   }
 
   /**
-   * 3.7 下载并安装 NapCat（Windows OneKey 无头绿色版）
-   * 特殊说明：一键版仅适用 Windows AMD64，无需单独安装 QQ，NapCat 已内置
+   * 3.7 安装 NapCat
+   * - Windows：下载 OneKey 无头绿色版 ZIP，解压 + 运行 NapCatInstaller.exe
+   * - Linux：参照官方 install.sh 的 Shell (Rootless) 模式，
+   *   在 $HOME/Napcat/ 下安装 LinuxQQ + NapCat，所有实例共享，只需装一次
    */
   async installNapCat(installDir, instanceId) {
     const napcatDir = path.join(installDir, instanceId, 'napcat');
@@ -901,6 +903,167 @@ class InstallWizardService {
       return { success: true, path: napcatDir, shellPath: null };
     }
 
+    // ── Linux: 先检测系统是否已安装 NapCat ──────────────────────────────
+    if (platformHelper.isLinux) {
+      const sysCheck = platformHelper.isNapcatInstalledOnSystem();
+      if (sysCheck.installed) {
+        this._emitOutput(`[napcat] 检测到系统已安装 NapCat (QQ 版本: ${sysCheck.qqVersion || '未知'})`);
+        this._emitOutput(`[napcat] 安装目录: ${sysCheck.napcatDir}`);
+        this._emitProgress('napcat', 100, 'NapCat 已安装，跳过安装');
+        return {
+          success: true,
+          path: sysCheck.napcatDir,
+          shellPath: sysCheck.shellPath || napcatDir,
+          version: sysCheck.qqVersion,
+          alreadyInstalled: true,
+        };
+      }
+      // 未安装，走 Linux 完整安装流程
+      return await this._installNapCatLinux(napcatDir);
+    }
+
+    // ── Windows: 原有 ZIP 下载 + 解压流程 ───────────────────────────────
+    return await this._installNapCatWindows(napcatDir);
+  }
+
+  /**
+   * Linux 下安装 NapCat（参照官方 install.sh 的 Shell Rootless 模式）
+   * 步骤：安装系统依赖 → 下载 LinuxQQ → 解压 → 下载 NapCat → 注入到 QQ
+   */
+  async _installNapCatLinux(napcatDir) {
+    const linuxCfg = platformHelper.getLinuxNapcatConfig();
+    if (!linuxCfg) throw new Error('无法获取 Linux NapCat 配置');
+
+    const paths = linuxCfg.paths;
+
+    // ── Step 1: 安装系统依赖 ────────────────────────────────────────────
+    this._emitProgress('napcat', 5, '正在安装系统依赖 (xvfb, libnss3 等)...');
+    this._emitOutput('[napcat] 安装系统依赖（需要 sudo 权限）...');
+    try {
+      await this._execCommand('sudo', ['apt-get', 'update', '-y', '-qq'], {
+        onStdout: (d) => this._emitOutput(d),
+        onStderr: (d) => this._emitOutput(d),
+      });
+      const depsStr = linuxCfg.systemDeps.join(' ');
+      await this._execCommand('sudo', ['apt-get', 'install', '-y', '-qq', ...linuxCfg.systemDeps], {
+        onStdout: (d) => this._emitOutput(d),
+        onStderr: (d) => this._emitOutput(d),
+      });
+      this._emitOutput('[napcat] 系统依赖安装完成');
+    } catch (e) {
+      this._emitOutput(`[napcat] 警告: 系统依赖安装失败 (${e.message})，继续安装...`);
+    }
+
+    // ── Step 2: 下载并解压 LinuxQQ ──────────────────────────────────────
+    const qqInfo = platformHelper.getLinuxQQDownloadInfo();
+    if (!qqInfo) {
+      throw new Error(`不支持当前架构 (${require('os').arch()}) 的 LinuxQQ 下载`);
+    }
+
+    this._emitProgress('napcat', 15, `正在下载 LinuxQQ ${linuxCfg.qqDownload.version}...`);
+    this._emitOutput(`[napcat] QQ 下载地址: ${qqInfo.url}`);
+
+    const qqDebPath = path.join(napcatDir, qqInfo.file);
+    await this._downloadFile(qqInfo.url, qqDebPath, (downloaded, total) => {
+      const pct = total > 0 ? Math.floor(15 + (downloaded / total) * 25) : 15;
+      const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+      const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
+      this._emitProgress('napcat', pct, `下载 LinuxQQ... ${dlMB} MB / ${totalMB} MB`);
+    });
+    this._emitOutput(`[napcat] LinuxQQ 下载完成: ${qqDebPath}`);
+
+    // 创建安装目录并解压 .deb
+    this._emitProgress('napcat', 42, '正在解压 LinuxQQ...');
+    fs.mkdirSync(paths.installBase, { recursive: true });
+    await this._execCommand('dpkg', ['-x', qqDebPath, paths.installBase], {
+      onStdout: (d) => this._emitOutput(d),
+      onStderr: (d) => this._emitOutput(d),
+    });
+    this._emitOutput('[napcat] LinuxQQ 解压完成');
+    try { fs.unlinkSync(qqDebPath); } catch (_) {}
+
+    // ── Step 3: 下载 NapCat ─────────────────────────────────────────────
+    this._emitProgress('napcat', 48, '正在获取 NapCat 最新版本...');
+    const release = await this._fetchLatestNapCatRelease();
+
+    const ASSET_NAME = platformHelper.napcatAssetName;
+    const asset = release.assets.find((a) => a.name === ASSET_NAME);
+    if (!asset) {
+      throw new Error(`在 ${release.tag_name} 中未找到 ${ASSET_NAME}，请前往 https://github.com/NapNeko/NapCatQQ/releases 手动下载`);
+    }
+
+    this._emitOutput(`[napcat] NapCat 版本: ${release.tag_name}`);
+    this._emitOutput(`[napcat] 资源: ${asset.name} (${(asset.size / 1024 / 1024).toFixed(1)} MB)`);
+
+    const zipPath = path.join(napcatDir, 'NapCat.Shell.zip');
+    this._emitProgress('napcat', 52, `正在下载 NapCat ${release.tag_name}...`);
+    await this._downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
+      const pct = total > 0 ? Math.floor(52 + (downloaded / total) * 20) : 52;
+      const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+      const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
+      this._emitProgress('napcat', pct, `下载 NapCat... ${dlMB} MB / ${totalMB} MB`);
+    });
+    this._emitOutput('[napcat] NapCat 下载完成');
+
+    // 解压 NapCat
+    this._emitProgress('napcat', 74, '正在解压 NapCat...');
+    const napcatTmpDir = path.join(napcatDir, 'NapCat_extract');
+    fs.mkdirSync(napcatTmpDir, { recursive: true });
+    await this._execCommand('unzip', ['-o', zipPath, '-d', napcatTmpDir], {
+      onStderr: (d) => this._emitOutput(d),
+    });
+    try { fs.unlinkSync(zipPath); } catch (_) {}
+
+    // ── Step 4: 将 NapCat 注入到 QQ 目录（参照官方 install_napcat）────────
+    this._emitProgress('napcat', 80, '正在注入 NapCat 到 LinuxQQ...');
+    const napcatTargetDir = path.join(paths.targetFolder, 'napcat');
+    fs.mkdirSync(napcatTargetDir, { recursive: true });
+
+    // 复制 NapCat 文件到 QQ 目录
+    await this._execCommand('cp', ['-r', '-f', `${napcatTmpDir}/.`, napcatTargetDir], {
+      onStderr: (d) => this._emitOutput(d),
+    });
+    this._emitOutput('[napcat] NapCat 文件复制完成');
+
+    // 赋予执行权限
+    await this._execCommand('chmod', ['-R', '+x', napcatTargetDir]);
+
+    // 写入 loadNapCat.js（参照官方脚本）
+    const loadNapcatPath = path.join(paths.qqBase, 'resources', 'app', 'loadNapCat.js');
+    const loadNapcatContent = `(async () => {await import('file:///${paths.targetFolder}/napcat/napcat.mjs');})();`;
+    fs.writeFileSync(loadNapcatPath, loadNapcatContent);
+    this._emitOutput(`[napcat] 已写入 ${loadNapcatPath}`);
+
+    // 修改 QQ 的 package.json，将 main 指向 loadNapCat.js
+    this._emitProgress('napcat', 88, '正在修改 QQ 启动配置...');
+    try {
+      const qqPkgContent = JSON.parse(fs.readFileSync(paths.qqPackageJson, 'utf8'));
+      qqPkgContent.main = './loadNapCat.js';
+      fs.writeFileSync(paths.qqPackageJson, JSON.stringify(qqPkgContent, null, 2));
+      this._emitOutput('[napcat] QQ package.json 修改成功 (main → loadNapCat.js)');
+    } catch (e) {
+      throw new Error(`修改 QQ package.json 失败: ${e.message}`);
+    }
+
+    // 清理临时目录
+    try { fs.rmSync(napcatTmpDir, { recursive: true, force: true }); } catch (_) {}
+
+    this._emitProgress('napcat', 100, 'NapCat 安装完成 (Linux Rootless)');
+    this._emitOutput(`[napcat] 安装位置: ${paths.installBase}`);
+    this._emitOutput(`[napcat] 启动命令: xvfb-run -a ${paths.qqExecutable} --no-sandbox -q <QQ号>`);
+
+    return {
+      success: true,
+      path: paths.installBase,
+      shellPath: napcatTargetDir,
+      version: release.tag_name,
+    };
+  }
+
+  /**
+   * Windows 下安装 NapCat（OneKey ZIP + NapCatInstaller.exe）
+   */
+  async _installNapCatWindows(napcatDir) {
     // ── Step 1: 获取最新 Release ────────────────────────────────────────
     this._emitProgress('napcat', 5, '正在获取 NapCat 最新版本信息...');
     const release = await this._fetchLatestNapCatRelease();
@@ -928,7 +1091,7 @@ class InstallWizardService {
 
     this._emitOutput(`[napcat] 下载完成: ${zipPath}`);
 
-    // ── Step 3: 解压（跨平台） ────────────────────────────────────────────
+    // ── Step 3: 解压 ────────────────────────────────────────────
     this._emitProgress('napcat', 68, '正在解压...');
     const unzipInfo = platformHelper.getUnzipCommand(zipPath, napcatDir);
     await this._execCommand(
@@ -941,45 +1104,23 @@ class InstallWizardService {
     // 删除 ZIP 释放空间
     try { fs.unlinkSync(zipPath); } catch (_) {}
 
-    // ── Step 4: 运行安装器自动化配置（跨平台） ───────────────────
-    if (platformHelper.isWindows) {
-      const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
-      if (fs.existsSync(installerPath)) {
-        this._emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
-        this._emitOutput('[napcat] 启动 NapCatInstaller.exe，等待配置完成...');
-        await this._execCommand(
-          'cmd',
-          ['/c', `echo.|"${installerPath}"`],
-          {
-            cwd: napcatDir,
-            onStdout: (d) => this._emitOutput(d),
-            onStderr: (d) => this._emitOutput(d),
-          }
-        );
-        this._emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
-      } else {
-        this._emitOutput('[napcat] 未找到 NapCatInstaller.exe，跳过自动化配置步骤');
-      }
-    } else if (platformHelper.isLinux) {
-      // Linux 下可能有 install.sh 之类的安装脚本
-      const installerScript = path.join(napcatDir, 'install.sh');
-      if (fs.existsSync(installerScript)) {
-        this._emitProgress('napcat', 75, '正在运行 install.sh 自动化配置...');
-        // 先赋予执行权限
-        await this._execCommand('chmod', ['+x', installerScript], { cwd: napcatDir });
-        await this._execCommand(
-          'bash',
-          [installerScript],
-          {
-            cwd: napcatDir,
-            onStdout: (d) => this._emitOutput(d),
-            onStderr: (d) => this._emitOutput(d),
-          }
-        );
-        this._emitOutput('[napcat] install.sh 执行完毕');
-      } else {
-        this._emitOutput('[napcat] 未找到安装脚本，跳过自动化配置步骤');
-      }
+    // ── Step 4: 运行安装器自动化配置 ───────────────────
+    const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
+    if (fs.existsSync(installerPath)) {
+      this._emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
+      this._emitOutput('[napcat] 启动 NapCatInstaller.exe，等待配置完成...');
+      await this._execCommand(
+        'cmd',
+        ['/c', `echo.|"${installerPath}"`],
+        {
+          cwd: napcatDir,
+          onStdout: (d) => this._emitOutput(d),
+          onStderr: (d) => this._emitOutput(d),
+        }
+      );
+      this._emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
+    } else {
+      this._emitOutput('[napcat] 未找到 NapCatInstaller.exe，跳过自动化配置步骤');
     }
 
     // ── Step 5: 定位 NapCat.*.Shell 目录 ───────────────────────────────
@@ -1220,6 +1361,8 @@ class InstallWizardService {
         const napResult = await this.installNapCat(inputs.installDir, instanceId);
         napcatShellPath = napResult.shellPath || null;
         napcatVersion = napResult.version || null; // 保存版本号
+        // Linux 已安装时更新 napcatDir 为系统路径
+        if (napResult.path) napcatDir = napResult.path;
       }
 
       // 3.8 写入 NapCat 配置
