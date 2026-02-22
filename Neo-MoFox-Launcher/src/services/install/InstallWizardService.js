@@ -875,12 +875,18 @@ class InstallWizardService {
     try {
       const data = storageService.readToml(modelTomlPath);
       
-      // 找到第一个 api_providers 条目并写入 api_key
+      // 找到名为 SiliconFlow 的 api_provider 并写入 api_key
       if (data.api_providers && data.api_providers.length > 0) {
-        data.api_providers[0].api_key = apiKey;
+        const siliconFlowProvider = data.api_providers.find(p => p.name === 'SiliconFlow');
+        if (siliconFlowProvider) {
+          siliconFlowProvider.api_key = apiKey;
+        } else {
+          // 如果没有找到 SiliconFlow，写入第一个 provider
+          data.api_providers[0].api_key = apiKey;
+        }
       } else {
-        // 如果不存在，创建一个
-        data.api_providers = [{ api_key: apiKey }];
+        // 如果不存在任何 provider，创建一个 SiliconFlow provider
+        data.api_providers = [{ name: 'SiliconFlow', api_key: apiKey }];
       }
       
       storageService.writeToml(modelTomlPath, data);

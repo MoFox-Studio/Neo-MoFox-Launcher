@@ -46,6 +46,19 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  // 监听窗口最大化/还原状态变化
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximize-changed', true);
+    }
+  });
+
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximize-changed', false);
+    }
+  });
+
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       if (mainWindow.webContents.isDevToolsOpened()) {

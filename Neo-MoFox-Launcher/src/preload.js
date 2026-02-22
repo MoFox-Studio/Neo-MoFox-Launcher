@@ -94,6 +94,9 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   onInstanceStatsUpdate: (callback) => {
     ipcRenderer.on('instance-stats-update', (_event, data) => callback(data));
   },
+  onWindowMaximizeChanged: (callback) => {
+    ipcRenderer.on('window-maximize-changed', (_event, isMaximized) => callback(isMaximized));
+  },
 
   // ─── 用户设置 ───────────────────────────────────────────────────────────
   settingsRead: () => ipcRenderer.invoke('settings-read'),

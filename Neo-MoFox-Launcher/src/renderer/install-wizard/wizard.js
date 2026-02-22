@@ -725,6 +725,12 @@ function bindEvents() {
 async function init() {
   bindEvents();
   
+  // 从设置中读取默认安装路径
+  const settings = await window.mofoxAPI.settingsRead();
+  if (settings && settings.defaultInstallDir) {
+    el.inputInstallDir.value = settings.defaultInstallDir;
+  }
+  
   // Reset form inputs to ensure clean state
   resetFormInputs();
   
