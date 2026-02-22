@@ -573,6 +573,69 @@ class InstallWizardService {
   }
 
   /**
+   * Linux 下安装系统依赖
+   * 先检测哪些依赖缺失，缺失的才安装；使用 pkexec 弹出图形化密码窗口提权
+   * @param {string[]} depPackages - apt 包名列表
+   */
+  async _installLinuxSystemDeps(depPackages) {
+    // 检查关键命令是否已存在（避免不必要的提权）
+    const criticalCmds = ['xvfb-run', 'screen', 'unzip', 'jq'];
+    const missingCmds = [];
+    for (const cmd of criticalCmds) {
+      try {
+        await this._execCommand('which', [cmd]);
+      } catch (_) {
+        missingCmds.push(cmd);
+      }
+    }
+
+    if (missingCmds.length === 0) {
+      this._emitOutput('[napcat] 系统依赖已全部安装，跳过');
+      return;
+    }
+
+    this._emitOutput(`[napcat] 缺少系统命令: ${missingCmds.join(', ')}，需要安装依赖`);
+    this._emitOutput('[napcat] 将弹出密码输入窗口请求管理员权限...');
+
+    // 构建安装命令（单条命令通过 pkexec 执行）
+    const installCmd = `apt-get update -y -qq && apt-get install -y -qq ${depPackages.join(' ')}`;
+
+    // 尝试 pkexec（图形化密码窗口，Ubuntu 桌面预装）
+    try {
+      await this._execCommand('pkexec', ['bash', '-c', installCmd], {
+        onStdout: (d) => this._emitOutput(d),
+        onStderr: (d) => this._emitOutput(d),
+      });
+      this._emitOutput('[napcat] 系统依赖安装完成');
+      return;
+    } catch (e) {
+      this._emitOutput(`[napcat] pkexec 提权失败: ${e.message}`);
+    }
+
+    // pkexec 失败，尝试 sudo（如果用户配置了免密 sudo 则能成功）
+    try {
+      await this._execCommand('sudo', ['-n', 'apt-get', 'update', '-y', '-qq']);
+      await this._execCommand('sudo', ['-n', 'apt-get', 'install', '-y', '-qq', ...depPackages], {
+        onStdout: (d) => this._emitOutput(d),
+        onStderr: (d) => this._emitOutput(d),
+      });
+      this._emitOutput('[napcat] 系统依赖安装完成 (sudo)');
+      return;
+    } catch (e) {
+      this._emitOutput(`[napcat] sudo 免密安装也失败: ${e.message}`);
+    }
+
+    // 都失败了，告知用户手动安装
+    const manualCmd = `sudo apt-get update && sudo apt-get install -y ${depPackages.join(' ')}`;
+    this._emitOutput(`[napcat] ⚠️ 无法自动安装系统依赖，请手动在终端执行以下命令后重试：`);
+    this._emitOutput(`[napcat] ${manualCmd}`);
+    throw new Error(
+      `系统依赖安装失败（缺少: ${missingCmds.join(', ')}）。\n` +
+      `请在终端手动执行:\n${manualCmd}\n然后重试安装。`
+    );
+  }
+
+  /**
    * 下载文件到本地路径，支持重定向和进度回调
    * @param {string} url
    * @param {string} destPath
@@ -937,22 +1000,8 @@ class InstallWizardService {
     const paths = linuxCfg.paths;
 
     // ── Step 1: 安装系统依赖 ────────────────────────────────────────────
-    this._emitProgress('napcat', 5, '正在安装系统依赖 (xvfb, libnss3 等)...');
-    this._emitOutput('[napcat] 安装系统依赖（需要 sudo 权限）...');
-    try {
-      await this._execCommand('sudo', ['apt-get', 'update', '-y', '-qq'], {
-        onStdout: (d) => this._emitOutput(d),
-        onStderr: (d) => this._emitOutput(d),
-      });
-      const depsStr = linuxCfg.systemDeps.join(' ');
-      await this._execCommand('sudo', ['apt-get', 'install', '-y', '-qq', ...linuxCfg.systemDeps], {
-        onStdout: (d) => this._emitOutput(d),
-        onStderr: (d) => this._emitOutput(d),
-      });
-      this._emitOutput('[napcat] 系统依赖安装完成');
-    } catch (e) {
-      this._emitOutput(`[napcat] 警告: 系统依赖安装失败 (${e.message})，继续安装...`);
-    }
+    this._emitProgress('napcat', 5, '正在检查系统依赖...');
+    await this._installLinuxSystemDeps(linuxCfg.systemDeps);
 
     // ── Step 2: 下载并解压 LinuxQQ ──────────────────────────────────────
     const qqInfo = platformHelper.getLinuxQQDownloadInfo();
