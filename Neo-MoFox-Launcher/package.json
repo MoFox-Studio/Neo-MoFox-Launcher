@@ -5,35 +5,42 @@
   "main": "src/main.js",
   "scripts": {
     "start": "chcp 65001 >nul 2>&1 & electron .",
-    "build": "electron-builder --win",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
     "dev": "chcp 65001 >nul 2>&1 & electron . --dev"
   },
   "author": "MoFox Studio",
   "license": "AGPL-3.0",
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8"
+    "@electron-forge/cli": "^7.5.0",
+    "@electron-forge/maker-squirrel": "^7.5.0",
+    "@electron-forge/maker-zip": "^7.5.0",
+    "electron": "^33.0.0"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "tree-kill": "^1.2.2"
   },
-  "build": {
-    "appId": "com.mofox.neo-mofox-launcher",
-    "productName": "Neo-MoFox Launcher",
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "name": "Neo-MoFox Launcher",
+        "icon": "assets/icon.ico"
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "neo_mofox_launcher",
+            "setupIcon": "assets/icon.ico",
+            "noMsi": true
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": ["win32"]
+        }
+      ]
     }
   }
 }
