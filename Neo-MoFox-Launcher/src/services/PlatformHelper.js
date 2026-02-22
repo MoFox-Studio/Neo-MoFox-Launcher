@@ -99,62 +99,10 @@ const PLATFORM_CONFIG = {
       cmd: 'unzip',
       args: ['-o', zipPath, '-d', destDir],
     }),
-    // NapCat Release 中的资源包名（用于 GitHub 下载）
-    napcatAsset: 'NapCat.Shell.zip',
-    /**
-     * Linux 下 NapCat 安装配置
-     * 参照 NapCat 官方安装脚本 install.sh 的 Shell (Rootless) 模式
-     * 安装到 $HOME/Napcat/ 下，所有实例共享，只需安装一次
-     */
-    linuxNapcat: {
-      // 路径定义（与官方脚本一致）
-      paths: {
-        installBase: path.join(os.homedir(), 'Napcat'),
-        qqBase: path.join(os.homedir(), 'Napcat', 'opt', 'QQ'),
-        targetFolder: path.join(os.homedir(), 'Napcat', 'opt', 'QQ', 'resources', 'app', 'app_launcher'),
-        qqExecutable: path.join(os.homedir(), 'Napcat', 'opt', 'QQ', 'qq'),
-        qqPackageJson: path.join(os.homedir(), 'Napcat', 'opt', 'QQ', 'resources', 'app', 'package.json'),
-      },
-      // LinuxQQ 下载信息（版本号和 URL 来自官方安装脚本 install.sh）
-      qqDownload: {
-        version: '3.2.25-45758',
-        urls: {
-          amd64_deb: 'https://dldir1.qq.com/qqfile/qq/QQNT/7516007c/linuxqq_3.2.25-45758_amd64.deb',
-          arm64_deb: 'https://dldir1.qq.com/qqfile/qq/QQNT/7516007c/linuxqq_3.2.25-45758_arm64.deb',
-        },
-      },
-      // QQ 运行所需的系统依赖（apt-get 包名，来自官方安装脚本）
-      systemDeps: [
-        'xvfb', 'screen', 'xauth', 'libnss3', 'libgbm1',
-        'libasound2', 'libglib2.0-0', 'libatk1.0-0',
-        'libatspi2.0-0', 'libgtk-3-0', 'unzip', 'jq',
-      ],
-    },
-    napcatStartCmd: (shellDir, qq) => {
-      // 使用 xvfb-run 无头运行 QQ + NapCat（参照官方脚本）
-      const qqExe = path.join(os.homedir(), 'Napcat', 'opt', 'QQ', 'qq');
-      const launcherSh = path.join(shellDir, `start_napcat_${qq}.sh`);
-      if (fs.existsSync(launcherSh)) {
-        return { cmd: 'bash', args: [launcherSh], cwd: shellDir };
-      }
-      return {
-        cmd: 'xvfb-run',
-        args: ['-a', qqExe, '--no-sandbox', '-q', qq],
-        cwd: shellDir,
-      };
-    },
-    writeNapcatLauncher: (shellDir, qq) => {
-      const qqExe = path.join(os.homedir(), 'Napcat', 'opt', 'QQ', 'qq');
-      const content = [
-        '#!/usr/bin/env bash',
-        'set -e',
-        `echo "正在启动 NapCat (QQ: ${qq})..."`,
-        `xvfb-run -a "${qqExe}" --no-sandbox -q ${qq}`,
-      ].join('\n');
-      const p = path.join(shellDir, `start_napcat_${qq}.sh`);
-      fs.writeFileSync(p, content, { mode: 0o755 });
-      return p;
-    },
+    // Linux 不支持自动安装 NapCat，用户需自行安装
+    napcatAsset: null,
+    napcatStartCmd: () => null,
+    writeNapcatLauncher: () => null,
   },
 
   // ──────────────── macOS（预留） ────────────────
@@ -356,65 +304,8 @@ class PlatformHelper {
   /** 当前平台对应的 NapCat Release 资源文件名（null = 不支持） */
   get napcatAssetName() { return this._config.napcatAsset; }
 
-  /** 当前平台是否支持 NapCat 自动安装 */
+  /** 当前平台是否支持 NapCat 自动安装（仅 Windows） */
   get supportsNapcatAutoInstall() { return !!this._config.napcatAsset; }
-
-  /**
-   * 检测系统上是否已安装 NapCat（仅 Linux 有效）
-   * 通过检查 $HOME/Napcat/opt/QQ/resources/app/app_launcher/napcat/ 目录判断
-   * @returns {{ installed: boolean, napcatDir: string|null, shellPath: string|null, qqVersion: string|null }}
-   */
-  isNapcatInstalledOnSystem() {
-    if (!this.isLinux || !this._config.linuxNapcat) {
-      return { installed: false, napcatDir: null, shellPath: null, qqVersion: null };
-    }
-    const paths = this._config.linuxNapcat.paths;
-    const napcatFilesDir = path.join(paths.targetFolder, 'napcat');
-
-    if (!fs.existsSync(napcatFilesDir)) {
-      return { installed: false, napcatDir: null, shellPath: null, qqVersion: null };
-    }
-
-    let qqVersion = null;
-    try {
-      if (fs.existsSync(paths.qqPackageJson)) {
-        const pkg = JSON.parse(fs.readFileSync(paths.qqPackageJson, 'utf8'));
-        qqVersion = pkg.version || null;
-      }
-    } catch (_) {}
-
-    return {
-      installed: true,
-      napcatDir: paths.installBase,
-      shellPath: napcatFilesDir,
-      qqVersion,
-    };
-  }
-
-  /**
-   * 获取 Linux 下 NapCat 安装的配置（路径、QQ 下载信息等）
-   * @returns {Object|null} 仅 Linux 返回配置，其他平台返回 null
-   */
-  getLinuxNapcatConfig() {
-    if (!this.isLinux || !this._config.linuxNapcat) return null;
-    return this._config.linuxNapcat;
-  }
-
-  /**
-   * 获取当前架构对应的 LinuxQQ 下载信息
-   * @returns {{ url: string, file: string }|null}
-   */
-  getLinuxQQDownloadInfo() {
-    if (!this.isLinux || !this._config.linuxNapcat) return null;
-    const arch = os.arch(); // 'x64' or 'arm64'
-    const urls = this._config.linuxNapcat.qqDownload.urls;
-    if (arch === 'x64') {
-      return { url: urls.amd64_deb, file: 'linuxqq.deb' };
-    } else if (arch === 'arm64') {
-      return { url: urls.arm64_deb, file: 'linuxqq.deb' };
-    }
-    return null;
-  }
 
   /**
    * 生成 NapCat 启动命令

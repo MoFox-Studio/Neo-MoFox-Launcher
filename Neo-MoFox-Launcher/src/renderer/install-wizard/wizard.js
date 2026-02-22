@@ -108,28 +108,29 @@ function goToPhase(phase) {
   });
 }
 
-// ─── NapCat 已安装检测 ─────────────────────────────────────────────────
+// ─── NapCat 平台检测 ────────────────────────────────────────────────────
 
 /**
- * 检测系统上是否已安装 NapCat（仅 Linux 有效）。
- * 如果已安装，自动取消勾选并禁用安装选项，显示已安装提示。
+ * 检测当前平台是否支持自动安装 NapCat。
+ * 非 Windows 平台直接禁用选项，提示用户自行安装。
  */
 async function checkNapcatInstalled() {
   try {
-    const result = await window.mofoxAPI.installCheckNapcatInstalled();
+    const platformInfo = await window.mofoxAPI.getPlatformInfo();
     const hintEl = el.inputInstallNapcat.closest('.form-group').querySelector('.form-hint');
-    if (result && result.installed) {
-      // 已安装：禁用复选框并取消勾选
+
+    if (platformInfo && platformInfo.platform !== 'win32') {
+      // 非 Windows：禁用复选框
       el.inputInstallNapcat.checked = false;
       el.inputInstallNapcat.disabled = true;
       state.inputs.installNapcat = false;
-      state.napcatAlreadyInstalled = true;
+      state.napcatAlreadyInstalled = false;
       if (hintEl) {
-        hintEl.textContent = `✅ NapCat 已安装在系统中 (QQ ${result.qqVersion || '未知版本'})，无需重复安装`;
-        hintEl.style.color = 'var(--md-sys-color-primary, #6750a4)';
+        hintEl.textContent = '⚠️ Linux / macOS 暂不支持自动安装 NapCat，请自行在终端安装后使用';
+        hintEl.style.color = 'var(--md-sys-color-error, #b3261e)';
       }
     } else {
-      // 未安装：恢复正常状态
+      // Windows：恢复正常状态
       el.inputInstallNapcat.disabled = false;
       state.napcatAlreadyInstalled = false;
       if (hintEl) {
@@ -138,7 +139,7 @@ async function checkNapcatInstalled() {
       }
     }
   } catch (e) {
-    console.warn('检测 NapCat 安装状态失败:', e);
+    console.warn('检测平台信息失败:', e);
   }
 }
 

@@ -578,7 +578,7 @@ ipcMain.handle('install-cleanup', async (event, instanceId) => {
 });
 
 ipcMain.handle('install-check-napcat-installed', () => {
-  return platformHelper.isNapcatInstalledOnSystem();
+  return { installed: false };
 });
 
 // ─── 用户设置 IPC ──────────────────────────────────────────────────────────
@@ -780,21 +780,11 @@ async function startInstanceInternal(instanceId, instance) {
   if (hasNapcat) {
     // 查找 Napcat Shell 目录
     let napcatShellPath;
-    if (platformHelper.isLinux) {
-      // Linux: NapCat 安装在 $HOME/Napcat/opt/QQ/resources/app/app_launcher/napcat/
-      const linuxCfg = platformHelper.getLinuxNapcatConfig();
-      if (linuxCfg) {
-        napcatShellPath = path.join(linuxCfg.paths.targetFolder, 'napcat');
-      } else {
-        napcatShellPath = napcatPath;
-      }
-    } else {
-      // Windows: 在 napcatDir 下查找 NapCat.*.Shell 子目录
-      const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
-      napcatShellPath = napcatShellDirs.length > 0 
-        ? path.join(napcatPath, napcatShellDirs[0]) 
-        : napcatPath;
-    }
+    // 在 napcatDir 下查找 NapCat.*.Shell 子目录
+    const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
+    napcatShellPath = napcatShellDirs.length > 0 
+      ? path.join(napcatPath, napcatShellDirs[0]) 
+      : napcatPath;
   
   // 使用 PlatformHelper 获取 NapCat 启动命令
   const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatShellPath, instance.qqNumber);
