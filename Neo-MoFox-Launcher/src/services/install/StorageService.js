@@ -173,14 +173,70 @@ class StorageService {
   deleteInstance(instanceId) {
     console.log(`[StorageService] 删除实例: ${instanceId}`);
     const instances = this.getInstances();
-    const originalCount = instances.length;
-    const filtered = instances.filter(i => i.id !== instanceId);
+    const instance = instances.find(i => i.id === instanceId);
     
-    if (filtered.length === originalCount) {
+    if (!instance) {
       console.warn(`[StorageService] 实例不存在: ${instanceId}`);
       throw new Error(`实例不存在: ${instanceId}`);
     }
     
+    // 删除实例文件夹
+    if (instance.neomofoxDir) {
+      // 从 neomofoxDir 推导实例根目录（父目录）
+      // 例如: E:/install/instance_12345/neo-mofox -> E:/install/instance_12345
+      const instanceRootDir = path.dirname(instance.neomofoxDir);
+      
+      if (fs.existsSync(instanceRootDir)) {
+        try {
+          // 检查根目录下的内容
+          const items = fs.readdirSync(instanceRootDir);
+          const allowedItems = ['neo-mofox', 'napcat'];
+          const extraItems = items.filter(item => !allowedItems.includes(item));
+          
+          if (extraItems.length > 0) {
+            // 如果有其他内容，只删除 neo-mofox 和 napcat 文件夹
+            console.log(`[StorageService] 检测到实例根目录包含其他内容: ${extraItems.join(', ')}`);
+            console.log(`[StorageService] 仅删除 neo-mofox 和 napcat 文件夹，保留根目录`);
+            
+            // 删除 neo-mofox
+            if (fs.existsSync(instance.neomofoxDir)) {
+              fs.rmSync(instance.neomofoxDir, { recursive: true, force: true });
+              console.log(`[StorageService] neo-mofox 文件夹删除成功`);
+            }
+            
+            // 删除 napcat（如果存在）
+            if (instance.napcatDir && fs.existsSync(instance.napcatDir)) {
+              fs.rmSync(instance.napcatDir, { recursive: true, force: true });
+              console.log(`[StorageService] napcat 文件夹删除成功`);
+            }
+          } else {
+            // 如果只有 neo-mofox 和/或 napcat，删除整个根目录
+            console.log(`[StorageService] 删除实例根目录: ${instanceRootDir}`);
+            fs.rmSync(instanceRootDir, { recursive: true, force: true });
+            console.log(`[StorageService] 实例根目录删除成功`);
+          }
+        } catch (e) {
+          console.error(`[StorageService] 删除实例文件夹失败:`, e);
+          // 即使文件夹删除失败，仍继续删除记录
+        }
+      }
+    }
+    
+    // 删除实例日志文件夹
+    try {
+      const logDir = path.join(this.getDataDir(), 'logs', instanceId);
+      if (fs.existsSync(logDir)) {
+        console.log(`[StorageService] 删除实例日志: ${logDir}`);
+        fs.rmSync(logDir, { recursive: true, force: true });
+        console.log(`[StorageService] 实例日志删除成功`);
+      }
+    } catch (e) {
+      console.error(`[StorageService] 删除实例日志失败:`, e);
+      // 即使日志删除失败，仍继续删除记录
+    }
+    
+    // 从记录中删除实例
+    const filtered = instances.filter(i => i.id !== instanceId);
     this.writeInstances(filtered);
     console.log(`[StorageService] 实例删除成功，剩余 ${filtered.length} 个实例`);
     return filtered;
