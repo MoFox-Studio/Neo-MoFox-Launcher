@@ -1,0 +1,24 @@
+# 打包时忽略的文件和目录
+dist
+.git
+.gitignore
+README.md
+*.md
+.vscode
+.idea
+
+# 开发依赖
+.editorconfig
+.eslintrc*
+.prettierrc*
+
+# 日志文件
+*.log
+logs
+
+# 测试文件
+test
+tests
+__tests__
+*.test.js
+*.spec.js

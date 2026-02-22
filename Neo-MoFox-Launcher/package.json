@@ -25,7 +25,17 @@
     "forge": {
       "packagerConfig": {
         "name": "Neo-MoFox Launcher",
-        "icon": "assets/icon.ico"
+        "icon": "assets/icon.ico",
+        "asar": true,
+        "ignore": [
+          "^/dist($|/)",
+          "^/\\.git($|/)",
+          "^/\\.vscode($|/)",
+          "^/\\.idea($|/)",
+          "\\.md$",
+          "^/logs($|/)",
+          "\\.log$"
+        ]
       },
       "makers": [
         {
