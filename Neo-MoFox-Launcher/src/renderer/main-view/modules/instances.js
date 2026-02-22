@@ -172,15 +172,14 @@ export function renderInstances() {
         </div>
       `;
       
-      // 事件绑定 - 管理按钮 (原启动/打开实例)
+      // 事件绑定 - 管理按钮 → 打开编辑对话框
       const btnSettings = card.querySelector('.btn-settings-instance');
       btnSettings.addEventListener('click', (e) => {
         e.stopPropagation();
-        // 跳转到实例视图页面
-        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+        openEditModal(instance);
       });
 
-      // 事件绑定 - 启动按钮 (新增逻辑)
+      // 事件绑定 - 启动按钮 → 跳转到实例视图页面并自动启动
       const btnStart = card.querySelector('.btn-start-instance');
       btnStart.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -188,7 +187,7 @@ export function renderInstances() {
         window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}&autoStart=true`;
       });
       
-      // 整个卡片点击也进入管理页面
+      // 整个卡片点击进入实例视图页面（不自动启动）
       card.addEventListener('click', () => {
          window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });

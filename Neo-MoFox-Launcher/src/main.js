@@ -51,6 +51,19 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  // 监听窗口最大化/还原状态变化
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximize-changed', true);
+    }
+  });
+
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximize-changed', false);
+    }
+  });
+
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       if (mainWindow.webContents.isDevToolsOpened()) {
@@ -1219,3 +1232,204 @@ ipcMain.handle('instance-export-logs', async (event, instanceId, type, logs) => 
     throw new Error('导出失败: ' + error.message);
   }
 });
+
+// ─── 实例文件管理 ───────────────────────────────────────────────────────────
+
+ipcMain.handle('instance-open-folder', async (event, instanceId, folderType) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    let folderPath = null;
+    const mofoxDir = instance.neomofoxDir;
+    
+    switch (folderType) {
+      case 'project':
+        folderPath = mofoxDir;
+        break;
+      case 'config':
+        folderPath = path.join(mofoxDir, 'config');
+        break;
+      case 'data':
+        folderPath = path.join(mofoxDir, 'data');
+        break;
+      case 'logs':
+        folderPath = path.join(mofoxDir, 'logs');
+        break;
+      case 'plugins':
+        folderPath = path.join(mofoxDir, 'plugins');
+        break;
+      case 'napcat':
+        if (instance.napcatDir) {
+          folderPath = instance.napcatDir;
+        } else {
+          throw new Error('该实例未安装 NapCat');
+        }
+        break;
+      default:
+        throw new Error(`未知的文件夹类型: ${folderType}`);
+    }
+
+    if (!fs.existsSync(folderPath)) {
+      throw new Error(`文件夹不存在: ${folderPath}`);
+    }
+
+    await shell.openPath(folderPath);
+    return { success: true, path: folderPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-open-file', async (event, instanceId, fileType) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    let filePath = null;
+    const mofoxDir = instance.neomofoxDir;
+    
+    switch (fileType) {
+      case 'core-config':
+        filePath = path.join(mofoxDir, 'config', 'core.toml');
+        break;
+      case 'model-config':
+        filePath = path.join(mofoxDir, 'config', 'model.toml');
+        break;
+      default:
+        throw new Error(`未知的文件类型: ${fileType}`);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`文件不存在: ${filePath}`);
+    }
+
+    await shell.openPath(filePath);
+    return { success: true, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-get-paths', (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    const mofoxDir = instance.neomofoxDir;
+    const paths = {
+      project: mofoxDir,
+      config: path.join(mofoxDir, 'config'),
+      data: path.join(mofoxDir, 'data'),
+      logs: path.join(mofoxDir, 'logs'),
+      plugins: path.join(mofoxDir, 'plugins'),
+      coreConfig: path.join(mofoxDir, 'config', 'core.toml'),
+      modelConfig: path.join(mofoxDir, 'config', 'model.toml'),
+    };
+
+    if (instance.napcatDir) {
+      paths.napcat = instance.napcatDir;
+    }
+
+    // 检查路径存在性
+    const exists = {};
+    Object.keys(paths).forEach(key => {
+      exists[key] = fs.existsSync(paths[key]);
+    });
+
+    return { success: true, paths, exists };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-delete-database', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    // 检查实例是否在运行
+    const instanceData = instanceProcesses.get(instanceId);
+    if (instanceData && instanceData.status === 'running') {
+      throw new Error('请先停止实例再删除数据库');
+    }
+
+    const dataDir = path.join(instance.neomofoxDir, 'data');
+    if (!fs.existsSync(dataDir)) {
+      return { success: true, message: '数据目录不存在，无需删除' };
+    }
+
+    // 查找所有 .db 文件
+    const dbFiles = fs.readdirSync(dataDir).filter(file => file.endsWith('.db'));
+    
+    if (dbFiles.length === 0) {
+      return { success: true, message: '未找到数据库文件' };
+    }
+
+    // 删除所有数据库文件
+    let deletedCount = 0;
+    for (const dbFile of dbFiles) {
+      const dbPath = path.join(dataDir, dbFile);
+      fs.unlinkSync(dbPath);
+      deletedCount++;
+      
+      // 同时删除可能的 .db-shm 和 .db-wal 文件
+      const shmPath = dbPath + '-shm';
+      const walPath = dbPath + '-wal';
+      if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+      if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+    }
+
+    return { 
+      success: true, 
+      message: `已删除 ${deletedCount} 个数据库文件`,
+      deletedFiles: dbFiles 
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-delete-logs', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    const logsDir = path.join(instance.neomofoxDir, 'logs');
+    if (!fs.existsSync(logsDir)) {
+      return { success: true, message: '日志目录不存在，无需删除' };
+    }
+
+    // 删除日志目录中的所有文件
+    const files = fs.readdirSync(logsDir);
+    let deletedCount = 0;
+    
+    for (const file of files) {
+      const filePath = path.join(logsDir, file);
+      const stat = fs.statSync(filePath);
+      
+      if (stat.isFile()) {
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      }
+    }
+
+    return { 
+      success: true, 
+      message: `已删除 ${deletedCount} 个日志文件` 
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+

@@ -327,7 +327,7 @@ class InstallWizardService {
   /**
    * 校验安装路径
    */
-  validateInstallDir(installDir) {
+  validateInstallDir(installDir, instanceId = null, isResume = false) {
     if (!installDir || installDir.trim().length === 0) {
       return { valid: false, error: '安装路径不能为空' };
     }
@@ -335,6 +335,23 @@ class InstallWizardService {
     if (/[\u4e00-\u9fa5\s]/.test(installDir)) {
       return { valid: false, error: '安装路径不应包含中文或空格' };
     }
+    
+    // 如果提供了 instanceId，检查实例目录是否为空（续装模式除外）
+    if (instanceId && !isResume) {
+      const instanceDir = path.join(installDir, instanceId);
+      if (fs.existsSync(instanceDir)) {
+        const files = fs.readdirSync(instanceDir);
+        // 过滤掉特定的安装目录，检查是否有其他文件
+        const otherFiles = files.filter(f => f !== 'neo-mofox' && f !== 'napcat');
+        if (otherFiles.length > 0) {
+          return { 
+            valid: false, 
+            error: `目标目录 ${instanceDir} 已包含其他文件，请选择空目录或清理后再安装` 
+          };
+        }
+      }
+    }
+    
     return { valid: true };
   }
 
@@ -425,7 +442,12 @@ class InstallWizardService {
     const portResult = this.validatePort(inputs.wsPort);
     if (!portResult.valid) errors.push({ field: 'wsPort', error: portResult.error });
 
-    const dirResult = this.validateInstallDir(inputs.installDir);
+    // 检查是否为续装模式
+    const instanceId = this._generateInstanceId(inputs.qqNumber);
+    const existing = storageService.getInstance(instanceId);
+    const isResume = existing && !existing.installCompleted;
+
+    const dirResult = this.validateInstallDir(inputs.installDir, instanceId, isResume);
     if (!dirResult.valid) errors.push({ field: 'installDir', error: dirResult.error });
 
     // 校验安装步骤配置
@@ -853,12 +875,18 @@ class InstallWizardService {
     try {
       const data = storageService.readToml(modelTomlPath);
       
-      // 找到第一个 api_providers 条目并写入 api_key
+      // 找到名为 SiliconFlow 的 api_provider 并写入 api_key
       if (data.api_providers && data.api_providers.length > 0) {
-        data.api_providers[0].api_key = apiKey;
+        const siliconFlowProvider = data.api_providers.find(p => p.name === 'SiliconFlow');
+        if (siliconFlowProvider) {
+          siliconFlowProvider.api_key = apiKey;
+        } else {
+          // 如果没有找到 SiliconFlow，写入第一个 provider
+          data.api_providers[0].api_key = apiKey;
+        }
       } else {
-        // 如果不存在，创建一个
-        data.api_providers = [{ api_key: apiKey }];
+        // 如果不存在任何 provider，创建一个 SiliconFlow provider
+        data.api_providers = [{ name: 'SiliconFlow', api_key: apiKey }];
       }
       
       storageService.writeToml(modelTomlPath, data);
@@ -1241,24 +1269,35 @@ class InstallWizardService {
 
   /**
    * 清理失败的安装
+   * 只删除安装过程中创建的 neo-mofox 和 napcat 文件夹，保留父目录和其他文件
    */
   async cleanupFailedInstall(instanceId) {
     const instance = storageService.getInstance(instanceId);
     if (!instance) return { success: false, error: '实例不存在' };
 
-    // 删除目录
-    const dirs = [instance.neomofoxDir, instance.napcatDir];
-    for (const dir of dirs) {
-      if (dir && fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
+    // 只删除安装的特定目录（neo-mofox 和 napcat），不删除父目录
+    const dirsToRemove = [];
+    
+    if (instance.neomofoxDir && fs.existsSync(instance.neomofoxDir)) {
+      dirsToRemove.push({ path: instance.neomofoxDir, name: 'neo-mofox' });
+    }
+    
+    if (instance.napcatDir && fs.existsSync(instance.napcatDir)) {
+      dirsToRemove.push({ path: instance.napcatDir, name: 'napcat' });
+    }
+
+    // 删除特定目录
+    for (const dir of dirsToRemove) {
+      try {
+        fs.rmSync(dir.path, { recursive: true, force: true });
+        console.log(`[Cleanup] 已删除: ${dir.name}`);
+      } catch (err) {
+        console.warn(`[Cleanup] 删除 ${dir.name} 失败:`, err.message);
       }
     }
 
-    // 删除父目录（如果为空）
-    const parentDir = path.dirname(instance.neomofoxDir);
-    if (fs.existsSync(parentDir) && fs.readdirSync(parentDir).length === 0) {
-      fs.rmdirSync(parentDir);
-    }
+    // 不删除父目录，即使为空（用户可能在该目录下有其他文件）
+    // 这样可以避免误删用户的其他数据
 
     // 删除实例记录
     storageService.deleteInstance(instanceId);

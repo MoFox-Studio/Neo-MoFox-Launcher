@@ -62,7 +62,12 @@ const el = {
 
   // 统计信息
   mofoxUptime: document.getElementById('mofoxUptime'),
-  napcatUptime: document.getElementById('napcatUptime')
+  napcatUptime: document.getElementById('napcatUptime'),
+
+  // 设置对话框
+  settingsDialog: document.getElementById('settingsDialog'),
+  btnCloseSettings: document.getElementById('btnCloseSettings'),
+  btnOpenNapcat: document.getElementById('btnOpenNapcat')
 };
 
 // ─── 初始化 ───────────────────────────────────────────────────────────
@@ -82,7 +87,7 @@ async function init() {
      console.log('自动启动标志位已设置，正在启动实例...');
      // 延迟一点点以确保UI加载完成
      setTimeout(() => {
-        handleStartInstance();
+        handleStart();
      }, 500);
   }
 }
@@ -218,6 +223,15 @@ function setupEventListeners() {
 
   // 导出日志
   el.btnExportLogs.addEventListener('click', handleExportLogs);
+
+  // 设置对话框
+  el.btnCloseSettings.addEventListener('click', closeSettings);
+  el.settingsDialog.querySelector('.settings-overlay').addEventListener('click', closeSettings);
+  
+  // 设置项点击
+  document.querySelectorAll('.settings-item').forEach(item => {
+    item.addEventListener('click', () => handleSettingsAction(item.dataset.action));
+  });
 }
 
 // ─── IPC 监听器 ───────────────────────────────────────────────────────
@@ -318,9 +332,140 @@ async function handleRestart() {
   }
 }
 
-function handleSettings() {
-  // TODO: 打开实例设置对话框
-  console.log('打开设置');
+async function handleSettings() {
+  // 打开设置对话框
+  el.settingsDialog.classList.remove('hidden');
+  
+  // 根据是否安装了 NapCat 显示/隐藏 NapCat 按钮
+  if (!state.hasNapcat && el.btnOpenNapcat) {
+    el.btnOpenNapcat.style.display = 'none';
+  }
+}
+
+function closeSettings() {
+  el.settingsDialog.classList.add('hidden');
+}
+
+async function handleSettingsAction(action) {
+  if (!state.instanceId) {
+    showError('实例信息丢失');
+    return;
+  }
+
+  try {
+    switch (action) {
+      case 'open-project':
+        await openFolder('project');
+        break;
+      case 'open-config-folder':
+        await openFolder('config');
+        break;
+      case 'open-data-folder':
+        await openFolder('data');
+        break;
+      case 'open-logs-folder':
+        await openFolder('logs');
+        break;
+      case 'open-plugins-folder':
+        await openFolder('plugins');
+        break;
+      case 'open-napcat':
+        await openFolder('napcat');
+        break;
+      case 'open-core-config':
+        await openFile('core-config');
+        break;
+      case 'open-model-config':
+        await openFile('model-config');
+        break;
+      case 'delete-database':
+        await handleDeleteDatabase();
+        break;
+      case 'delete-logs':
+        await handleDeleteInstanceLogs();
+        break;
+      default:
+        showWarning('未知操作: ' + action);
+    }
+  } catch (error) {
+    console.error('操作失败:', error);
+    showError('操作失败: ' + error.message);
+  }
+}
+
+async function openFolder(folderType) {
+  const result = await window.mofoxAPI.openInstanceFolder(state.instanceId, folderType);
+  
+  if (result.success) {
+    showSuccess('已打开文件夹');
+  } else {
+    showError(result.error || '打开文件夹失败');
+  }
+}
+
+async function openFile(fileType) {
+  const result = await window.mofoxAPI.openInstanceFile(state.instanceId, fileType);
+  
+  if (result.success) {
+    showSuccess('已打开文件');
+  } else {
+    showError(result.error || '打开文件失败');
+  }
+}
+
+async function handleDeleteDatabase() {
+  // 先检查实例是否在运行
+  if (state.instanceStatus === 'running') {
+    showError('请先停止实例再删除数据库');
+    return;
+  }
+  
+  // 确认对话框
+  const confirmed = await customConfirm(
+    '确定要删除数据库吗？\n\n' +
+    '这将清空所有数据，包括：\n' +
+    '• 聊天记录\n' +
+    '• 用户数据\n' +
+    '• 插件数据\n\n' +
+    '此操作不可恢复！',
+    '删除数据库'
+  );
+  
+  if (!confirmed) {
+    return;
+  }
+  
+  const result = await window.mofoxAPI.deleteInstanceDatabase(state.instanceId);
+  
+  if (result.success) {
+    showSuccess(result.message || '数据库已删除');
+    closeSettings();
+  } else {
+    showError(result.error || '删除数据库失败');
+  }
+}
+
+async function handleDeleteInstanceLogs() {
+  // 确认对话框
+  const confirmed = await customConfirm(
+    '确定要清空日志文件吗？\n\n' +
+    '这将删除所有历史日志文件，但不会影响当前运行的日志显示。\n\n' +
+    '此操作不可恢复！',
+    '清空日志文件'
+  );
+  
+  if (!confirmed) {
+    return;
+  }
+  
+  const result = await window.mofoxAPI.deleteInstanceLogs(state.instanceId);
+  
+  if (result.success) {
+    showSuccess(result.message || '日志文件已清空');
+    closeSettings();
+  } else {
+    showError(result.error || '清空日志失败');
+  }
 }
 
 // ─── 状态更新 ─────────────────────────────────────────────────────────
