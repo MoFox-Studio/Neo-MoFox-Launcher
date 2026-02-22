@@ -10,6 +10,7 @@ const net = require('net');
 const https = require('https');
 const http = require('http');
 const { storageService } = require('./StorageService');
+const { platformHelper } = require('../PlatformHelper');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -52,6 +53,10 @@ class InstallWizardService {
     this._progressCallback = null;
     this._outputCallback = null;
     this._currentInstance = null;
+
+    // 启动时检测系统环境
+    this._sysEnv = platformHelper.detectSystemEnv();
+    console.log(`[InstallWizard] 当前系统: ${this._sysEnv.platformLabel}${this._sysEnv.distro ? ' (' + this._sysEnv.distroName + ')' : ''}`);
   }
 
   /**
@@ -98,9 +103,9 @@ class InstallWizardService {
   async _checkCommand(command, args = ['--version']) {
     return new Promise((resolve) => {
       const proc = spawn(command, args, { 
-        shell: true, 
+        shell: platformHelper.config.shell, 
         timeout: 10000,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' }
+        env: platformHelper.buildSpawnEnv()
       });
       let stdout = '';
       let stderr = '';
@@ -137,7 +142,7 @@ class InstallWizardService {
     // 收集 PATH 中所有 python 可执行文件
     const pythonPaths = [];
     const seen = new Set();
-    const exeName = process.platform === 'win32' ? 'python.exe' : 'python3';
+    const exeName = platformHelper.pythonExeName;
     const pathDirs = (process.env.PATH || '').split(path.delimiter);
     for (const dir of pathDirs) {
       try {
@@ -478,8 +483,8 @@ class InstallWizardService {
     return new Promise((resolve, reject) => {
       // 强制使用 UTF-8 编码输出，避免中文乱码
       const proc = spawn(command, args, {
-        shell: true,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' },
+        shell: platformHelper.config.shell,
+        env: platformHelper.buildSpawnEnv(),
         ...options,
       });
 
@@ -752,12 +757,8 @@ class InstallWizardService {
           clearTimeout(timeout);
           if (!killed) {
             killed = true;
-            // Windows 下使用 taskkill
-            if (process.platform === 'win32') {
-              spawn('taskkill', ['/pid', proc.pid, '/f', '/t'], { shell: true });
-            } else {
-              proc.kill('SIGINT');
-            }
+            // 使用 PlatformHelper 杀死进程
+            platformHelper.killProcessTree(proc, 'SIGTERM');
             this._emitProgress('gen-config', 100, '配置文件生成完成');
             resolve({ success: true, configDir });
           }
@@ -768,11 +769,7 @@ class InstallWizardService {
         clearInterval(checkInterval);
         if (!killed) {
           killed = true;
-          if (process.platform === 'win32') {
-            spawn('taskkill', ['/pid', proc.pid, '/f', '/t'], { shell: true });
-          } else {
-            proc.kill('SIGINT');
-          }
+          platformHelper.killProcessTree(proc, 'SIGKILL');
           reject(new Error('生成配置文件超时（60秒）'));
         }
       }, CONFIG_DETECT_TIMEOUT);
@@ -898,9 +895,9 @@ class InstallWizardService {
     const napcatDir = path.join(installDir, instanceId, 'napcat');
     fs.mkdirSync(napcatDir, { recursive: true });
 
-    // 非 Windows 平台跳过，返回目录供用户手动安装
-    if (process.platform !== 'win32') {
-      this._emitProgress('napcat', 100, '非 Windows 平台，跳过 NapCat 自动安装，请手动安装');
+    // 检查当前平台是否支持 NapCat 自动安装
+    if (!platformHelper.supportsNapcatAutoInstall) {
+      this._emitProgress('napcat', 100, `${platformHelper.label} 暂不支持 NapCat 自动安装，请手动安装`);
       return { success: true, path: napcatDir, shellPath: null };
     }
 
@@ -908,7 +905,7 @@ class InstallWizardService {
     this._emitProgress('napcat', 5, '正在获取 NapCat 最新版本信息...');
     const release = await this._fetchLatestNapCatRelease();
 
-    const ASSET_NAME = 'NapCat.Shell.Windows.OneKey.zip';
+    const ASSET_NAME = platformHelper.napcatAssetName;
     const asset = release.assets.find((a) => a.name === ASSET_NAME);
     if (!asset) {
       throw new Error(`在 ${release.tag_name} 中未找到 ${ASSET_NAME}，请前往 https://github.com/NapNeko/NapCatQQ/releases 手动下载`);
@@ -931,11 +928,12 @@ class InstallWizardService {
 
     this._emitOutput(`[napcat] 下载完成: ${zipPath}`);
 
-    // ── Step 3: 解压 ────────────────────────────────────────────────────
+    // ── Step 3: 解压（跨平台） ────────────────────────────────────────────
     this._emitProgress('napcat', 68, '正在解压...');
+    const unzipInfo = platformHelper.getUnzipCommand(zipPath, napcatDir);
     await this._execCommand(
-      'powershell',
-      ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${napcatDir}" -Force`],
+      unzipInfo.cmd,
+      unzipInfo.args,
       { onStderr: (d) => this._emitOutput(d) }
     );
     this._emitOutput('[napcat] 解压完成');
@@ -943,24 +941,45 @@ class InstallWizardService {
     // 删除 ZIP 释放空间
     try { fs.unlinkSync(zipPath); } catch (_) {}
 
-    // ── Step 4: 运行 NapCatInstaller.exe 自动化配置 ───────────────────
-    const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
-    if (fs.existsSync(installerPath)) {
-      this._emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
-      this._emitOutput('[napcat] 启动 NapCatInstaller.exe，等待配置完成...');
-      // 使用 cmd /c "echo.|exe" 自动对 "Press any key to continue" 输入回车，避免阻塞
-      await this._execCommand(
-        'cmd',
-        ['/c', `echo.|"${installerPath}"`],
-        {
-          cwd: napcatDir,
-          onStdout: (d) => this._emitOutput(d),
-          onStderr: (d) => this._emitOutput(d),
-        }
-      );
-      this._emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
-    } else {
-      this._emitOutput(`[napcat] 未找到 NapCatInstaller.exe，跳过自动化配置步骤`);
+    // ── Step 4: 运行安装器自动化配置（跨平台） ───────────────────
+    if (platformHelper.isWindows) {
+      const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
+      if (fs.existsSync(installerPath)) {
+        this._emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
+        this._emitOutput('[napcat] 启动 NapCatInstaller.exe，等待配置完成...');
+        await this._execCommand(
+          'cmd',
+          ['/c', `echo.|"${installerPath}"`],
+          {
+            cwd: napcatDir,
+            onStdout: (d) => this._emitOutput(d),
+            onStderr: (d) => this._emitOutput(d),
+          }
+        );
+        this._emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
+      } else {
+        this._emitOutput('[napcat] 未找到 NapCatInstaller.exe，跳过自动化配置步骤');
+      }
+    } else if (platformHelper.isLinux) {
+      // Linux 下可能有 install.sh 之类的安装脚本
+      const installerScript = path.join(napcatDir, 'install.sh');
+      if (fs.existsSync(installerScript)) {
+        this._emitProgress('napcat', 75, '正在运行 install.sh 自动化配置...');
+        // 先赋予执行权限
+        await this._execCommand('chmod', ['+x', installerScript], { cwd: napcatDir });
+        await this._execCommand(
+          'bash',
+          [installerScript],
+          {
+            cwd: napcatDir,
+            onStdout: (d) => this._emitOutput(d),
+            onStderr: (d) => this._emitOutput(d),
+          }
+        );
+        this._emitOutput('[napcat] install.sh 执行完毕');
+      } else {
+        this._emitOutput('[napcat] 未找到安装脚本，跳过自动化配置步骤');
+      }
     }
 
     // ── Step 5: 定位 NapCat.*.Shell 目录 ───────────────────────────────
@@ -1028,20 +1047,10 @@ class InstallWizardService {
     this._emitOutput(`[napcat-config] onebot11 配置: ${onebot11Path}`);
     this._emitOutput(`[napcat-config] napcat 配置: ${napcatCfgPath}`);
 
-    // 生成快速启动 bat（Windows 一键版）
-    // 命令格式: NapCatWinBootMain.exe <QQ号>
-    if (process.platform === 'win32') {
-      const batContent = [
-        '@echo off',
-        `chcp 65001 >nul`,
-        `echo 正在启动 NapCat (QQ: ${qqNumber})...`,
-        `NapCatWinBootMain.exe ${qqNumber}`,
-        'pause',
-      ].join('\r\n');
-
-      const batPath = path.join(shellDir, `start_napcat_${qqNumber}.bat`);
-      fs.writeFileSync(batPath, batContent, 'utf8');
-      this._emitOutput(`[napcat-config] 启动脚本: ${batPath}`);
+    // 生成快速启动脚本（跨平台）
+    const launcherPath = platformHelper.writeNapcatLauncherScript(shellDir, qqNumber);
+    if (launcherPath) {
+      this._emitOutput(`[napcat-config] 启动脚本: ${launcherPath}`);
     }
 
     this._emitProgress('napcat-config', 100, 'NapCat 配置写入完成');

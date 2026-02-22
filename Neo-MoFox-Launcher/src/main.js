@@ -3,6 +3,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
+const { platformHelper } = require('./services/PlatformHelper');
 
 // 强制 stdout/stderr 使用 UTF-8 输出，解决 Windows 终端中文乱码
 if (process.stdout && typeof process.stdout.setEncoding === 'function') {
@@ -64,6 +65,11 @@ app.whenReady().then(() => {
   process.env.PYTHONIOENCODING = 'utf-8';
   process.env.PYTHONUNBUFFERED = '1';
   
+  // 启动时检测系统环境
+  const sysEnv = platformHelper.detectSystemEnv();
+  console.log(`[Main] 系统平台: ${sysEnv.platformLabel} (${sysEnv.osType} ${sysEnv.osRelease})${sysEnv.distro ? ' - ' + sysEnv.distroName : ''}`);
+  console.log(`[Main] 架构: ${sysEnv.arch}, Shell: ${sysEnv.shell}`);
+  
   createWindow();
   loadSettings();
 });
@@ -124,20 +130,8 @@ function updateStatus(status, detail = '') {
 }
 
 function findPythonExecutable() {
-  // 优先找项目目录下的 .venv
-  const venvPaths = [
-    path.join(projectPath, '.venv', 'Scripts', 'python.exe'),
-    path.join(projectPath, '.venv', 'bin', 'python'),
-    path.join(projectPath, 'venv', 'Scripts', 'python.exe'),
-    path.join(projectPath, 'venv', 'bin', 'python'),
-  ];
-
-  for (const p of venvPaths) {
-    if (fs.existsSync(p)) return p;
-  }
-
-  // 尝试 uv run
-  return null;
+  // 使用 PlatformHelper 查找虚拟环境 Python
+  return platformHelper.findVenvPython(projectPath);
 }
 
 function startMofox() {
@@ -171,7 +165,7 @@ function startMofox() {
     sendLog('info', `  使用 Python: ${pythonExe}`);
   } else {
     // 使用 uv run
-    cmd = process.platform === 'win32' ? 'uv.exe' : 'uv';
+    cmd = platformHelper.uvBin;
     args = ['run', 'python', 'main.py'];
     sendLog('info', '  使用 uv run 启动');
   }
@@ -180,7 +174,7 @@ function startMofox() {
     // 强制使用 UTF-8 编码输出，避免中文乱码
     mofoxProcess = spawn(cmd, args, {
       cwd: projectPath,
-      env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+      env: platformHelper.buildSpawnEnv(),
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -252,13 +246,7 @@ function stopMofox() {
   sendLog('info', '◉ 正在停止 Neo-MoFox...');
 
   try {
-    const treeKill = require('tree-kill');
-    treeKill(mofoxProcess.pid, 'SIGTERM', (err) => {
-      if (err) {
-        sendLog('warn', `  强制终止进程...`);
-        try { mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-      }
-    });
+    platformHelper.killProcessTree(mofoxProcess, 'SIGTERM');
 
     // 超时强杀
     setTimeout(() => {
@@ -283,11 +271,12 @@ function restartMofox() {
   sendLog('info', '◉ 正在重启 Neo-MoFox...');
   if (mofoxProcess) {
     updateStatus('stopping');
-    const treeKill = require('tree-kill');
-    treeKill(mofoxProcess.pid, 'SIGTERM', () => {
+    platformHelper.killProcessTree(mofoxProcess, 'SIGTERM');
+    // 等待进程退出后重启
+    setTimeout(() => {
       mofoxProcess = null;
-      setTimeout(() => startMofox(), 1500);
-    });
+      startMofox();
+    }, 1500);
     setTimeout(() => {
       if (mofoxProcess) {
         try { mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
@@ -303,27 +292,17 @@ function restartMofox() {
 function killMofoxProcess() {
   // 杀死旧的单实例进程
   if (mofoxProcess) {
-    try {
-      const treeKill = require('tree-kill');
-      treeKill(mofoxProcess.pid, 'SIGKILL');
-    } catch (e) {
-      try { mofoxProcess.kill('SIGKILL'); } catch (e2) { /* ignore */ }
-    }
+    platformHelper.killProcessTree(mofoxProcess, 'SIGKILL');
     mofoxProcess = null;
   }
   
   // 杀死所有实例进程
-  const treeKill = require('tree-kill');
   for (const [instanceId, data] of instanceProcesses.entries()) {
     if (data.mofoxProcess) {
-      try {
-        treeKill(data.mofoxProcess.pid, 'SIGKILL');
-      } catch (e) { /* ignore */ }
+      platformHelper.killProcessTree(data.mofoxProcess, 'SIGKILL');
     }
     if (data.napcatProcess) {
-      try {
-        treeKill(data.napcatProcess.pid, 'SIGKILL');
-      } catch (e) { /* ignore */ }
+      platformHelper.killProcessTree(data.napcatProcess, 'SIGKILL');
     }
   }
   instanceProcesses.clear();
@@ -335,8 +314,13 @@ function getSystemInfo() {
   const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1);
   const freeMem = (os.freemem() / 1024 / 1024 / 1024).toFixed(1);
   const usedMem = (totalMem - freeMem).toFixed(1);
+  const sysEnv = platformHelper.detectSystemEnv();
   return {
     platform: `${os.type()} ${os.release()}`,
+    platformId: sysEnv.platform,
+    platformLabel: sysEnv.platformLabel,
+    distro: sysEnv.distro || null,
+    distroName: sysEnv.distroName || null,
     arch: os.arch(),
     cpu: cpus[0] ? cpus[0].model : 'Unknown',
     cpuCores: cpus.length,
@@ -371,6 +355,10 @@ ipcMain.handle('get-logs', () => {
 
 ipcMain.handle('get-system-info', () => {
   return getSystemInfo();
+});
+
+ipcMain.handle('get-platform-info', () => {
+  return platformHelper.detectSystemEnv();
 });
 
 ipcMain.handle('start-mofox', () => {
@@ -718,20 +706,7 @@ async function startInstanceInternal(instanceId, instance) {
   
   // ── 启动 MoFox ──────────────────────────────────────────────────────
   // 查找 Python 可执行文件
-  const venvPaths = [
-    path.join(mofoxPath, '.venv', 'Scripts', 'python.exe'),
-    path.join(mofoxPath, '.venv', 'bin', 'python'),
-    path.join(mofoxPath, 'venv', 'Scripts', 'python.exe'),
-    path.join(mofoxPath, 'venv', 'bin', 'python'),
-  ];
-  
-  let pythonExe = null;
-  for (const p of venvPaths) {
-    if (fs.existsSync(p)) {
-      pythonExe = p;
-      break;
-    }
-  }
+  const pythonExe = platformHelper.findVenvPython(mofoxPath);
   
   let cmd, args;
   if (pythonExe) {
@@ -739,7 +714,7 @@ async function startInstanceInternal(instanceId, instance) {
     args = [mainPy];
     sendInstanceLog(instanceId, 'mofox', `使用 Python: ${pythonExe}`, 'info');
   } else {
-    cmd = process.platform === 'win32' ? 'uv.exe' : 'uv';
+    cmd = platformHelper.uvBin;
     args = ['run', 'python', 'main.py'];
     sendInstanceLog(instanceId, 'mofox', '使用 uv run 启动', 'info');
   }
@@ -747,7 +722,7 @@ async function startInstanceInternal(instanceId, instance) {
   // 强制使用 UTF-8 编码输出，避免中文乱码
   const mofoxProc = spawn(cmd, args, {
     cwd: mofoxPath,
-    env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+    env: platformHelper.buildSpawnEnv(),
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -805,21 +780,14 @@ async function startInstanceInternal(instanceId, instance) {
       ? path.join(napcatPath, napcatShellDirs[0]) 
       : napcatPath;
   
-  const napcatBat = path.join(napcatShellPath, `start_napcat_${instance.qqNumber}.bat`);
-  const napcatExe = path.join(napcatShellPath, 'NapCatWinBootMain.exe');
+  // 使用 PlatformHelper 获取 NapCat 启动命令
+  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatShellPath, instance.qqNumber);
   
   let napcatCmd, napcatArgs;
-  
-  if (fs.existsSync(napcatBat)) {
-    // 使用启动脚本
-    napcatCmd = 'cmd';
-    napcatArgs = ['/c', napcatBat];
-    sendInstanceLog(instanceId, 'napcat', `使用启动脚本: ${napcatBat}`, 'info');
-  } else if (fs.existsSync(napcatExe)) {
-    // 直接使用 exe
-    napcatCmd = napcatExe;
-    napcatArgs = [instance.qqNumber];
-    sendInstanceLog(instanceId, 'napcat', `使用 NapCatWinBootMain.exe`, 'info');
+  if (napcatStartInfo) {
+    napcatCmd = napcatStartInfo.cmd;
+    napcatArgs = napcatStartInfo.args;
+    sendInstanceLog(instanceId, 'napcat', `使用启动命令: ${napcatCmd} ${napcatArgs.join(' ')}`, 'info');
   } else {
     sendInstanceLog(instanceId, 'napcat', '警告: 未找到 Napcat 启动文件', 'warning');
   }
@@ -936,26 +904,14 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
     sendInstanceLog(instanceId, 'mofox', '正在停止 MoFox...', 'info');
     sendInstanceLog(instanceId, 'napcat', '正在停止 Napcat...', 'info');
     
-    const treeKill = require('tree-kill');
-    
     // 停止 MoFox
     if (instanceData.mofoxProcess) {
-      treeKill(instanceData.mofoxProcess.pid, 'SIGTERM', (err) => {
-        if (err) {
-          sendInstanceLog(instanceId, 'mofox', '强制终止 MoFox...', 'warning');
-          try { instanceData.mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-        }
-      });
+      platformHelper.killProcessTree(instanceData.mofoxProcess, 'SIGTERM');
     }
     
     // 停止 Napcat
     if (instanceData.napcatProcess) {
-      treeKill(instanceData.napcatProcess.pid, 'SIGTERM', (err) => {
-        if (err) {
-          sendInstanceLog(instanceId, 'napcat', '强制终止 Napcat...', 'warning');
-          try { instanceData.napcatProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-        }
-      });
+      platformHelper.killProcessTree(instanceData.napcatProcess, 'SIGTERM');
     }
     
     // 超时强杀
@@ -989,32 +945,14 @@ ipcMain.handle('instance-restart', async (event, instanceId) => {
       sendInstanceLog(instanceId, 'napcat', '正在重启 Napcat...', 'info');
       
       return new Promise((resolve) => {
-        const treeKill = require('tree-kill');
-        let mofoxKilled = false;
-        let napcatKilled = false;
-        
         // 停止 MoFox
         if (instanceData.mofoxProcess) {
-          treeKill(instanceData.mofoxProcess.pid, 'SIGTERM', (err) => {
-            if (err) {
-              try { instanceData.mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            }
-            mofoxKilled = true;
-          });
-        } else {
-          mofoxKilled = true;
+          platformHelper.killProcessTree(instanceData.mofoxProcess, 'SIGTERM');
         }
         
         // 停止 Napcat
         if (instanceData.napcatProcess) {
-          treeKill(instanceData.napcatProcess.pid, 'SIGTERM', (err) => {
-            if (err) {
-              try { instanceData.napcatProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-            }
-            napcatKilled = true;
-          });
-        } else {
-          napcatKilled = true;
+          platformHelper.killProcessTree(instanceData.napcatProcess, 'SIGTERM');
         }
         
         instanceData.mofoxProcess = null;

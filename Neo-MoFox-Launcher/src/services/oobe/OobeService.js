@@ -16,40 +16,86 @@ const path = require('path');
 const os   = require('os');
 const https = require('https');
 const http  = require('http');
+const { platformHelper } = require('../PlatformHelper');
 
 // ─── 下载链接 & 静默安装参数 ──────────────────────────────────────────────
 
 const DOWNLOAD_META = {
   python: {
     displayName: 'Python 3.11',
-    // Python 官方 Windows 安装包
-    downloadUrl: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe',
-    fileName: 'python-3.11.9-amd64.exe',
-    // 静默安装参数：/quiet = 无 UI, InstallAllUsers=0 当前用户, PrependPath=1 加入PATH
-    silentArgs: ['/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_test=0', 'Include_launcher=1'],
+    // 按平台区分下载链接和安装方式
+    win32: {
+      downloadUrl: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe',
+      fileName: 'python-3.11.9-amd64.exe',
+      silentArgs: ['/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_test=0', 'Include_launcher=1'],
+    },
+    linux: {
+      // Ubuntu/Debian: 使用 apt 安装
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: [
+        '-c',
+        'sudo apt-get update && sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip',
+      ],
+    },
+    darwin: {
+      downloadUrl: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg',
+      fileName: 'python-3.11.9-macos11.pkg',
+      silentArgs: [],
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: ['-c', 'brew install python@3.11 || echo "Please install Homebrew first"'],
+    },
     requirement: '>= 3.11',
     postInstallNote: 'Python 安装完成后可能需要重启终端或应用才能识别。',
   },
   uv: {
     displayName: 'uv (Python 包管理器)',
-    // uv Windows 安装脚本 (PowerShell one-liner from astral-sh)
-    useScript: true,
-    scriptType: 'powershell',
-    scriptCmd: 'powershell',
-    scriptArgs: [
-      '-ExecutionPolicy', 'Bypass', '-NoProfile', '-NonInteractive',
-      '-Command', 'irm https://astral.sh/uv/install.ps1 | iex',
-    ],
+    win32: {
+      useScript: true,
+      scriptType: 'powershell',
+      scriptCmd: 'powershell',
+      scriptArgs: [
+        '-ExecutionPolicy', 'Bypass', '-NoProfile', '-NonInteractive',
+        '-Command', 'irm https://astral.sh/uv/install.ps1 | iex',
+      ],
+    },
+    linux: {
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'],
+    },
+    darwin: {
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'],
+    },
     requirement: '已安装',
     postInstallNote: 'uv 已通过官方脚本安装。',
   },
   git: {
     displayName: 'Git',
-    // Git for Windows 便携 / 安装包
-    downloadUrl: 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe',
-    fileName: 'Git-2.47.1.2-64-bit.exe',
-    // Inno Setup 静默参数
-    silentArgs: ['/VERYSILENT', '/NORESTART', '/SP-', '/SUPPRESSMSGBOXES'],
+    win32: {
+      downloadUrl: 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe',
+      fileName: 'Git-2.47.1.2-64-bit.exe',
+      silentArgs: ['/VERYSILENT', '/NORESTART', '/SP-', '/SUPPRESSMSGBOXES'],
+    },
+    linux: {
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: ['-c', 'sudo apt-get update && sudo apt-get install -y git'],
+    },
+    darwin: {
+      useScript: true,
+      scriptType: 'bash',
+      scriptCmd: 'bash',
+      scriptArgs: ['-c', 'xcode-select --install 2>/dev/null || brew install git'],
+    },
     requirement: '已安装',
     postInstallNote: 'Git 安装完成后可能需要重启终端或应用才能识别。',
   },
@@ -65,6 +111,10 @@ class OobeService {
     this._app = electronApp;
     /** @type {Map<string, AbortController>} 正在进行的下载任务 */
     this._downloads = new Map();
+
+    // 启动时检测系统环境
+    this._sysEnv = platformHelper.detectSystemEnv();
+    console.log(`[OobeService] 系统环境: ${this._sysEnv.platformLabel}${this._sysEnv.distro ? ' (' + this._sysEnv.distroName + ')' : ''}`);
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -76,7 +126,11 @@ class OobeService {
    */
   checkCommandVersion(command, args = ['--version']) {
     return new Promise((resolve) => {
-      const proc = spawn(command, args, { shell: true, timeout: 15000 });
+      const proc = spawn(command, args, {
+        shell: platformHelper.config.shell,
+        timeout: 15000,
+        env: platformHelper.buildSpawnEnv(),
+      });
       let stdout = '';
       let stderr = '';
 
@@ -106,7 +160,9 @@ class OobeService {
   // ─── 单项检测 ──────────────────────────────────────────────────────
 
   async checkPython() {
-    const result = await this.checkCommandVersion('python', ['--version']);
+    // 根据平台使用不同的 Python 命令
+    const pythonCmd = platformHelper.pythonExeName.replace(/\.exe$/, '');
+    const result = await this.checkCommandVersion(pythonCmd, ['--version']);
     if (result.installed && result.version) {
       const [major, minor] = result.version.split('.').map(Number);
       result.valid = major >= 3 && minor >= 11;
@@ -115,16 +171,16 @@ class OobeService {
     }
     result.requirement    = DOWNLOAD_META.python.requirement;
     result.canAutoInstall = true;
-    result.downloadUrl    = DOWNLOAD_META.python.downloadUrl;
+    result.platform       = platformHelper.platform;
     return result;
   }
 
   async checkUv() {
-    const result = await this.checkCommandVersion('uv', ['--version']);
+    const result = await this.checkCommandVersion(platformHelper.uvBin.replace(/\.exe$/, ''), ['--version']);
     result.valid          = result.installed;
     result.requirement    = DOWNLOAD_META.uv.requirement;
     result.canAutoInstall = true;
-    result.downloadUrl    = 'https://astral.sh/uv';
+    result.platform       = platformHelper.platform;
     return result;
   }
 
@@ -133,7 +189,7 @@ class OobeService {
     result.valid          = result.installed;
     result.requirement    = DOWNLOAD_META.git.requirement;
     result.canAutoInstall = true;
-    result.downloadUrl    = DOWNLOAD_META.git.downloadUrl;
+    result.platform       = platformHelper.platform;
     return result;
   }
 
@@ -146,7 +202,7 @@ class OobeService {
     ]);
 
     const passed = python.valid && uv.valid && git.valid;
-    const result = { passed, checks: { python, uv, git } };
+    const result = { passed, checks: { python, uv, git }, platform: platformHelper.platform, platformLabel: platformHelper.label };
 
     if (passed) {
       this.saveCache(result);
@@ -391,13 +447,19 @@ class OobeService {
       return { success: false, error: `未知依赖: ${depName}` };
     }
 
-    try {
-      // ─ 脚本安装方式 (如 uv) ─
-      if (meta.useScript) {
-        onProgress({ type: 'status', message: `正在安装 ${meta.displayName}...` });
-        onProgress({ type: 'log', message: `[信息] 使用官方安装脚本安装 ${meta.displayName}\n` });
+    // 获取当前平台的安装配置
+    const platMeta = meta[platformHelper.platform] || meta.linux;
+    if (!platMeta) {
+      return { success: false, error: `${meta.displayName} 不支持当前平台 (${platformHelper.label})` };
+    }
 
-        const result = await this._runScript(meta.scriptCmd, meta.scriptArgs, (line) => {
+    try {
+      // ─ 脚本安装方式 (uv / Linux apt 等) ─
+      if (platMeta.useScript) {
+        onProgress({ type: 'status', message: `正在安装 ${meta.displayName} (${platformHelper.label})...` });
+        onProgress({ type: 'log', message: `[信息] 使用${platformHelper.isLinux ? '系统包管理器' : '官方安装脚本'}安装 ${meta.displayName}\n` });
+
+        const result = await this._runScript(platMeta.scriptCmd, platMeta.scriptArgs, (line) => {
           onProgress({ type: 'log', message: line });
         });
 
@@ -410,14 +472,14 @@ class OobeService {
         }
       }
 
-      // ─ 下载安装包方式 (Python / Git) ─
+      // ─ 下载安装包方式 (Windows Python / Git) ─
       const tempDir = this._getTempDir();
-      const destPath = path.join(tempDir, meta.fileName);
+      const destPath = path.join(tempDir, platMeta.fileName);
 
       // 1. 下载
       onProgress({ type: 'status', message: `正在下载 ${meta.displayName}...` });
       onProgress({ type: 'log', message: `[下载] 开始下载 ${meta.displayName}\n` });
-      onProgress({ type: 'log', message: `[下载] URL: ${meta.downloadUrl}\n` });
+      onProgress({ type: 'log', message: `[下载] URL: ${platMeta.downloadUrl}\n` });
 
       // 如果文件已存在且大小 > 1MB，跳过下载
       if (fs.existsSync(destPath)) {
@@ -432,7 +494,7 @@ class OobeService {
       }
 
       if (!fs.existsSync(destPath)) {
-        await this._downloadFile(meta.downloadUrl, destPath, (prog) => {
+        await this._downloadFile(platMeta.downloadUrl, destPath, (prog) => {
           onProgress({
             type: 'download',
             percent: prog.percent,
@@ -446,7 +508,7 @@ class OobeService {
       onProgress({ type: 'status', message: `正在静默安装 ${meta.displayName}...` });
       onProgress({ type: 'log', message: `[安装] 开始静默安装 ${meta.displayName}\n` });
 
-      const installResult = await this._runInstaller(destPath, meta.silentArgs, (line) => {
+      const installResult = await this._runInstaller(destPath, platMeta.silentArgs, (line) => {
         onProgress({ type: 'log', message: line });
       });
 

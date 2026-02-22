@@ -4,15 +4,20 @@
   "description": "Neo-MoFox Launcher - Material Design 3 Style",
   "main": "src/main.js",
   "scripts": {
-    "start": "chcp 65001 >nul 2>&1 & electron .",
+    "start": "electron .",
+    "start:win": "chcp 65001 >nul 2>&1 & electron .",
+    "start:linux": "electron .",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "dev": "chcp 65001 >nul 2>&1 & electron . --dev"
+    "dev": "electron . --dev",
+    "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
+    "dev:linux": "electron . --dev"
   },
   "author": "MoFox Studio",
   "license": "AGPL-3.0",
   "devDependencies": {
     "@electron-forge/cli": "^7.5.0",
+    "@electron-forge/maker-deb": "^7.5.0",
     "@electron-forge/maker-squirrel": "^7.5.0",
     "@electron-forge/maker-zip": "^7.5.0",
     "electron": "^33.0.0"
@@ -48,7 +53,17 @@
         },
         {
           "name": "@electron-forge/maker-zip",
-          "platforms": ["win32"]
+          "platforms": ["win32", "linux", "darwin"]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {
+            "options": {
+              "maintainer": "MoFox Studio",
+              "homepage": "https://github.com/MoFox-Studio/Neo-MoFox-Launcher",
+              "icon": "assets/icon.png"
+            }
+          }
         }
       ]
     }

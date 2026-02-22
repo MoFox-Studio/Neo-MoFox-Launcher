@@ -9,6 +9,7 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { storageService } = require('../install/StorageService');
+const { platformHelper } = require('../PlatformHelper');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -116,18 +117,15 @@ class VersionService {
   _execCommand(command, args, options = {}) {
     return new Promise((resolve, reject) => {
       // Windows 下先设置 UTF-8 代码页
-      const isWindows = process.platform === 'win32';
+      const isWindows = platformHelper.isWindows;
       const fullCommand = isWindows 
         ? `chcp 65001 >nul && ${command} ${args.map(a => `"${a}"`).join(' ')}`
         : `${command} ${args.join(' ')}`;
       
       const proc = spawn(fullCommand, [], {
-        shell: true,
+        shell: platformHelper.config.shell,
         cwd: options.cwd || process.cwd(),
-        env: { 
-          ...process.env, 
-          ...options.env,
-        },
+        env: platformHelper.buildSpawnEnv(options.env || {}),
       });
 
       let stdout = '';
@@ -674,12 +672,9 @@ class VersionService {
    * 解压 ZIP 文件
    */
   async _extractZip(zipPath, destDir) {
-    // 使用 PowerShell 解压
-    await this._execCommand('powershell', [
-      '-NoProfile',
-      '-Command',
-      `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`
-    ]);
+    // 使用 PlatformHelper 获取跨平台解压命令
+    const unzipInfo = platformHelper.getUnzipCommand(zipPath, destDir);
+    await this._execCommand(unzipInfo.cmd, unzipInfo.args);
   }
 
   /**
