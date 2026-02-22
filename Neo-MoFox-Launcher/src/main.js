@@ -411,8 +411,8 @@ ipcMain.handle('open-project-folder', () => {
   }
 });
 
-ipcMain.handle('open-github', () => {
-  shell.openExternal('https://github.com/MoFox-Studio/Neo-MoFox-Launcher');
+ipcMain.handle('open-external', (event, url) => {
+  shell.openExternal(url);
 });
 
 ipcMain.handle('get-project-info', () => {

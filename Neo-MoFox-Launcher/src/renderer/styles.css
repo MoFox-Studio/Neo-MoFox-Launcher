@@ -519,6 +519,7 @@ body {
   border-radius: 20px;
   height: 40px;
   display: flex;
+  flex-direction: row; /* 确保图标和文字横向排列 */
   align-items: center;
   justify-content: center;
   gap: 8px;

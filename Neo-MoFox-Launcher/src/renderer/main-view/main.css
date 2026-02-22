@@ -377,7 +377,12 @@
   height: 32px;
   font-size: 0.8125rem; /* 稍微调小字号 */
   border-radius: 16px; /* 更圆润 */
-  
+  flex-direction: row;  /* 这个属性确保flex子项横向排列 */
+  display: inline-flex;  /* 添加这个 - 确保flex布局生效 */
+  align-items: center;   /* 添加这个 - 垂直居中 */
+  justify-content: center; /* 添加这个 - 水平居中 */
+  white-space: nowrap;   /* 添加这个 - 防止文字换行 */
+  gap: 4px;
 }
 
 .md3-btn-text {

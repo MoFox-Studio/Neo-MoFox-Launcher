@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   // 文件操作
   selectProjectPath: () => ipcRenderer.invoke('select-project-path'),
   openProjectFolder: () => ipcRenderer.invoke('open-project-folder'),
-  openGithub: () => ipcRenderer.invoke('open-github'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   clearLogs: () => ipcRenderer.invoke('clear-logs'),
 
   // 窗口控制

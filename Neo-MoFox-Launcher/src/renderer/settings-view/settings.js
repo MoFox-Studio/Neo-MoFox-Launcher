@@ -45,6 +45,7 @@ const el = {
   aboutVersion:       $('about-version'),
   btnOpenGithub:      $('btn-open-github'),
   btnOpenLogs:        $('btn-open-logs'),
+  btnOpenYishan:      $('btn-open-yishan'),
 };
 
 // ─── 初始化 ──────────────────────────────────────────────────────────────
@@ -209,11 +210,15 @@ function bindEvents() {
 
   // 关于页按钮
   el.btnOpenGithub?.addEventListener('click', () => {
-    window.mofoxAPI.openGithub();
+    window.mofoxAPI.openExternal('https://github.com/MoFox-Studio/Neo-MoFox-Launcher');
   });
 
   el.btnOpenLogs?.addEventListener('click', () => {
     window.mofoxAPI.openLogsDir();
+  });
+
+  el.btnOpenYishan?.addEventListener('click', () => {
+    window.mofoxAPI.openExternal('https://www.bilibili.com/video/BV1uT4y1P7CX/');
   });
 }
 
