@@ -6,15 +6,19 @@
 class CustomDialog {
   constructor() {
     this.container = null;
-    this.init();
+    this._initialized = false;
   }
 
-  init() {
+  _ensureInit() {
+    if (this._initialized) return;
+    if (!document.body) return;
+    
     // 创建对话框容器
     this.container = document.createElement('div');
     this.container.id = 'custom-dialog-container';
     this.container.className = 'dialog-container hidden';
     document.body.appendChild(this.container);
+    this._initialized = true;
   }
 
   /**
@@ -22,6 +26,7 @@ class CustomDialog {
    */
   confirm(message, title = '确认') {
     return new Promise((resolve) => {
+      this._ensureInit();
       this.container.innerHTML = `
         <div class="dialog-backdrop"></div>
         <div class="dialog-card md3-dialog">
@@ -83,6 +88,7 @@ class CustomDialog {
    */
   alert(message, title = '提示') {
     return new Promise((resolve) => {
+      this._ensureInit();
       this.container.innerHTML = `
         <div class="dialog-backdrop"></div>
         <div class="dialog-card md3-dialog">

@@ -336,22 +336,6 @@ class InstallWizardService {
       return { valid: false, error: '安装路径不应包含中文或空格' };
     }
     
-    // 如果提供了 instanceId，检查实例目录是否为空（续装模式除外）
-    if (instanceId && !isResume) {
-      const instanceDir = path.join(installDir, instanceId);
-      if (fs.existsSync(instanceDir)) {
-        const files = fs.readdirSync(instanceDir);
-        // 过滤掉特定的安装目录，检查是否有其他文件
-        const otherFiles = files.filter(f => f !== 'neo-mofox' && f !== 'napcat');
-        if (otherFiles.length > 0) {
-          return { 
-            valid: false, 
-            error: `目标目录 ${instanceDir} 已包含其他文件，请选择空目录或清理后再安装` 
-          };
-        }
-      }
-    }
-    
     return { valid: true };
   }
 
@@ -980,6 +964,7 @@ class InstallWizardService {
     }
 
     this._emitProgress('napcat', 100, 'NapCat 安装完成');
+    console.log(`[InstallWizard] NapCat 安装完成，路径: ${napcatDir}, 版本: ${release.tag_name}`);
     return { success: true, path: napcatDir, shellPath: shellPath || napcatDir, version: release.tag_name };
   }
 

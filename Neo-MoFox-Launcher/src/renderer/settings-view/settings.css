@@ -166,7 +166,7 @@ body {
 /* ─── Settings Cards ─────────────────────────────────────────────────── */
 .settings-card {
   background: var(--md-sys-color-surface-container-low);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(var(--md-sys-color-on-surface-rgb), 0.05);
   border-radius: 16px;
   padding: 20px 24px;
   display: flex;
@@ -178,12 +178,12 @@ body {
 }
 
 .settings-card:hover {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(var(--md-sys-color-on-surface-rgb), 0.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .settings-card-danger {
-  border-color: rgba(var(--md-sys-color-error-rgb, 242, 184, 181), 0.3);
+  border-color: rgba(var(--md-sys-color-error-rgb), 0.3);
 }
 
 .settings-card-header {
@@ -236,7 +236,7 @@ body {
 }
 
 .theme-option:hover {
-  border-color: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.5);
+  border-color: rgba(var(--md-sys-color-primary-rgb), 0.5);
   background: var(--md-sys-color-surface-container-high);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -244,7 +244,7 @@ body {
 
 .theme-option.selected {
   border-color: var(--md-sys-color-primary);
-  background: rgba(var(--md-sys-color-primary-container-rgb, 79, 55, 139), 0.2);
+  background: rgba(var(--md-sys-color-primary-container-rgb), 0.2);
 }
 
 .theme-check {

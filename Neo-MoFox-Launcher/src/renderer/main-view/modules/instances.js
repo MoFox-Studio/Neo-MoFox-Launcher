@@ -165,6 +165,10 @@ export function renderInstances() {
             <span class="material-symbols-rounded">settings</span>
             管理
           </button>
+          <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
+            <span class="material-symbols-rounded">system_update</span>
+            版本
+          </button>
           <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动">
             <span class="material-symbols-rounded">play_arrow</span>
             启动
@@ -177,6 +181,13 @@ export function renderInstances() {
       btnSettings.addEventListener('click', (e) => {
         e.stopPropagation();
         openEditModal(instance);
+      });
+      
+      // 事件绑定 - 版本管理按钮 → 跳转到版本管理页面
+      const btnVersion = card.querySelector('.btn-version-instance');
+      btnVersion.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });
 
       // 事件绑定 - 启动按钮 → 跳转到实例视图页面并自动启动

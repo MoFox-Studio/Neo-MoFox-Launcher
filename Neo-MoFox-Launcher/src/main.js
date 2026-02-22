@@ -514,6 +514,7 @@ ipcMain.handle('window-close', () => {
 // ─── 实例管理 & 安装向导 IPC ──────────────────────────────────────────────
 const { storageService } = require('./services/install/StorageService');
 const { installWizardService } = require('./services/install/InstallWizardService');
+const { versionService } = require('./services/version/VersionService');
 
 // 初始化存储服务
 storageService.init();
@@ -1286,3 +1287,56 @@ ipcMain.handle('instance-delete-logs', async (event, instanceId) => {
   }
 });
 
+// ─── 版本管理 IPC ────────────────────────────────────────────────────────────
+
+// 设置版本服务的进度回调
+versionService.setProgressCallback((progress) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('version-progress', progress);
+  }
+});
+
+// 获取实例版本信息
+ipcMain.handle('version-get-info', async (event, instanceId) => {
+  return versionService.getInstanceVersionInfo(instanceId);
+});
+
+// 获取远程分支列表
+ipcMain.handle('version-get-branches', async () => {
+  return versionService.getRemoteBranches();
+});
+
+// 获取 NapCat 版本列表
+ipcMain.handle('version-get-napcat-releases', async (event, limit) => {
+  return versionService.getNapCatReleases(limit || 10);
+});
+
+// 检查 MoFox 更新
+ipcMain.handle('version-check-mofox-update', async (event, instanceId) => {
+  return versionService.checkMofoxUpdate(instanceId);
+});
+
+// 切换分支
+ipcMain.handle('version-switch-branch', async (event, instanceId, branch) => {
+  return versionService.switchBranch(instanceId, branch);
+});
+
+// 更新 MoFox
+ipcMain.handle('version-update-mofox', async (event, instanceId) => {
+  return versionService.updateMofox(instanceId);
+});
+
+// 更新 NapCat
+ipcMain.handle('version-update-napcat', async (event, instanceId, version) => {
+  return versionService.updateNapCat(instanceId, version);
+});
+
+// 获取 MoFox 提交历史
+ipcMain.handle('version-get-mofox-commit-history', async (event, instanceId, limit) => {
+  return versionService.getMofoxCommitHistory(instanceId, limit || 20);
+});
+
+// 回退到指定 commit
+ipcMain.handle('version-checkout-commit', async (event, instanceId, commitHash) => {
+  return versionService.checkoutCommit(instanceId, commitHash);
+});

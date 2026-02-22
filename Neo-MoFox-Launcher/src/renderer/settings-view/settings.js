@@ -184,7 +184,7 @@ function bindEvents() {
 
   // 浏览安装目录
   el.btnBrowseInstallDir.addEventListener('click', async () => {
-    const selected = await window.mofoxAPI.oobeSelectPath();
+    const selected = await window.mofoxAPI.selectProjectPath();
     if (selected) {
       el.defaultInstallDir.value = selected;
       savePartial({ defaultInstallDir: selected });
@@ -193,10 +193,11 @@ function bindEvents() {
 
   // 重置全部
   el.btnResetAll.addEventListener('click', async () => {
-    const confirmed = await window.customConfirm?.(
+    const confirmed = await window.customConfirm(
       '确定要将所有设置恢复为默认值吗？',
-      '重置设置',
-    ) ?? confirm('确定要将所有设置恢复为默认值吗？');
+      '重置设置'
+    );
+    console.log('[settings] 用户重置设置 - 确认:', confirmed);
 
     if (!confirmed) return;
 

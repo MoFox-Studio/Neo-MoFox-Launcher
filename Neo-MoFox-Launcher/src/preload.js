@@ -119,4 +119,18 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   getInstancePaths: (instanceId) => ipcRenderer.invoke('instance-get-paths', instanceId),
   deleteInstanceDatabase: (instanceId) => ipcRenderer.invoke('instance-delete-database', instanceId),
   deleteInstanceLogs: (instanceId) => ipcRenderer.invoke('instance-delete-logs', instanceId),
+
+  // ─── 版本管理 ───────────────────────────────────────────────────────────────
+  versionGetInfo: (instanceId) => ipcRenderer.invoke('version-get-info', instanceId),
+  versionGetBranches: () => ipcRenderer.invoke('version-get-branches'),
+  versionGetNapCatReleases: (limit) => ipcRenderer.invoke('version-get-napcat-releases', limit),
+  versionCheckMofoxUpdate: (instanceId) => ipcRenderer.invoke('version-check-mofox-update', instanceId),
+  versionSwitchBranch: (instanceId, branch) => ipcRenderer.invoke('version-switch-branch', instanceId, branch),
+  versionUpdateMofox: (instanceId) => ipcRenderer.invoke('version-update-mofox', instanceId),
+  versionUpdateNapcat: (instanceId, version) => ipcRenderer.invoke('version-update-napcat', instanceId, version),
+  versionGetMofoxCommitHistory: (instanceId, limit) => ipcRenderer.invoke('version-get-mofox-commit-history', instanceId, limit),
+  versionCheckoutCommit: (instanceId, commitHash) => ipcRenderer.invoke('version-checkout-commit', instanceId, commitHash),
+  onVersionProgress: (callback) => {
+    ipcRenderer.on('version-progress', (_event, data) => callback(data));
+  },
 });

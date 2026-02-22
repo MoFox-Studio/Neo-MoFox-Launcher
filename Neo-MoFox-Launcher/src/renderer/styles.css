@@ -87,28 +87,8 @@ body {
 /* ══ Dark Theme (default) ══ */
 :root,
 [data-theme="dark"] {
-  /* Material Design 3 Dark Theme Palette */
-  --md-sys-color-primary: #d0bcff;
-  --md-sys-color-primary-rgb: 208, 188, 255;
-  --md-sys-color-on-primary: #381e72;
-  --md-sys-color-primary-container: #4f378b;
-  --md-sys-color-on-primary-container: #eaddff;
+  /* Note: Primary/Secondary/Tertiary colors are dynamically set by theme-init.js */
   
-  --md-sys-color-secondary: #ccc2dc;
-  --md-sys-color-on-secondary: #332d41;
-  --md-sys-color-secondary-container: #4a4458;
-  --md-sys-color-on-secondary-container: #e8def8;
-
-  --md-sys-color-tertiary: #efb8c8;
-  --md-sys-color-on-tertiary: #492532;
-  --md-sys-color-tertiary-container: #633b48;
-  --md-sys-color-on-tertiary-container: #ffd8e4;
-
-  --md-sys-color-error: #f2b8b5;
-  --md-sys-color-on-error: #601410;
-  --md-sys-color-error-container: #8c1d18;
-  --md-sys-color-on-error-container: #f9dedc;
-
   --md-sys-color-background: #0b0b0e;
   --md-sys-color-on-background: #e6e1e5;
   
@@ -131,6 +111,13 @@ body {
   --md-sys-color-outline-variant-rgb: 73, 69, 79;
   --md-sys-color-outline-rgb: 147, 143, 153;
 
+  /* Error colors */
+  --md-sys-color-error: #f2b8b5;
+  --md-sys-color-error-rgb: 242, 184, 181;
+  --md-sys-color-on-error: #601410;
+  --md-sys-color-error-container: #8c1d18;
+  --md-sys-color-on-error-container: #f9dedc;
+
   /* Elevation */
   --md-sys-elevation-level1: 0 1px 2px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4);
   --md-sys-elevation-level2: 0 2px 6px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);
@@ -152,27 +139,8 @@ body {
 
 /* ══ Light Theme ══ */
 [data-theme="light"] {
-  --md-sys-color-primary: #6750a4;
-  --md-sys-color-primary-rgb: 103, 80, 164;
-  --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #eaddff;
-  --md-sys-color-on-primary-container: #21005d;
-
-  --md-sys-color-secondary: #625b71;
-  --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #e8def8;
-  --md-sys-color-on-secondary-container: #1d192b;
-
-  --md-sys-color-tertiary: #7d5260;
-  --md-sys-color-on-tertiary: #ffffff;
-  --md-sys-color-tertiary-container: #ffd8e4;
-  --md-sys-color-on-tertiary-container: #31111d;
-
-  --md-sys-color-error: #b3261e;
-  --md-sys-color-on-error: #ffffff;
-  --md-sys-color-error-container: #f9dedc;
-  --md-sys-color-on-error-container: #410e0b;
-
+  /* Note: Primary/Secondary/Tertiary colors are dynamically set by theme-init.js */
+  
   --md-sys-color-background: #fffbfe;
   --md-sys-color-on-background: #1c1b1f;
 
@@ -194,6 +162,13 @@ body {
   --md-sys-color-outline-variant: #cac4d0;
   --md-sys-color-outline-variant-rgb: 202, 196, 208;
   --md-sys-color-outline-rgb: 121, 116, 126;
+
+  /* Error colors */
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-error-rgb: 186, 26, 26;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
 
   /* Elevation */
   --md-sys-elevation-level1: 0 1px 2px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
@@ -217,22 +192,8 @@ body {
 /* ══ Auto theme fallback (no JS) ══ */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --md-sys-color-primary: #6750a4;
-    --md-sys-color-on-primary: #ffffff;
-    --md-sys-color-primary-container: #eaddff;
-    --md-sys-color-on-primary-container: #21005d;
-    --md-sys-color-secondary: #625b71;
-    --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #e8def8;
-    --md-sys-color-on-secondary-container: #1d192b;
-    --md-sys-color-tertiary: #7d5260;
-    --md-sys-color-on-tertiary: #ffffff;
-    --md-sys-color-tertiary-container: #ffd8e4;
-    --md-sys-color-on-tertiary-container: #31111d;
-    --md-sys-color-error: #b3261e;
-    --md-sys-color-on-error: #ffffff;
-    --md-sys-color-error-container: #f9dedc;
-    --md-sys-color-on-error-container: #410e0b;
+    /* Note: Primary/Secondary/Tertiary colors are dynamically set by theme-init.js */
+    /* This fallback is only for cases where JS hasn't loaded yet */
     --md-sys-color-background: #fffbfe;
     --md-sys-color-on-background: #1c1b1f;
     --md-sys-color-surface: #fffbfe;

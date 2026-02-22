@@ -51,6 +51,7 @@ function hexToRgb(hex) {
  */
 function generatePalette(hex, isDark) {
   const [h, s] = hexToHsl(hex);
+  console.log('[theme] 生成调色板 -', { hex, isDark, h, s });
   const palette = {};
 
   const p = (key, val) => { palette[key] = val; };
@@ -59,34 +60,45 @@ function generatePalette(hex, isDark) {
   if (isDark) {
       prgb('--md-sys-color-primary',               hslToHex(h, Math.min(s, 80), 80));
       p   ('--md-sys-color-on-primary',            hslToHex(h, s, 20));
-      p   ('--md-sys-color-primary-container',     hslToHex(h, s, 30));
+      prgb('--md-sys-color-primary-container',     hslToHex(h, s, 30));
       p   ('--md-sys-color-on-primary-container',  hslToHex(h, Math.min(s, 60), 90));
       
       prgb('--md-sys-color-secondary',             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 78));
       p   ('--md-sys-color-on-secondary',          hslToHex((h + 30) % 360, s, 20));
-      p   ('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 28));
+      prgb('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 28));
       p   ('--md-sys-color-on-secondary-container',hslToHex((h + 30) % 360, s, 88));
       
       prgb('--md-sys-color-tertiary',              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 78));
       p   ('--md-sys-color-on-tertiary',           hslToHex((h + 60) % 360, s, 18));
-      p   ('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 28));
+      prgb('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 28));
       p   ('--md-sys-color-on-tertiary-container', hslToHex((h + 60) % 360, s, 88));
+      
+      prgb('--md-sys-color-error',                 '#f2b8b5');
+      p   ('--md-sys-color-on-error',              '#601410');
+      prgb('--md-sys-color-error-container',       '#8c1d18');
+      p   ('--md-sys-color-on-error-container',    '#f9dedc');
   } else {
       prgb('--md-sys-color-primary',               hslToHex(h, s, 38));
       p   ('--md-sys-color-on-primary',            '#ffffff');
-      p   ('--md-sys-color-primary-container',     hslToHex(h, Math.min(s, 60), 92));
+      prgb('--md-sys-color-primary-container',     hslToHex(h, Math.min(s, 60), 92));
       p   ('--md-sys-color-on-primary-container',  hslToHex(h, s, 12));
       
       prgb('--md-sys-color-secondary',             hslToHex((h + 30) % 360, Math.max(s - 20, 20), 40));
       p   ('--md-sys-color-on-secondary',          '#ffffff');
-      p   ('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 90));
+      prgb('--md-sys-color-secondary-container',   hslToHex((h + 30) % 360, Math.max(s - 20, 20), 90));
       p   ('--md-sys-color-on-secondary-container',hslToHex((h + 30) % 360, s, 12));
       
       prgb('--md-sys-color-tertiary',              hslToHex((h + 60) % 360, Math.max(s - 10, 20), 40));
       p   ('--md-sys-color-on-tertiary',           '#ffffff');
-      p   ('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 90));
+      prgb('--md-sys-color-tertiary-container',    hslToHex((h + 60) % 360, Math.max(s - 10, 20), 90));
       p   ('--md-sys-color-on-tertiary-container', hslToHex((h + 60) % 360, s, 12));
+      
+      prgb('--md-sys-color-error',                 '#ba1a1a');
+      p   ('--md-sys-color-on-error',              '#ffffff');
+      prgb('--md-sys-color-error-container',       '#ffdad6');
+      p   ('--md-sys-color-on-error-container',    '#410002');
   }
+  console.log('[theme] 生成的调色板:', palette);
   return palette;
 }
 
@@ -98,6 +110,7 @@ function generatePalette(hex, isDark) {
  * @param {{ theme: string, accentColor: string }} settings
  */
 export function applyTheme(settings) {
+  console.log('[theme] 应用主题 -', settings);
   if (window.__themeApplySync) {
     window.__themeApplySync(settings);
     return;
@@ -112,6 +125,7 @@ export function applyTheme(settings) {
   root.setAttribute('data-theme', effective);
   const isDark = effective === 'dark';
   const palette = generatePalette(accentColor, isDark);
+  console.log('[theme] 应用 CSS 变量到 :root');
   for (const [key, val] of Object.entries(palette)) {
     root.style.setProperty(key, val);
   }
