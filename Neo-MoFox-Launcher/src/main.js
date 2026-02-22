@@ -30,10 +30,15 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    frame: false, // 无边框窗口
-    titleBarStyle: 'hidden', // 隐藏原生标题栏但保留窗口控制（仅macOS，Windows下配合frame: false可确保完全移除）
-    transparent: true, // 开启透明，有时frame: false需要这就才能生效，或者为了圆角
-    backgroundColor: '#00000000', // 透明背景，配合 transparent: true
+    frame: false, // 无边框但不仅是去除frame，这会保留一部分系统行为
+    titleBarStyle: 'hidden', // 关键：隐藏标题栏内容，但保留窗口的基本行为框架
+    titleBarOverlay: {
+      color: '#00000000', // 设置控制按钮区域为透明，让我们的CSS透出来（如果支持）
+      symbolColor: '#747474', // 按钮图标颜色
+      height: 38 // 匹配我们 CSS 中的 --titlebar-height
+    },
+    transparent: false, // 方案B：关闭透明，换回系统原生窗口行为（圆角+吸附）
+    backgroundColor: '#1e1e24', // 设置一个默认背景色，防止闪烁
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
