@@ -696,7 +696,8 @@ async function startInstanceInternal(instanceId, instance) {
       status: 'stopped',
       logs: [],
       stats: {},
-      startTime: 0
+      startTime: 0,
+      webuiOpened: false
     });
   }
   
@@ -705,6 +706,7 @@ async function startInstanceInternal(instanceId, instance) {
   instanceData.startTime = Date.now();
   instanceData.mofoxProcess = null;
   instanceData.napcatProcess = null;
+  instanceData.webuiOpened = false;
   updateInstanceStatus(instanceId, 'starting');
   
   sendInstanceLog(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
@@ -838,6 +840,20 @@ async function startInstanceInternal(instanceId, instance) {
       lines.forEach(line => {
         if (line.trim()) {
           sendInstanceLog(instanceId, 'napcat', line, 'info');
+          
+          // 检测 WebUI URL 并自动打开（仅首次）
+          const webuiMatch = line.match(/WebUI User Panel Url:\s*(https?:\/\/[^\s]+)/i);
+          if (webuiMatch && !instanceData.webuiOpened) {
+            const url = webuiMatch[1];
+            const settings = settingsService.readSettings();
+            if (settings.autoOpenNapcatWebUI) {
+              instanceData.webuiOpened = true;
+              sendInstanceLog(instanceId, 'napcat', `自动打开 WebUI: ${url}`, 'info');
+              shell.openExternal(url).catch(err => {
+                sendInstanceLog(instanceId, 'napcat', `打开 WebUI 失败: ${err.message}`, 'error');
+              });
+            }
+          }
         }
       });
     });

@@ -40,6 +40,7 @@ const el = {
   defaultInstallDir:  $('default-install-dir'),
   btnBrowseInstallDir:$('btn-browse-install-dir'),
   btnResetAll:        $('btn-reset-all'),
+  autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
 
   // 关于
   aboutVersion:       $('about-version'),
@@ -77,6 +78,7 @@ function populateUI(settings) {
 
   // 通用
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
+  el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
 }
 
 // ─── 主题选项 ────────────────────────────────────────────────────────────
@@ -181,6 +183,11 @@ function bindEvents() {
   // 默认安装目录
   el.defaultInstallDir.addEventListener('change', () => {
     savePartial({ defaultInstallDir: el.defaultInstallDir.value });
+  });
+
+  // 自动打开 Napcat WebUI
+  el.autoOpenNapcatWebUI.addEventListener('change', () => {
+    savePartial({ autoOpenNapcatWebUI: el.autoOpenNapcatWebUI.checked });
   });
 
   // 浏览安装目录
