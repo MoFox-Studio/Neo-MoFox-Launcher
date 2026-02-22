@@ -9,6 +9,7 @@
     "start:linux": "electron .",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "make:deb": "electron-forge make --targets @electron-forge/maker-deb",
     "dev": "electron . --dev",
     "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:linux": "electron . --dev"
@@ -30,7 +31,8 @@
     "forge": {
       "packagerConfig": {
         "name": "Neo-MoFox Launcher",
-        "icon": "assets/icon.ico",
+        "executableName": "neo-mofox-launcher",
+        "icon": "assets/icon",
         "asar": true,
         "ignore": [
           "^/dist($|/)",
@@ -61,7 +63,14 @@
             "options": {
               "maintainer": "MoFox Studio",
               "homepage": "https://github.com/MoFox-Studio/Neo-MoFox-Launcher",
-              "icon": "assets/icon.png"
+              "icon": "assets/icon.png",
+              "name": "neo-mofox-launcher",
+              "productName": "Neo-MoFox Launcher",
+              "genericName": "Bot Launcher",
+              "description": "Neo-MoFox Launcher - MoFox QQ Bot 管理器",
+              "section": "utils",
+              "categories": ["Utility", "Network"],
+              "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libsecret-1-0"]
             }
           }
         }
