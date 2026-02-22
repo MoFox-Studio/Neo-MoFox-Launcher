@@ -31,6 +31,7 @@ const el = {
   napcatVersion: document.getElementById('napcatVersion'),
   napcatPath: document.getElementById('napcatPath'),
   napcatVersionList: document.getElementById('napcatVersionList'),
+  napcatCard: document.getElementById('napcatCard'),
   
   // Progress
   progressOverlay: document.getElementById('progressOverlay'),
@@ -263,10 +264,9 @@ async function loadVersionInfo() {
         el.napcatPath.title = dir || '';
       }
       
-      // 如果 napcat 路径为空，隐藏 NapCat 版本列表区域
-      const napcatCard = el.napcatVersionList?.closest('.version-card');
-      if (napcatCard) {
-        napcatCard.style.display = dir ? '' : 'none';
+      // 如果有 napcat 路径，显示 NapCat 卡片；否则保持隐藏
+      if (el.napcatCard) {
+        el.napcatCard.style.display = dir ? '' : 'none';
       }
     }
     
