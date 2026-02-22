@@ -102,4 +102,11 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   /** 同步读取设置，仅在 <head> 中应用主题时使用，避免 FOUC */
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
+
+  // ─── 实例文件管理 ───────────────────────────────────────────────────────────
+  openInstanceFolder: (instanceId, folderType) => ipcRenderer.invoke('instance-open-folder', instanceId, folderType),
+  openInstanceFile: (instanceId, fileType) => ipcRenderer.invoke('instance-open-file', instanceId, fileType),
+  getInstancePaths: (instanceId) => ipcRenderer.invoke('instance-get-paths', instanceId),
+  deleteInstanceDatabase: (instanceId) => ipcRenderer.invoke('instance-delete-database', instanceId),
+  deleteInstanceLogs: (instanceId) => ipcRenderer.invoke('instance-delete-logs', instanceId),
 });
