@@ -1,6 +1,10 @@
 name: Nightly Build
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nightly.yml'  # 推送此文件时触发（用于测试，确认能跑后可删除）
   schedule:
     # 每天 UTC 00:00 (北京时间 08:00) 执行
     - cron: '0 0 * * *'
