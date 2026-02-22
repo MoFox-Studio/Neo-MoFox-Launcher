@@ -208,6 +208,18 @@
           <p id="summary-desc">所有依赖项均已正确安装，您可以开始使用 Neo-MoFox。</p>
         </div>
 
+        <!-- 自动安装进度区域 -->
+        <div class="env-install-progress hidden" id="env-install-progress">
+          <div class="install-progress-header">
+            <span class="material-symbols-rounded spinning">sync</span>
+            <span id="install-progress-title">正在安装依赖...</span>
+          </div>
+          <div class="install-progress-bar-container">
+            <div class="install-progress-bar" id="install-progress-bar" style="width: 0%"></div>
+          </div>
+          <div class="install-progress-log" id="install-progress-log"></div>
+        </div>
+
         <!-- 安装提示区域 (失败时显示) -->
         <div class="env-install-hints hidden" id="env-install-hints">
           <h3>缺失的依赖项</h3>
@@ -222,6 +234,10 @@
           <button class="md3-btn md3-btn-tonal" id="oobe-btn-recheck" disabled>
             <span class="material-symbols-rounded">refresh</span>
             <span>重新检测</span>
+          </button>
+          <button class="md3-btn md3-btn-filled" id="oobe-btn-auto-install" style="display:none">
+            <span class="material-symbols-rounded">download</span>
+            <span>一键安装缺失依赖</span>
           </button>
           <button class="md3-btn md3-btn-primary" id="oobe-btn-continue" disabled>
             <span>继续</span>

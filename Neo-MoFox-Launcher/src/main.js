@@ -470,157 +470,31 @@ ipcMain.handle('get-project-info', () => {
 });
 
 
-// ─── 环境检测 IPC ──────────────────────────────────
-function checkCommandVersion(command, args = ['--version']) {
-  return new Promise((resolve) => {
-    const proc = spawn(command, args, { shell: true, timeout: 10000 });
-    let stdout = '';
-    let stderr = '';
-    
-    proc.stdout.on('data', (d) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d) => { stderr += d.toString(); });
-    
-    proc.on('close', (code) => {
-      if (code === 0) {
-        // 提取版本号
-        const output = stdout.trim() || stderr.trim();
-        const versionMatch = output.match(/(\d+\.\d+(\.\d+)?)/);
-        resolve({
-          installed: true,
-          version: versionMatch ? versionMatch[1] : output.split('\n')[0],
-          output: output,
-        });
-      } else {
-        resolve({ installed: false, version: null, error: stderr.trim() || '命令执行失败' });
-      }
-    });
-    
-    proc.on('error', (err) => {
-      resolve({ installed: false, version: null, error: err.message });
-    });
+// ─── 环境检测 & 自动安装 IPC（委托 OobeService）──────────────────────
+const { getOobeService } = require('./services/oobe/OobeService');
+const oobeService = getOobeService(app);
+
+ipcMain.handle('env-check-python', () => oobeService.checkPython());
+ipcMain.handle('env-check-uv',     () => oobeService.checkUv());
+ipcMain.handle('env-check-git',    () => oobeService.checkGit());
+ipcMain.handle('env-check-all',    () => oobeService.checkAll());
+
+ipcMain.handle('env-check-get-cached', () => oobeService.loadCache());
+
+ipcMain.handle('env-check-clear-cache', () => oobeService.clearCache());
+
+// 安装单个依赖（下载安装包 + 静默安装），通过事件推送进度
+ipcMain.handle('env-install-dep', async (_event, depName) => {
+  return oobeService.installDep(depName, (evt) => {
+    mainWindow?.webContents.send('env-install-progress', { depName, ...evt });
   });
-}
-
-ipcMain.handle('env-check-python', async () => {
-  const result = await checkCommandVersion('python', ['--version']);
-  if (result.installed && result.version) {
-    const [major, minor] = result.version.split('.').map(Number);
-    result.valid = major >= 3 && minor >= 11;
-    result.requirement = '>= 3.11';
-  } else {
-    result.valid = false;
-    result.requirement = '>= 3.11';
-  }
-  return result;
 });
 
-ipcMain.handle('env-check-uv', async () => {
-  const result = await checkCommandVersion('uv', ['--version']);
-  result.requirement = '已安装';
-  result.valid = result.installed;
-  result.installHint = 'pip install uv';
-  return result;
-});
-
-ipcMain.handle('env-check-git', async () => {
-  const result = await checkCommandVersion('git', ['--version']);
-  result.requirement = '已安装';
-  result.valid = result.installed;
-  return result;
-});
-
-ipcMain.handle('env-check-all', async () => {
-  const [python, uv, git] = await Promise.all([
-    checkCommandVersion('python', ['--version']),
-    checkCommandVersion('uv', ['--version']),
-    checkCommandVersion('git', ['--version']),
-  ]);
-  
-  // 验证 Python 版本
-  if (python.installed && python.version) {
-    const [major, minor] = python.version.split('.').map(Number);
-    python.valid = major >= 3 && minor >= 11;
-  } else {
-    python.valid = false;
-  }
-  python.requirement = '>= 3.11';
-  
-  uv.valid = uv.installed;
-  uv.requirement = '已安装';
-  uv.installHint = 'pip install uv';
-  
-  git.valid = git.installed;
-  git.requirement = '已安装';
-  
-  const allPassed = python.valid && uv.valid && git.valid;
-  
-  const result = {
-    passed: allPassed,
-    checks: { python, uv, git },
-  };
-  
-  // 如果检测通过，自动保存结果
-  if (allPassed) {
-    saveEnvCheckResult(result);
-  }
-  
-  return result;
-});
-
-// ─── 环境检测结果缓存 ──────────────────────────────────
-function getEnvCheckCachePath() {
-  return path.join(app.getPath('userData'), 'env-check-cache.json');
-}
-
-function saveEnvCheckResult(result) {
-  try {
-    const cachePath = getEnvCheckCachePath();
-    const cacheData = {
-      timestamp: Date.now(),
-      result: result,
-    };
-    fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2));
-    console.log('环境检测结果已缓存');
-  } catch (e) {
-    console.error('保存环境检测结果失败:', e);
-  }
-}
-
-function loadEnvCheckResult() {
-  try {
-    const cachePath = getEnvCheckCachePath();
-    if (fs.existsSync(cachePath)) {
-      const cacheData = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-      // 缓存有效期：7 天
-      const maxAge = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - cacheData.timestamp < maxAge) {
-        console.log('使用缓存的环境检测结果');
-        return cacheData.result;
-      } else {
-        console.log('缓存已过期');
-      }
-    }
-  } catch (e) {
-    console.error('读取环境检测缓存失败:', e);
-  }
-  return null;
-}
-
-ipcMain.handle('env-check-get-cached', () => {
-  return loadEnvCheckResult();
-});
-
-ipcMain.handle('env-check-clear-cache', () => {
-  try {
-    const cachePath = getEnvCheckCachePath();
-    if (fs.existsSync(cachePath)) {
-      fs.unlinkSync(cachePath);
-      return { success: true };
-    }
-    return { success: true, message: '无缓存需要清除' };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
+// 一键安装所有缺失依赖
+ipcMain.handle('env-install-all-missing', async (_event, checks) => {
+  return oobeService.installAllMissing(checks, (evt) => {
+    mainWindow?.webContents.send('env-install-progress', evt);
+  });
 });
 
 // 窗口控制

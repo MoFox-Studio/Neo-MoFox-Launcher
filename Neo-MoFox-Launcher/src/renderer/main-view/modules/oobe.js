@@ -4,6 +4,7 @@ import { el } from './elements.js';
 
 const envState = {
   checking: false,
+  installing: false,
   results: {
     python: null,
     uv: null,
@@ -73,9 +74,13 @@ function resetCheckUI() {
     }
   });
   
-  // 隐藏摘要和提示
+  // 隐藏摘要、提示和进度
   el.envCheckSummary?.classList.add('hidden');
   el.envInstallHints?.classList.add('hidden');
+  el.envInstallProgress?.classList.add('hidden');
+  
+  // 隐藏安装按钮
+  if (el.oobeBtnAutoInstall) el.oobeBtnAutoInstall.style.display = 'none';
   
   // 禁用按钮
   if (el.oobeBtnRecheck) el.oobeBtnRecheck.disabled = true;
@@ -106,6 +111,11 @@ async function runEnvCheck() {
     // 启用按钮
     if (el.oobeBtnRecheck) el.oobeBtnRecheck.disabled = false;
     if (el.oobeBtnContinue) el.oobeBtnContinue.disabled = !result.passed;
+    
+    // 如果有未通过项，显示"一键安装"按钮
+    if (!result.passed) {
+      showAutoInstallButton(result.checks);
+    }
     
     return result.passed;
   } catch (error) {
@@ -158,6 +168,23 @@ function updateCheckItem(name, checkResult) {
   }
 }
 
+// ─── 显示"一键安装"按钮 ──────────────────────────────────────────────
+
+function showAutoInstallButton(checks) {
+  const missing = [];
+  if (!checks.python.valid) missing.push('Python');
+  if (!checks.uv.valid)     missing.push('uv');
+  if (!checks.git.valid)    missing.push('Git');
+
+  if (missing.length > 0 && el.oobeBtnAutoInstall) {
+    el.oobeBtnAutoInstall.style.display = '';
+    const label = el.oobeBtnAutoInstall.querySelector('span:last-child');
+    if (label) {
+      label.textContent = `一键安装 (${missing.join(', ')})`;
+    }
+  }
+}
+
 // ─── 显示结果摘要 ─────────────────────────────────────────────────────
 
 function showSummary(passed, checks, errorMessage = null) {
@@ -181,7 +208,7 @@ function showSummary(passed, checks, errorMessage = null) {
     // 部分失败
     if (el.summaryIcon) el.summaryIcon.innerHTML = '<span class="material-symbols-rounded text-warning">warning</span>';
     if (el.summaryTitle) el.summaryTitle.textContent = '缺少依赖项';
-    if (el.summaryDesc) el.summaryDesc.textContent = '请安装以下缺失的依赖项后重新检测。';
+    if (el.summaryDesc) el.summaryDesc.textContent = '可点击下方「一键安装」自动下载并静默安装所有缺失依赖。';
     
     // 显示安装提示
     showInstallHints(checks);
@@ -199,7 +226,7 @@ function showInstallHints(checks) {
     hints.push({
       name: 'Python',
       requirement: checks.python.requirement,
-      hint: '请从 <a href="https://www.python.org/downloads/" target="_blank">python.org</a> 下载并安装 Python 3.11 或更高版本',
+      hint: '将自动下载 Python 3.11 安装包并静默安装',
       installed: checks.python.installed,
       version: checks.python.version,
     });
@@ -209,8 +236,7 @@ function showInstallHints(checks) {
     hints.push({
       name: 'uv',
       requirement: '已安装',
-      hint: '在终端运行: <code>pip install uv</code>',
-      command: 'pip install uv',
+      hint: '将通过官方安装脚本自动安装',
     });
   }
   
@@ -218,7 +244,7 @@ function showInstallHints(checks) {
     hints.push({
       name: 'Git',
       requirement: '已安装',
-      hint: '请从 <a href="https://git-scm.com/downloads" target="_blank">git-scm.com</a> 下载并安装 Git',
+      hint: '将自动下载 Git 安装包并静默安装',
     });
   }
   
@@ -238,11 +264,97 @@ function showInstallHints(checks) {
         </div>
         <div class="hint-body">
           <p>${hint.hint}</p>
-          ${hint.command ? `<div class="hint-command"><code>${hint.command}</code></div>` : ''}
         </div>
       </div>
     `).join('');
   }
+}
+
+// ─── 自动安装所有缺失依赖 ──────────────────────────────────────────────
+
+async function autoInstallAll() {
+  if (envState.installing) return;
+  envState.installing = true;
+
+  // 禁用按钮
+  if (el.oobeBtnAutoInstall) {
+    el.oobeBtnAutoInstall.disabled = true;
+    const label = el.oobeBtnAutoInstall.querySelector('span:last-child');
+    if (label) label.textContent = '安装中...';
+  }
+  if (el.oobeBtnRecheck) el.oobeBtnRecheck.disabled = true;
+
+  // 显示安装进度区域
+  el.envInstallHints?.classList.add('hidden');
+  el.envInstallProgress?.classList.remove('hidden');
+  if (el.installProgressLog) el.installProgressLog.textContent = '';
+  if (el.installProgressBar) el.installProgressBar.style.width = '0%';
+  if (el.installProgressTitle) el.installProgressTitle.textContent = '正在准备安装...';
+
+  // 监听安装进度事件
+  const progressHandler = (data) => {
+    if (data.type === 'status' || data.type === 'installing') {
+      if (el.installProgressTitle) {
+        el.installProgressTitle.textContent = data.message || `正在安装 ${data.depName}...`;
+      }
+    }
+    if (data.type === 'download' && data.percent != null) {
+      if (el.installProgressBar) {
+        el.installProgressBar.style.width = `${data.percent}%`;
+      }
+      if (data.message && el.installProgressTitle) {
+        el.installProgressTitle.textContent = data.message;
+      }
+    }
+    if (data.type === 'log' && data.message) {
+      appendInstallLog(data.message);
+    }
+  };
+
+  window.mofoxAPI.onEnvInstallProgress(progressHandler);
+
+  try {
+    // 调用主进程安装
+    const installResult = await window.mofoxAPI.envInstallAllMissing(envState.results);
+
+    if (el.installProgressBar) el.installProgressBar.style.width = '100%';
+
+    if (installResult.success) {
+      if (el.installProgressTitle) el.installProgressTitle.textContent = '所有依赖安装完成！';
+      appendInstallLog('\n✅ 所有依赖安装完成，正在重新检测...\n');
+    } else {
+      // 部分失败
+      const failedDeps = Object.entries(installResult.results || {})
+        .filter(([, r]) => !r.success)
+        .map(([name, r]) => `${name}: ${r.error}`)
+        .join('\n');
+      if (el.installProgressTitle) el.installProgressTitle.textContent = '部分依赖安装失败';
+      appendInstallLog(`\n⚠️ 部分安装失败:\n${failedDeps}\n\n将重新检测当前状态...\n`);
+    }
+
+    // 安装完成后等一会再重新检测（让 PATH 刷新）
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 重新检测
+    el.envInstallProgress?.classList.add('hidden');
+    if (el.oobeBtnAutoInstall) el.oobeBtnAutoInstall.style.display = 'none';
+    resetCheckUI();
+    await runEnvCheck();
+  } catch (err) {
+    console.error('自动安装失败:', err);
+    if (el.installProgressTitle) el.installProgressTitle.textContent = '安装过程出错';
+    appendInstallLog(`\n❌ 安装出错: ${err.message}\n`);
+    if (el.oobeBtnRecheck) el.oobeBtnRecheck.disabled = false;
+  } finally {
+    envState.installing = false;
+    if (el.oobeBtnAutoInstall) el.oobeBtnAutoInstall.disabled = false;
+  }
+}
+
+function appendInstallLog(text) {
+  if (!el.installProgressLog) return;
+  el.installProgressLog.textContent += text;
+  el.installProgressLog.scrollTop = el.installProgressLog.scrollHeight;
 }
 
 // ─── 事件绑定 ─────────────────────────────────────────────────────────
@@ -253,6 +365,11 @@ el.oobeBtnRecheck?.addEventListener('click', async () => {
   await window.mofoxAPI.envCheckClearCache();
   resetCheckUI();
   await runEnvCheck();
+});
+
+// 一键安装按钮
+el.oobeBtnAutoInstall?.addEventListener('click', () => {
+  autoInstallAll();
 });
 
 // 继续按钮

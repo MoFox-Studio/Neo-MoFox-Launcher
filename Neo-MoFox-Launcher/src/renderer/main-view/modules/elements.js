@@ -52,8 +52,15 @@ export const el = {
   envInstallHints: document.getElementById('env-install-hints'),
   installHintsList: document.getElementById('install-hints-list'),
   
+  // 自动安装进度
+  envInstallProgress: document.getElementById('env-install-progress'),
+  installProgressTitle: document.getElementById('install-progress-title'),
+  installProgressBar: document.getElementById('install-progress-bar'),
+  installProgressLog: document.getElementById('install-progress-log'),
+  
   // 按钮
   oobeBtnRecheck: document.getElementById('oobe-btn-recheck'),
+  oobeBtnAutoInstall: document.getElementById('oobe-btn-auto-install'),
   oobeBtnContinue: document.getElementById('oobe-btn-continue'),
 };
 

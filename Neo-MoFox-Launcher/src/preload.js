@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   envCheckGetCached: () => ipcRenderer.invoke('env-check-get-cached'),
   envCheckClearCache: () => ipcRenderer.invoke('env-check-clear-cache'),
 
+  // 环境依赖自动安装
+  envInstallDep: (depName) => ipcRenderer.invoke('env-install-dep', depName),
+  envInstallAllMissing: (checks) => ipcRenderer.invoke('env-install-all-missing', checks),
+
   // ─── 实例管理 ───────────────────────────────────────────────────────────
   getInstances: () => ipcRenderer.invoke('instances-get-all'),
   getInstance: (instanceId) => ipcRenderer.invoke('instances-get', instanceId),
@@ -78,6 +82,9 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   },
   onCloneProgress: (callback) => {
     ipcRenderer.on('oobe-clone-progress', (_event, data) => callback(data));
+  },
+  onEnvInstallProgress: (callback) => {
+    ipcRenderer.on('env-install-progress', (_event, data) => callback(data));
   },
   onInstallProgress: (callback) => {
     ipcRenderer.on('install-progress', (_event, data) => callback(data));
