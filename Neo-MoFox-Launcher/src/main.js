@@ -53,6 +53,14 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  // ─── 禁用鼠标侧键导航（主进程层面拦截） ──────────────────────────────
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // 仅允许 file:// 协议的本地页面导航
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+    }
+  });
+
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       if (mainWindow.webContents.isDevToolsOpened()) {

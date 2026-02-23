@@ -1,5 +1,34 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// ─── 禁用鼠标侧键（前进/后退）导航 ──────────────────────────────────────
+window.addEventListener('mouseup', (e) => {
+  // button 3 = 后退, button 4 = 前进
+  if (e.button === 3 || e.button === 4) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
+// 部分浏览器/Electron 版本通过 auxclick 触发侧键
+window.addEventListener('auxclick', (e) => {
+  if (e.button === 3 || e.button === 4) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
+// 禁用键盘 Alt+Left / Alt+Right / Backspace 等浏览器后退快捷键
+window.addEventListener('keydown', (e) => {
+  // Alt + ArrowLeft / ArrowRight
+  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+  }
+  // Backspace 在非输入区域时触发后退
+  if (e.key === 'Backspace' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) {
+    e.preventDefault();
+  }
+}, true);
+
 contextBridge.exposeInMainWorld('mofoxAPI', {
   // 进程控制
   startMofox: () => ipcRenderer.invoke('start-mofox'),
