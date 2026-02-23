@@ -1085,6 +1085,14 @@ ipcMain.handle('instance-status', (event, instanceId) => {
   return instanceData ? instanceData.status : 'stopped';
 });
 
+ipcMain.handle('instance-status-all', () => {
+  const result = {};
+  for (const [instanceId, data] of instanceProcesses.entries()) {
+    result[instanceId] = data.status || 'stopped';
+  }
+  return result;
+});
+
 ipcMain.handle('instance-stats', (event, instanceId) => {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {

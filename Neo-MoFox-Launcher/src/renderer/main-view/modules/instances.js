@@ -5,7 +5,33 @@ import { el } from './elements.js';
 export const state = {
   instances: [],
   currentEditingInstance: null,
+  /** 实时运行状态映射：instanceId -> status */
+  runningStatuses: {},
 };
+
+// ─── Status Helpers ───────────────────────────────────────────────────
+
+const STATUS_TEXT = {
+  stopped:    '未运行',
+  starting:   '启动中...',
+  running:    '运行中',
+  stopping:   '停止中...',
+  restarting: '重启中...',
+  error:      '错误',
+  disabled:   '已禁用',
+  incomplete: '安装未完成',
+};
+
+function isActiveStatus(status) {
+  return status === 'running' || status === 'starting' || status === 'restarting' || status === 'stopping';
+}
+
+/** 更新「活跃实例」统计数字 */
+function refreshActiveCount() {
+  const count = Object.values(state.runningStatuses).filter(s => isActiveStatus(s)).length;
+  const activeEl = document.getElementById('active-instances');
+  if (activeEl) activeEl.textContent = count.toString();
+}
 
 // ─── Load Instances ───────────────────────────────────────────────────
 
@@ -14,6 +40,13 @@ export async function loadInstances() {
     // 从后端 API 加载实例列表
     const instances = await window.mofoxAPI.getInstances();
     
+    // 批量获取所有实例的实时运行状态
+    try {
+      state.runningStatuses = await window.mofoxAPI.getAllInstanceStatuses() || {};
+    } catch (_) {
+      state.runningStatuses = {};
+    }
+    
     // 转换字段名以适配前端显示（后端使用 displayName，前端使用 name）
     state.instances = instances.map(instance => ({
       id: instance.id,
@@ -21,7 +54,7 @@ export async function loadInstances() {
       path: instance.neomofoxDir,
       description: instance.description || '', // 用户编辑的描述
       autoInfo: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`, // 自动信息
-      status: instance.enabled ? 'stopped' : 'disabled',
+      status: state.runningStatuses[instance.id] || (instance.enabled ? 'stopped' : 'disabled'),
       branch: instance.channel,
       version: instance.neomofoxVersion || 'unknown',
       // 保留原始数据
@@ -34,6 +67,7 @@ export async function loadInstances() {
     }));
     
     renderInstances();
+    refreshActiveCount();
   } catch (error) {
     console.error('加载实例失败:', error);
     state.instances = [];
@@ -63,13 +97,7 @@ export function renderInstances() {
     countBadge.textContent = state.instances.length.toString();
   }
   
-  // 更新活跃实例数
-  const activeInstancesEl = document.getElementById('active-instances');
-  if (activeInstancesEl) {
-    activeInstancesEl.textContent = state.instances.length.toString();
-  }
-  
-  // 如果没有实例，不需要显示 Empty State，因为 Add Card 就在那里
+  refreshActiveCount();
   
   // 渲染实例
   state.instances.forEach(instance => {
@@ -80,8 +108,9 @@ export function renderInstances() {
     // 检查是否是未完成安装的实例
     const isIncomplete = instance.installCompleted === false;
     
-    // 状态样式映射
-    let statusClass = instance.status || 'stopped';
+    // 实时状态
+    const liveStatus = state.runningStatuses[instance.id] || instance.status || 'stopped';
+    let statusClass = liveStatus;
     if (isIncomplete) {
       statusClass = 'incomplete';
       card.classList.add('incomplete');
@@ -145,12 +174,23 @@ export function renderInstances() {
       });
       
     } else {
+      const isRunning = isActiveStatus(liveStatus);
+      const isStopped = liveStatus === 'stopped' || liveStatus === 'error';
+      const statusLabel = STATUS_TEXT[liveStatus] || liveStatus;
+      
+      // 运行中的卡片加上特殊 class
+      if (isRunning) card.classList.add('instance-running');
+      if (liveStatus === 'error') card.classList.add('instance-error');
+      
       card.innerHTML = `
         <div class="instance-card-header">
-          <div class="instance-icon">
-            <span class="material-symbols-rounded">dns</span>
+          <div class="instance-icon ${isRunning ? 'running' : ''}">
+            <span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>
           </div>
-          <div class="instance-status-dot ${statusClass}" title="状态: ${statusClass}"></div>
+          <div class="instance-status-indicator">
+            <div class="instance-status-dot ${liveStatus}"></div>
+            <span class="instance-status-label">${statusLabel}</span>
+          </div>
         </div>
         
         <div class="instance-card-body">
@@ -165,14 +205,25 @@ export function renderInstances() {
             <span class="material-symbols-rounded">settings</span>
             管理
           </button>
-          <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
-            <span class="material-symbols-rounded">system_update</span>
-            版本
-          </button>
-          <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动">
-            <span class="material-symbols-rounded">play_arrow</span>
-            启动
-          </button>
+          ${isRunning ? `
+            <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${liveStatus !== 'running' ? 'disabled' : ''}>
+              <span class="material-symbols-rounded">stop</span>
+              停止
+            </button>
+            <button class="md3-btn md3-btn-tonal md3-btn-sm btn-view-instance" title="查看日志">
+              <span class="material-symbols-rounded">terminal</span>
+              日志
+            </button>
+          ` : `
+            <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
+              <span class="material-symbols-rounded">system_update</span>
+              版本
+            </button>
+            <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动" ${!isStopped ? 'disabled' : ''}>
+              <span class="material-symbols-rounded">play_arrow</span>
+              启动
+            </button>
+          `}
         </div>
       `;
       
@@ -185,20 +236,41 @@ export function renderInstances() {
       
       // 事件绑定 - 版本管理按钮 → 跳转到版本管理页面
       const btnVersion = card.querySelector('.btn-version-instance');
-      btnVersion.addEventListener('click', (e) => {
-        e.stopPropagation();
-        window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
-      });
+      if (btnVersion) {
+        btnVersion.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+        });
+      }
 
-      // 事件绑定 - 启动按钮 → 跳转到实例视图页面并自动启动
+      // 事件绑定 - 启动按钮 → 在主界面直接启动，然后刷新卡片
       const btnStart = card.querySelector('.btn-start-instance');
-      btnStart.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // 跳转到实例视图页面，并带上自动启动参数
-        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}&autoStart=true`;
-      });
+      if (btnStart) {
+        btnStart.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await startInstanceFromCard(instance.id);
+        });
+      }
       
-      // 整个卡片点击进入实例视图页面（不自动启动）
+      // 事件绑定 - 停止按钮 → 在主界面直接停止
+      const btnStop = card.querySelector('.btn-stop-instance');
+      if (btnStop) {
+        btnStop.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await stopInstanceFromCard(instance.id);
+        });
+      }
+      
+      // 事件绑定 - 查看日志按钮 → 跳转到实例视图（不自动启动）
+      const btnView = card.querySelector('.btn-view-instance');
+      if (btnView) {
+        btnView.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+        });
+      }
+      
+      // 整个卡片点击：运行中 → 进入日志，停止中 → 进入实例视图
       card.addEventListener('click', () => {
          window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
       });
@@ -206,6 +278,73 @@ export function renderInstances() {
     
     // 将卡片插入到 Add Card 后面
     grid.appendChild(card);
+  });
+}
+
+// ─── 主界面直接启动/停止实例 ──────────────────────────────────────────
+
+async function startInstanceFromCard(instanceId) {
+  try {
+    // 立即更新UI状态
+    updateCardStatus(instanceId, 'starting');
+    
+    const result = await window.mofoxAPI.startInstance(instanceId);
+    if (!result.success) {
+      console.error('启动失败:', result.error);
+      updateCardStatus(instanceId, 'error');
+      await window.customAlert('启动失败: ' + result.error, '错误');
+    }
+    // 成功后状态会由 IPC 事件自动更新
+  } catch (error) {
+    console.error('启动异常:', error);
+    updateCardStatus(instanceId, 'error');
+    await window.customAlert('启动异常: ' + error.message, '错误');
+  }
+}
+
+async function stopInstanceFromCard(instanceId) {
+  try {
+    updateCardStatus(instanceId, 'stopping');
+    
+    const result = await window.mofoxAPI.stopInstance(instanceId);
+    if (!result.success) {
+      console.error('停止失败:', result.error);
+      await window.customAlert('停止失败: ' + result.error, '错误');
+    }
+  } catch (error) {
+    console.error('停止异常:', error);
+    await window.customAlert('停止异常: ' + error.message, '错误');
+  }
+}
+
+// ─── 单卡片实时状态更新（无需重渲染全部） ─────────────────────────────
+
+function updateCardStatus(instanceId, status) {
+  state.runningStatuses[instanceId] = status;
+  
+  // 同步到 state.instances
+  const inst = state.instances.find(i => i.id === instanceId);
+  if (inst) inst.status = status;
+  
+  const card = document.querySelector(`.instance-card[data-instance-id="${instanceId}"]`);
+  if (!card || card.classList.contains('incomplete')) return;
+  
+  // 完全重渲染该卡片的方式太重，做轻量级 DOM 更新
+  // 但由于按钮组结构会变化（启动↔停止），最简单的做法是重渲全部
+  renderInstances();
+}
+
+// ─── IPC 事件监听（实时状态推送） ─────────────────────────────────────
+
+export function setupInstanceStatusListener() {
+  window.mofoxAPI?.onInstanceStatusChange?.((data) => {
+    const { instanceId, status } = data;
+    const oldStatus = state.runningStatuses[instanceId];
+    
+    if (oldStatus !== status) {
+      console.log(`[Main] 实例 ${instanceId} 状态: ${oldStatus} → ${status}`);
+      updateCardStatus(instanceId, status);
+    }
   });
 }
 

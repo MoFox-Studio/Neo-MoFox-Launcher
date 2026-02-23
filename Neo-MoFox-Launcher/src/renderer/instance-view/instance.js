@@ -198,13 +198,9 @@ function hideNapcatUI() {
 // ─── 事件监听器 ───────────────────────────────────────────────────────
 
 function setupEventListeners() {
-  // 返回按钮 - 只有停止状态才能返回
+  // 返回按钮 - 多开模式下始终允许返回，实例在后台继续运行
   el.btnBack.addEventListener('click', () => {
-    if (state.instanceStatus === 'stopped' || state.instanceStatus === 'error') {
-      navigateToMain();
-    } else {
-      showError('请先停止实例再返回主界面');
-    }
+    navigateToMain();
   });
 
   // 控制按钮
@@ -523,17 +519,14 @@ function updateStatus(status) {
   el.btnStop.disabled = !(isRunning || status === 'restarting' || status === 'starting');
   el.btnRestart.disabled = !isRunning;
   
-  // 更新返回按钮状态和样式
+  // 更新返回按钮 - 多开模式下始终可用
+  el.btnBack.disabled = false;
+  el.btnBack.style.opacity = '1';
+  el.btnBack.style.cursor = 'pointer';
   if (isStopped) {
-    el.btnBack.disabled = false;
-    el.btnBack.style.opacity = '1';
-    el.btnBack.style.cursor = 'pointer';
     el.btnBack.title = '返回主界面';
   } else {
-    el.btnBack.disabled = true;
-    el.btnBack.style.opacity = '0.38';
-    el.btnBack.style.cursor = 'not-allowed';
-    el.btnBack.title = '运行中无法返回，请先停止实例';
+    el.btnBack.title = '返回主界面（实例将在后台继续运行）';
   }
 }
 
@@ -850,34 +843,13 @@ function navigateToMain() {
 }
 
 function setupNavigationGuard() {
-  // 阻止浏览器后退键（鼠标侧键等）在实例运行时导航离开
-  window.addEventListener('beforeunload', (e) => {
-    if (isNavigatingAway) return; // 正常导航，不阻止
-    
-    const isRunning = state.instanceStatus === 'running' || 
-                      state.instanceStatus === 'starting' || 
-                      state.instanceStatus === 'restarting' ||
-                      state.instanceStatus === 'stopping';
-    
-    if (isRunning) {
-      e.preventDefault();
-      e.returnValue = '实例正在运行中，确定要离开吗？进程可能不会被正确停止。';
-      return e.returnValue;
-    }
-  });
-
-  // 拦截 popstate 事件（浏览器后退/前进）
+  // 多开模式：实例在后台运行，允许自由导航
+  // 仅在用户通过非正常方式（如鼠标侧键）导航时给予提示
   window.addEventListener('popstate', (e) => {
-    const isRunning = state.instanceStatus === 'running' || 
-                      state.instanceStatus === 'starting' || 
-                      state.instanceStatus === 'restarting' ||
-                      state.instanceStatus === 'stopping';
-    
-    if (isRunning) {
-      // 阻止导航，推回当前状态
-      history.pushState(null, '', window.location.href);
-      showError('请先停止实例再返回主界面');
-    }
+    // 推回当前状态以防止页面跳转到未知地址
+    // 然后用正常方式导航回主页
+    history.pushState(null, '', window.location.href);
+    navigateToMain();
   });
 
   // 初始推入一个状态，让 popstate 能被触发

@@ -6,6 +6,7 @@ import {
   createNewInstance,
   saveInstance,
   deleteInstance,
+  setupInstanceStatusListener,
 } from './modules/instances.js';
 
 // ─── Initialization ───────────────────────────────────────────────────
@@ -26,6 +27,9 @@ async function init() {
   
   // 加载实例列表
   await loadInstances();
+  
+  // 监听实例状态变化（多开实时更新）
+  setupInstanceStatusListener();
   
   // 每30秒更新一次名言
   setInterval(updateQuotes, 30000);

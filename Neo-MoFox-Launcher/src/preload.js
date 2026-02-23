@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   stopInstance: (instanceId) => ipcRenderer.invoke('instance-stop', instanceId),
   restartInstance: (instanceId) => ipcRenderer.invoke('instance-restart', instanceId),
   getInstanceStatus: (instanceId) => ipcRenderer.invoke('instance-status', instanceId),
+  getAllInstanceStatuses: () => ipcRenderer.invoke('instance-status-all'),
   getInstanceStats: (instanceId) => ipcRenderer.invoke('instance-stats', instanceId),
   clearInstanceLogs: (instanceId, type) => ipcRenderer.invoke('instance-clear-logs', instanceId, type),
   exportInstanceLogs: (instanceId, type, logs) => ipcRenderer.invoke('instance-export-logs', instanceId, type, logs),
