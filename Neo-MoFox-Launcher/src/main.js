@@ -577,10 +577,6 @@ ipcMain.handle('install-cleanup', async (event, instanceId) => {
   return await installWizardService.cleanupFailedInstall(instanceId);
 });
 
-ipcMain.handle('install-check-napcat-installed', () => {
-  return { installed: false };
-});
-
 // ─── 用户设置 IPC ──────────────────────────────────────────────────────────
 const { settingsService } = require('./services/settings/SettingsService');
 

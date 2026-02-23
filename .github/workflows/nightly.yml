@@ -63,29 +63,45 @@ jobs:
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
+      - name: Cache Electron and Electron Forge
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-forge
+            ~\AppData\Local\Temp\electron-packager
+          key: ${{ runner.os }}-electron-forge-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-forge-
+            ${{ runner.os }}-electron-
+
       - name: Install dependencies
         working-directory: Neo-MoFox-Launcher
         run: npm ci
 
-      - name: Build Windows installer
+      - name: Build Windows package
         working-directory: Neo-MoFox-Launcher
-        run: npm run make
+        run: npm run package
 
-      - name: Rename artifacts
+      - name: Create ZIP archive
         shell: pwsh
         working-directory: Neo-MoFox-Launcher
         run: |
-          $squirrelDir = Get-ChildItem -Path "out/make/squirrel.windows" -Directory -Recurse | Select-Object -First 1
-          $exe = Get-ChildItem -Path $squirrelDir.FullName -Filter "*.exe" | Select-Object -First 1
-          $newName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly.exe"
-          Copy-Item $exe.FullName -Destination "out/$newName"
-          Write-Host "Renamed to $newName"
+          $packageDir = Get-ChildItem -Path "out" -Directory -Recurse | Where-Object { $_.Name -like "*-win32-*" } | Select-Object -First 1
+          if ($packageDir) {
+            $zipName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win.zip"
+            Compress-Archive -Path "$($packageDir.FullName)\*" -DestinationPath "out\$zipName" -Force
+            Write-Host "Created $zipName"
+          } else {
+            Write-Error "Package directory not found"
+            exit 1
+          }
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: Neo-MoFox-Launcher/out/Neo-MoFox-Launcher-*-nightly.exe
+          path: Neo-MoFox-Launcher/out/Neo-MoFox-Launcher-*-nightly-win.zip
 
   # Linux 构建 (.deb)
   build-linux:
@@ -108,6 +124,18 @@ jobs:
       - name: Install dependencies
         working-directory: Neo-MoFox-Launcher
         run: npm ci
+
+      - name: Cache Electron and Electron Forge
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-forge
+            /tmp/electron-packager
+          key: ${{ runner.os }}-electron-forge-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-forge-
+            ${{ runner.os }}-electron-
 
       - name: Install Linux build dependencies
         run: |
@@ -155,13 +183,23 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          echo "## Nightly Build - ${{ env.BUILD_DATE }}" > changelog.md
+          echo "## 🌙 每夜构建版本 - ${{ env.BUILD_DATE }}" > changelog.md
           echo "" >> changelog.md
-          echo "### Recent Commits" >> changelog.md
+          echo "### 📝 最近提交" >> changelog.md
           git log --oneline --since="24 hours ago" --format="- %h %s" >> changelog.md
           echo "" >> changelog.md
+          echo "### 📦 构建信息" >> changelog.md
+          echo "- 🗓️ 构建日期: ${{ env.BUILD_DATE }}" >> changelog.md
+          echo "- 🔖 提交哈希: $(git rev-parse --short HEAD)" >> changelog.md
+          echo "- 🚀 自动构建: GitHub Actions" >> changelog.md
+          echo "" >> changelog.md
           echo "---" >> changelog.md
-          echo "> This is an automated nightly build. It may be unstable." >> changelog.md
+          echo "" >> changelog.md
+          echo "> ⚠️ **注意**: 这是一个自动化每夜构建版本，可能存在不稳定因素，仅供测试使用。" >> changelog.md
+          echo ">" >> changelog.md
+          echo "> 📥 请根据您的操作系统下载对应的安装包：" >> changelog.md
+          echo "> - Windows 用户请下载 `.zip` 文件，解压后运行" >> changelog.md
+          echo "> - Linux 用户请下载 `.deb` 文件" >> changelog.md
 
       - name: Delete existing nightly release (if any)
         env:
@@ -169,13 +207,25 @@ jobs:
         run: |
           gh release delete "nightly-${{ env.BUILD_DATE }}" --yes --cleanup-tag 2>/dev/null || true
 
+      - name: Clean up old nightly releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🧹 清理旧的每夜构建版本，保留最新的 6 个版本..."
+          gh release list --limit 100 | grep "nightly-" | awk '{print $1}' | tail -n +7 | while read tag; do
+            echo "删除旧版本: $tag"
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          done
+          echo "✅ 清理完成"
+
       - name: Create nightly release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "nightly-${{ env.BUILD_DATE }}" \
-            --title "Nightly Build ${{ env.BUILD_DATE }}" \
+            --title "🌙 每夜构建 ${{ env.BUILD_DATE }}" \
             --notes-file changelog.md \
             --prerelease \
-            artifacts/windows-build/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly.exe \
+            artifacts/windows-build/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win.zip \
             artifacts/linux-build/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly.deb
+          echo "✅ 发布完成: nightly-${{ env.BUILD_DATE }}"
