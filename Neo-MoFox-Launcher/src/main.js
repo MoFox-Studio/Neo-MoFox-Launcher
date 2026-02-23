@@ -1,17 +1,26 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
-const { platformHelper } = require('./services/PlatformHelper');
 
-// 强制 stdout/stderr 使用 UTF-8 输出，解决 Windows 终端中文乱码
+// ─── Windows 终端 UTF-8 修复 ────────────────────────────────────────
+// 在任何 console.log 之前，将 Windows 控制台代码页切换为 UTF-8 (65001)
+// 否则中文字符会因 GBK/CP936 默认编码而显示为乱码
+if (process.platform === 'win32') {
+  try {
+    execSync('chcp 65001', { stdio: 'ignore' });
+  } catch (_) { /* ignore - non-critical */ }
+}
+
 if (process.stdout && typeof process.stdout.setEncoding === 'function') {
   process.stdout.setEncoding('utf-8');
 }
 if (process.stderr && typeof process.stderr.setEncoding === 'function') {
   process.stderr.setEncoding('utf-8');
 }
+
+const { platformHelper } = require('./services/PlatformHelper');
 
 let mainWindow;
 let mofoxProcess = null;

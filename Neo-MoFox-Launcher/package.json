@@ -4,13 +4,13 @@
   "description": "Neo-MoFox Launcher - Material Design 3 Style",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "chcp 65001 >nul 2>&1 & electron .",
     "start:win": "chcp 65001 >nul 2>&1 & electron .",
     "start:linux": "electron .",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "make:deb": "electron-forge make --targets @electron-forge/maker-deb",
-    "dev": "electron . --dev",
+    "dev": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:linux": "electron . --dev"
   },
