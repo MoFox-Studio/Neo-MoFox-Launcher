@@ -76,19 +76,46 @@ async function init() {
   await loadInstanceData();
   setupEventListeners();
   setupIPCListeners();
+  setupNavigationGuard();
   startStatsUpdate();
   
-  // 初始化状态显示
-  updateStatus(state.instanceStatus);
+  // 从主进程加载实例的真实运行状态（而不是默认 stopped）
+  try {
+    if (state.instanceId && window.mofoxAPI?.getInstanceStatus) {
+      const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
+      if (realStatus && realStatus !== 'stopped') {
+        console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
+        updateStatus(realStatus);
+        
+        // 如果实例已在运行，加载运行时统计信息
+        if (realStatus === 'running') {
+          const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
+          if (stats) updateStats(stats);
+        }
+      } else {
+        updateStatus('stopped');
+      }
+    } else {
+      updateStatus(state.instanceStatus);
+    }
+  } catch (e) {
+    console.warn('[Instance] 无法加载实例状态:', e);
+    updateStatus(state.instanceStatus);
+  }
 
   // 检查是否需要自动启动
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('autoStart') === 'true') {
-     console.log('自动启动标志位已设置，正在启动实例...');
-     // 延迟一点点以确保UI加载完成
-     setTimeout(() => {
+    // 只有在实例未运行时才自动启动
+    if (state.instanceStatus === 'stopped' || state.instanceStatus === 'error') {
+      console.log('自动启动标志位已设置，正在启动实例...');
+      // 延迟一点点以确保UI加载完成
+      setTimeout(() => {
         handleStart();
-     }, 500);
+      }, 500);
+    } else {
+      console.log(`实例已在运行 (${state.instanceStatus})，跳过自动启动`);
+    }
   }
 }
 
@@ -174,7 +201,7 @@ function setupEventListeners() {
   // 返回按钮 - 只有停止状态才能返回
   el.btnBack.addEventListener('click', () => {
     if (state.instanceStatus === 'stopped' || state.instanceStatus === 'error') {
-      window.location.href = '../main-view/index.html';
+      navigateToMain();
     } else {
       showError('请先停止实例再返回主界面');
     }
@@ -489,14 +516,15 @@ function updateStatus(status) {
 
   // 更新按钮状态
   const isRunning = status === 'running';
-  const isStopped = status === 'stopped';
+  const isStopped = status === 'stopped' || status === 'error';
+  const isTransitioning = status === 'starting' || status === 'stopping' || status === 'restarting';
   
   el.btnStart.disabled = !isStopped;
-  el.btnStop.disabled = !isRunning;
+  el.btnStop.disabled = !(isRunning || status === 'restarting' || status === 'starting');
   el.btnRestart.disabled = !isRunning;
   
   // 更新返回按钮状态和样式
-  if (isStopped || status === 'error') {
+  if (isStopped) {
     el.btnBack.disabled = false;
     el.btnBack.style.opacity = '1';
     el.btnBack.style.cursor = 'pointer';
@@ -810,6 +838,50 @@ function ansi256ToRgb(code) {
     const hex = gray.toString(16).padStart(2, '0');
     return `#${hex}${hex}${hex}`;
   }
+}
+
+// ─── 导航控制 ─────────────────────────────────────────────────────────
+
+let isNavigatingAway = false;
+
+function navigateToMain() {
+  isNavigatingAway = true;
+  window.location.href = '../main-view/index.html';
+}
+
+function setupNavigationGuard() {
+  // 阻止浏览器后退键（鼠标侧键等）在实例运行时导航离开
+  window.addEventListener('beforeunload', (e) => {
+    if (isNavigatingAway) return; // 正常导航，不阻止
+    
+    const isRunning = state.instanceStatus === 'running' || 
+                      state.instanceStatus === 'starting' || 
+                      state.instanceStatus === 'restarting' ||
+                      state.instanceStatus === 'stopping';
+    
+    if (isRunning) {
+      e.preventDefault();
+      e.returnValue = '实例正在运行中，确定要离开吗？进程可能不会被正确停止。';
+      return e.returnValue;
+    }
+  });
+
+  // 拦截 popstate 事件（浏览器后退/前进）
+  window.addEventListener('popstate', (e) => {
+    const isRunning = state.instanceStatus === 'running' || 
+                      state.instanceStatus === 'starting' || 
+                      state.instanceStatus === 'restarting' ||
+                      state.instanceStatus === 'stopping';
+    
+    if (isRunning) {
+      // 阻止导航，推回当前状态
+      history.pushState(null, '', window.location.href);
+      showError('请先停止实例再返回主界面');
+    }
+  });
+
+  // 初始推入一个状态，让 popstate 能被触发
+  history.pushState(null, '', window.location.href);
 }
 
 // ─── 使用 Toast 组件显示消息 ──────────────────────────────────────────

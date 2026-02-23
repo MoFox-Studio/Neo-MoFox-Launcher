@@ -21,7 +21,7 @@ let logBuffer = [];
 const MAX_LOG_LINES = 2000;
 
 // ─── 多实例进程管理 ───────────────────────────────────
-const instanceProcesses = new Map(); // instanceId -> { process, status, logs, stats, startTime }
+const instanceProcesses = new Map(); // instanceId -> { process, status, logs, stats, startTime, generation }
 const { storageService: instanceStorage } = require('./services/install/StorageService');
 
 // ─── 窗口创建 ───────────────────────────────────────
@@ -685,11 +685,14 @@ async function startInstanceInternal(instanceId, instance) {
       logs: [],
       stats: {},
       startTime: 0,
-      webuiOpened: false
+      webuiOpened: false,
+      generation: 0
     });
   }
   
   const instanceData = instanceProcesses.get(instanceId);
+  instanceData.generation = (instanceData.generation || 0) + 1;
+  const currentGeneration = instanceData.generation;
   instanceData.status = 'starting';
   instanceData.startTime = Date.now();
   instanceData.mofoxProcess = null;
@@ -751,24 +754,32 @@ async function startInstanceInternal(instanceId, instance) {
   
   mofoxProc.on('close', (code) => {
     sendInstanceLog(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code})`, 'info');
+    // 使用 generation 检查：如果 generation 已经变了，说明这是旧进程的事件，忽略
+    if (instanceData.generation !== currentGeneration) {
+      console.log(`[Instance ${instanceId}] 忽略旧 MoFox 进程 close 事件 (gen ${currentGeneration} vs ${instanceData.generation})`);
+      return;
+    }
     instanceData.mofoxProcess = null;
     // 检查是否需要等待 NapCat 进程（只在安装了 NapCat 时）
     const shouldWaitForNapcat = hasNapcat && instanceData.napcatProcess;
     if (!shouldWaitForNapcat) {
       instanceData.process = null;
-      if (instanceData.status !== 'stopping') {
-        updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
-      } else {
+      if (instanceData.status === 'stopping') {
         updateInstanceStatus(instanceId, 'stopped');
+      } else if (instanceData.status === 'restarting') {
+        // 重启中，不更新状态，等待 restart handler 自行处理
+        console.log(`[Instance ${instanceId}] MoFox 进程在重启期间退出，等待重启流程`);
+      } else {
+        updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
       }
     }
   });
   
   mofoxProc.on('error', (err) => {
     sendInstanceLog(instanceId, 'mofox', `MoFox 启动失败: ${err.message}`, 'error');
+    if (instanceData.generation !== currentGeneration) return;
     instanceData.mofoxProcess = null;
     updateInstanceStatus(instanceId, 'error');
-    throw err;
   });
   
   // ── 启动 Napcat ────────────────────────────────────────────────────
@@ -839,20 +850,28 @@ async function startInstanceInternal(instanceId, instance) {
     
     napcatProc.on('close', (code) => {
       sendInstanceLog(instanceId, 'napcat', `Napcat 进程已退出 (code: ${code})`, 'info');
+      // 使用 generation 检查：如果 generation 已经变了，说明这是旧进程的事件，忽略
+      if (instanceData.generation !== currentGeneration) {
+        console.log(`[Instance ${instanceId}] 忽略旧 Napcat 进程 close 事件 (gen ${currentGeneration} vs ${instanceData.generation})`);
+        return;
+      }
       instanceData.napcatProcess = null;
       // 检查两个进程是否都停止了
       if (!instanceData.mofoxProcess) {
         instanceData.process = null;
-        if (instanceData.status !== 'stopping') {
-          updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
-        } else {
+        if (instanceData.status === 'stopping') {
           updateInstanceStatus(instanceId, 'stopped');
+        } else if (instanceData.status === 'restarting') {
+          console.log(`[Instance ${instanceId}] Napcat 进程在重启期间退出，等待重启流程`);
+        } else {
+          updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
         }
       }
     });
     
     napcatProc.on('error', (err) => {
       sendInstanceLog(instanceId, 'napcat', `Napcat 启动失败: ${err.message}`, 'error');
+      if (instanceData.generation !== currentGeneration) return;
       instanceData.napcatProcess = null;
     });
   }
@@ -883,8 +902,24 @@ ipcMain.handle('instance-start', async (event, instanceId) => {
     
     if (instanceProcesses.has(instanceId)) {
       const data = instanceProcesses.get(instanceId);
-      if (data.status === 'running' || data.status === 'starting') {
+      // 检查状态和实际进程引用，防止状态不同步时重复启动
+      if (data.status === 'running' || data.status === 'starting' || data.status === 'restarting') {
         throw new Error('实例已在运行中');
+      }
+      // 即使状态为 stopped，也检查是否有残留进程
+      if (data.mofoxProcess || data.napcatProcess) {
+        console.warn(`[Instance ${instanceId}] 状态为 ${data.status} 但仍有残留进程，先清理`);
+        if (data.mofoxProcess) {
+          try { platformHelper.killProcessTree(data.mofoxProcess, 'SIGKILL'); } catch (e) { /* ignore */ }
+          data.mofoxProcess = null;
+        }
+        if (data.napcatProcess) {
+          try { platformHelper.killProcessTree(data.napcatProcess, 'SIGKILL'); } catch (e) { /* ignore */ }
+          data.napcatProcess = null;
+        }
+        data.process = null;
+        // 等待短暂时间让进程完全退出
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
@@ -899,12 +934,18 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
   try {
     const instanceData = instanceProcesses.get(instanceId);
     if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {
+      // 即使没有进程引用，也确保状态重置为 stopped
+      if (instanceData && instanceData.status !== 'stopped') {
+        updateInstanceStatus(instanceId, 'stopped');
+      }
       throw new Error('实例未在运行');
     }
     
     updateInstanceStatus(instanceId, 'stopping');
     sendInstanceLog(instanceId, 'mofox', '正在停止 MoFox...', 'info');
-    sendInstanceLog(instanceId, 'napcat', '正在停止 Napcat...', 'info');
+    if (instanceData.napcatProcess) {
+      sendInstanceLog(instanceId, 'napcat', '正在停止 Napcat...', 'info');
+    }
     
     // 停止 MoFox
     if (instanceData.mofoxProcess) {
@@ -946,37 +987,71 @@ ipcMain.handle('instance-restart', async (event, instanceId) => {
       sendInstanceLog(instanceId, 'mofox', '正在重启 MoFox...', 'info');
       sendInstanceLog(instanceId, 'napcat', '正在重启 Napcat...', 'info');
       
-      return new Promise((resolve) => {
-        // 停止 MoFox
-        if (instanceData.mofoxProcess) {
-          platformHelper.killProcessTree(instanceData.mofoxProcess, 'SIGTERM');
-        }
-        
-        // 停止 Napcat
-        if (instanceData.napcatProcess) {
-          platformHelper.killProcessTree(instanceData.napcatProcess, 'SIGTERM');
-        }
-        
-        instanceData.mofoxProcess = null;
-        instanceData.napcatProcess = null;
-        instanceData.process = null;
-        
-        // 等待 1.5 秒后重启
-        setTimeout(async () => {
-          const instance = storageService.getInstance(instanceId);
-          if (!instance) {
-            resolve({ success: false, error: '实例不存在' });
-            return;
+      // 保存旧进程引用用于等待退出
+      const oldMofox = instanceData.mofoxProcess;
+      const oldNapcat = instanceData.napcatProcess;
+      
+      // 发送 SIGTERM 优雅关闭
+      if (oldMofox) {
+        platformHelper.killProcessTree(oldMofox, 'SIGTERM');
+      }
+      if (oldNapcat) {
+        platformHelper.killProcessTree(oldNapcat, 'SIGTERM');
+      }
+      
+      // 等待旧进程真正退出（最多 5 秒），而不是立即清空引用
+      await new Promise((resolve) => {
+        let resolved = false;
+        const checkDone = () => {
+          if (resolved) return;
+          const mofoxDone = !oldMofox || oldMofox.killed || oldMofox.exitCode !== null;
+          const napcatDone = !oldNapcat || oldNapcat.killed || oldNapcat.exitCode !== null;
+          if (mofoxDone && napcatDone) {
+            resolved = true;
+            resolve();
           }
-          
-          try {
-            await startInstanceInternal(instanceId, instance);
-            resolve({ success: true });
-          } catch (error) {
-            resolve({ success: false, error: error.message });
+        };
+        
+        if (oldMofox) oldMofox.on('close', checkDone);
+        if (oldNapcat) oldNapcat.on('close', checkDone);
+        checkDone(); // 检查是否已经退出
+        
+        // 超时强杀
+        setTimeout(() => {
+          if (!resolved) {
+            if (oldMofox && !oldMofox.killed) {
+              try { oldMofox.kill('SIGKILL'); } catch (e) { /* ignore */ }
+            }
+            if (oldNapcat && !oldNapcat.killed) {
+              try { oldNapcat.kill('SIGKILL'); } catch (e) { /* ignore */ }
+            }
+            // 再等 500ms 让 SIGKILL 生效
+            setTimeout(() => {
+              resolved = true;
+              resolve();
+            }, 500);
           }
-        }, 1500);
+        }, 4000);
       });
+      
+      // 清理旧进程引用
+      instanceData.mofoxProcess = null;
+      instanceData.napcatProcess = null;
+      instanceData.process = null;
+      
+      // 开始启动新进程
+      const instance = storageService.getInstance(instanceId);
+      if (!instance) {
+        updateInstanceStatus(instanceId, 'error');
+        return { success: false, error: '实例不存在' };
+      }
+      
+      try {
+        await startInstanceInternal(instanceId, instance);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
     } else {
       // 直接启动
       const instance = storageService.getInstance(instanceId);
