@@ -376,7 +376,7 @@ window.customConfirm(message, title)
 
 ### 可以在 Linux/Mac 上使用吗？
 
-当前版本仅支持 Windows，跨平台支持在计划中。
+当前已支持 Windows 和基于 deb 包管理的 Linux 发行版（如 Ubuntu、Debian 等），macOS 支持仍在计划中。
 
 ### 如何备份配置？
 
