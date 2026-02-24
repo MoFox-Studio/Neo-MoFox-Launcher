@@ -114,6 +114,16 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
 
+  // ─── 环境管理 ───────────────────────────────────────────────────────────
+  envGetRecommendedTools: () => ipcRenderer.invoke('env-get-recommended-tools'),
+  envGetRecommendedExtensions: () => ipcRenderer.invoke('env-get-recommended-extensions'),
+  envGetExtensionCategories: () => ipcRenderer.invoke('env-get-extension-categories'),
+  envGetToolCategories: () => ipcRenderer.invoke('env-get-tool-categories'),
+  envPerformFullCheck: () => ipcRenderer.invoke('env-perform-full-check'),
+  envDetectVSCode: () => ipcRenderer.invoke('env-detect-vscode'),
+  envGetInstalledExtensions: () => ipcRenderer.invoke('env-get-installed-extensions'),
+  envDetectTool: (toolName, command) => ipcRenderer.invoke('env-detect-tool', toolName, command),
+
   // ─── 实例文件管理 ───────────────────────────────────────────────────────────
   openInstanceFolder: (instanceId, folderType) => ipcRenderer.invoke('instance-open-folder', instanceId, folderType),
   openInstanceFile: (instanceId, fileType) => ipcRenderer.invoke('instance-open-file', instanceId, fileType),

@@ -1,0 +1,672 @@
+/* ═══════════════════════════════════════════════════════════════
+   环境管理视图样式
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Body Background ─────────────────────────────────────── */
+body {
+  background: var(--md-sys-color-background);
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── App Content Wrapper ─────────────────────────────────── */
+.app-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 38px);
+  margin-top: 38px;
+  padding: 16px 24px 24px;
+  overflow: hidden;
+  background: var(--md-sys-color-background);
+}
+
+/* ─── Page Header ─────────────────────────────────────────── */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-btn {
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.back-btn:hover {
+  background: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-on-surface);
+}
+
+/* ─── Icon Only Buttons ───────────────────────────────────── */
+.icon-only {
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0 !important;
+  border-radius: 20px;
+}
+
+.icon-only span {
+  font-size: 20px;
+}
+
+/* ─── Tab Navigation ────────────────────────────────────────── */
+.tab-navigation {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  bottom: -1px;
+}
+
+.tab-btn .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.tab-btn:hover {
+  background: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-on-surface);
+}
+
+.tab-btn.active {
+  color: var(--md-sys-color-primary);
+  border-bottom-color: var(--md-sys-color-primary);
+}
+
+/* ─── Tab Content ──────────────────────────────────────────── */
+.tab-content-container {
+  padding: 0 24px 24px;
+  flex: 1;
+  overflow: auto;
+}
+
+.tab-pane {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Tools List ───────────────────────────────────────────── */
+.tools-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.tool-item {
+  background: var(--md-sys-color-surface-container);
+  border-radius: 16px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.2s ease;
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.tool-item:hover {
+  background: var(--md-sys-color-surface-container-high);
+  border-color: var(--md-sys-color-outline);
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tool-item-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.tool-item-icon .material-symbols-rounded {
+  font-size: 32px;
+}
+
+.tool-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tool-item-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-item-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.tool-item-description {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tool-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.tool-status.installed {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.tool-status.not-installed {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.tool-status .material-symbols-rounded {
+  font-size: 16px;
+}
+
+.tool-version {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 6px 12px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-version .material-symbols-rounded {
+  font-size: 16px;
+}
+
+.tool-item-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.tool-required-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.tool-required-badge .material-symbols-rounded {
+  font-size: 12px;
+}
+
+/* ─── VS Code Info Banner ──────────────────────────────────── */
+.vscode-info-banner {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  padding: 20px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.banner-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.banner-icon .material-symbols-rounded {
+  font-size: 32px;
+}
+
+.banner-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 2px 8px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border-radius: 8px;
+}
+
+.install-path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  opacity: 0.8;
+  margin: 0;
+}
+
+/* ─── Extensions Container ─────────────────────────────────── */
+.extensions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.extension-category {
+  background: var(--md-sys-color-surface-container);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.category-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.category-icon .material-symbols-rounded {
+  font-size: 24px;
+}
+
+.category-title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.category-count {
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 4px 12px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 12px;
+}
+
+.extensions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Extension Item ───────────────────────────────────────── */
+.extension-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--md-sys-color-surface);
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  transition: all 0.2s ease;
+}
+
+.extension-item:hover {
+  background: var(--md-sys-color-surface-container-highest);
+  border-color: var(--md-sys-color-outline);
+  transform: translateX(4px);
+}
+
+.extension-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-sys-color-surface-variant);
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.extension-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.extension-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.extension-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.extension-publisher {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.7;
+}
+
+.extension-required {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.extension-description {
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.extension-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.extension-status-badge.installed {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.extension-status-badge .material-symbols-rounded {
+  font-size: 16px;
+}
+
+.extension-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── System Info Grid ─────────────────────────────────────── */
+.system-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.system-info-card {
+  background: var(--md-sys-color-surface-container);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.system-info-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.system-info-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.system-info-icon .material-symbols-rounded {
+  font-size: 24px;
+}
+
+.system-info-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.system-info-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.system-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.info-label {
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.info-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  text-align: right;
+}
+
+/* ─── Empty State ──────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+  gap: 16px;
+}
+
+.empty-state .material-symbols-rounded {
+  font-size: 80px;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.3;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+  max-width: 400px;
+}
+
+/* ─── Loading State ────────────────────────────────────────── */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.loading-state .material-symbols-rounded {
+  font-size: 48px;
+  color: var(--md-sys-color-primary);
+}
+
+.loading-state p {
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .tool-item {
+    grid-template-columns: auto 1fr;
+  }
+
+  .tool-item-actions {
+    grid-column: 1 / 3;
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+
+  .tool-item-actions .md3-btn {
+    flex: 1;
+  }
+
+  .system-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tab-navigation {
+    overflow-x: auto;
+    padding: 0 16px;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+  }
+}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>环境管理 - Neo-MoFox Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  
+  <!-- Global Styles (Theme) -->
+  <link rel="stylesheet" href="../styles.css">
+  
+  <!-- Environment View Styles -->
+  <link rel="stylesheet" href="environment.css">
+  
+  <!-- Theme Init -->
+  <script src="../theme-init.js"></script>
+  
+  <!-- Components -->
+  <link rel="stylesheet" href="../components/toast.css">
+  <script src="../components/toast.js"></script>
+  <link rel="stylesheet" href="../components/dialog.css">
+  <script src="../components/dialog.js"></script>
+  
+  <script src="../window-controls.js" defer></script>
+</head>
+<body>
+
+  <!-- ═══ Title Bar ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">环境管理 - Neo-MoFox Launcher</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ Main Content ═══ -->
+  <div class="app-content-wrapper">
+    
+    <!-- Page Header -->
+    <header class="page-header">
+      <div class="header-left">
+        <button class="icon-btn back-btn" id="btnBack" title="返回">
+          <span class="material-symbols-rounded">arrow_back</span>
+        </button>
+        <div class="header-info">
+          <h1 class="page-title">环境管理</h1>
+          <p class="page-subtitle">推荐的开发工具和 VS Code 扩展</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="md3-btn md3-btn-text icon-only" id="btnRefresh" title="刷新环境信息">
+          <span class="material-symbols-rounded">refresh</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+      <button class="tab-btn active" data-tab="tools">
+        <span class="material-symbols-rounded">build</span>
+        <span>开发工具</span>
+      </button>
+      <button class="tab-btn" data-tab="extensions" id="extensionsTab" style="display: none;">
+        <span class="material-symbols-rounded">extension</span>
+        <span>VS Code 扩展</span>
+      </button>
+      <button class="tab-btn" data-tab="system">
+        <span class="material-symbols-rounded">info</span>
+        <span>系统信息</span>
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content-container">
+      
+      <!-- Tools Tab -->
+      <div class="tab-pane active" id="tab-tools">
+        <div class="tools-grid" id="toolsGrid">
+          <!-- 加载中状态 -->
+          <div class="loading-state">
+            <span class="material-symbols-rounded spinning">progress_activity</span>
+            <p>正在检测开发工具...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extensions Tab -->
+      <div class="tab-pane" id="tab-extensions">
+        <!-- VS Code 未安装提示 -->
+        <div class="vscode-not-found" id="vscodeNotFound" style="display: none;">
+          <div class="empty-state">
+            <span class="material-symbols-rounded">code_off</span>
+            <h3>未检测到 Visual Studio Code</h3>
+            <p>请先安装 VS Code 才能查看和安装推荐的扩展</p>
+            <button class="md3-btn md3-btn-filled" id="btnDownloadVSCode">
+              <span class="material-symbols-rounded">download</span>
+              <span>下载 VS Code</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VS Code 已安装 -->
+        <div class="vscode-info-banner" id="vscodeInfo" style="display: none;">
+          <div class="banner-icon">
+            <span class="material-symbols-rounded">check_circle</span>
+          </div>
+          <div class="banner-content">
+            <h3>Visual Studio Code <span class="version-badge" id="vscodeVersion">--</span></h3>
+            <p class="install-path" id="vscodePath">--</p>
+          </div>
+        </div>
+
+        <!-- 扩展分类列表 -->
+        <div class="extensions-container" id="extensionsContainer">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+
+      <!-- System Tab -->
+      <div class="tab-pane" id="tab-system">
+        <div class="system-info-grid" id="systemInfo">
+          <!-- 加载中状态 -->
+          <div class="loading-state">
+            <span class="material-symbols-rounded spinning">progress_activity</span>
+            <p>正在获取系统信息...</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="environment.js" type="module"></script>
+</body>
+</html>

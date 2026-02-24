@@ -1243,6 +1243,57 @@ ipcMain.handle('instance-delete-logs', async (event, instanceId) => {
   }
 });
 
+// ─── 环境管理 IPC ────────────────────────────────────────────────────────────
+const { getEnvironmentService } = require('./services/environment/EnvironmentService');
+const {
+  RECOMMENDED_TOOLS,
+  RECOMMENDED_VSCODE_EXTENSIONS,
+  EXTENSION_CATEGORIES,
+  TOOL_CATEGORIES
+} = require('./services/environment/RecommendedTools');
+
+const environmentService = getEnvironmentService();
+
+// 获取推荐工具列表
+ipcMain.handle('env-get-recommended-tools', () => {
+  return RECOMMENDED_TOOLS;
+});
+
+// 获取推荐扩展列表
+ipcMain.handle('env-get-recommended-extensions', () => {
+  return RECOMMENDED_VSCODE_EXTENSIONS;
+});
+
+// 获取扩展分类
+ipcMain.handle('env-get-extension-categories', () => {
+  return EXTENSION_CATEGORIES;
+});
+
+// 获取工具分类
+ipcMain.handle('env-get-tool-categories', () => {
+  return TOOL_CATEGORIES;
+});
+
+// 执行完整环境检测
+ipcMain.handle('env-perform-full-check', async () => {
+  return await environmentService.performFullCheck();
+});
+
+// 检测 VS Code
+ipcMain.handle('env-detect-vscode', async () => {
+  return await environmentService.detectVSCode();
+});
+
+// 获取已安装的 VS Code 扩展
+ipcMain.handle('env-get-installed-extensions', async () => {
+  return await environmentService.getInstalledExtensions();
+});
+
+// 检测单个工具
+ipcMain.handle('env-detect-tool', async (event, toolName, command) => {
+  return await environmentService.detectTool(toolName, command);
+});
+
 // ─── 版本管理 IPC ────────────────────────────────────────────────────────────
 
 // 设置版本服务的进度回调
