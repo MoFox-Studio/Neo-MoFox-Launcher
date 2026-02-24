@@ -312,13 +312,20 @@
   font-size: 20px;
 }
 
-.icon-button:hover {
+.icon-button:hover:not(.active) {
   background-color: var(--md-sys-color-surface-container-highest);
 }
 
 .icon-button.active {
   color: var(--md-sys-color-primary);
   background-color: var(--md-sys-color-primary-container);
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+}
+
+.icon-button.active:hover {
+  background-color: var(--md-sys-color-primary-container);
+  box-shadow: 0 0 0 2px var(--md-sys-color-primary);
+  opacity: 0.9;
 }
 
 .icon-button.small {
@@ -435,6 +442,12 @@
   font-variant-ligatures: none;
   font-kerning: none;
   -moz-osx-font-smoothing: grayscale;
+  /* 允许文本选择和复制 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  cursor: text;
 }
 
 .log-content::-webkit-scrollbar {
@@ -496,7 +509,13 @@
   text-rendering: geometricPrecision; /* 强制几何精度，优先保证对齐而非美观 */
   -webkit-font-smoothing: antialiased;
   letter-spacing: 0;
-  font-kerning: none; 
+  font-kerning: none;
+  
+  /* 允许文本选择 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 /* 针对 CJK 字符可能需要的微调，虽然 CSS 无法单独控制 CJK 宽度，但指定字体栈顺序很重要 */
@@ -505,6 +524,20 @@
 .log-entry span {
   font-family: inherit;
   white-space: pre; /* 确保 span 内部也不换行 */
+  /* 覆盖全局 user-select: none，确保所有内联元素都可选中 */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* 确保所有日志条目内的元素都可选中 */
+.log-entry *,
+.log-content * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 .log-entry .highlight {

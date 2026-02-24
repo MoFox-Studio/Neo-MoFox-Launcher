@@ -47,6 +47,7 @@ const el = {
 
   // 工具栏
   btnSearch: document.getElementById('btnSearch'),
+  btnCopyLogs: document.getElementById('btnCopyLogs'),
   btnAutoScroll: document.getElementById('btnAutoScroll'),
   btnClearLogs: document.getElementById('btnClearLogs'),
   btnExportLogs: document.getElementById('btnExportLogs'),
@@ -78,6 +79,11 @@ async function init() {
   setupIPCListeners();
   setupNavigationGuard();
   startStatsUpdate();
+  
+  // 初始化自动滚动按钮状态（默认开启）
+  if (state.autoScroll) {
+    el.btnAutoScroll.classList.add('active');
+  }
   
   // 从主进程加载实例的真实运行状态（而不是默认 stopped）
   try {
@@ -271,6 +277,9 @@ function setupEventListeners() {
     state.searchQuery = e.target.value.toLowerCase();
     renderLogs();
   });
+
+  // 复制日志
+  el.btnCopyLogs.addEventListener('click', handleCopyLogs);
 
   // 自动滚动
   el.btnAutoScroll.addEventListener('click', () => {
@@ -652,6 +661,46 @@ function renderLogs() {
 function scrollToBottom() {
   const container = state.currentTab === 'mofox' ? el.mofoxLogs : el.napcatLogs;
   container.scrollTop = container.scrollHeight;
+}
+
+async function handleCopyLogs() {
+  const type = state.currentTab;
+  const logs = state.logs[type];
+  
+  if (logs.length === 0) {
+    showError('没有可复制的日志');
+    return;
+  }
+
+  try {
+    // 将日志转换为纯文本
+    const logText = logs.map(log => log.message).join('\n');
+    
+    // 复制到剪贴板
+    await navigator.clipboard.writeText(logText);
+    
+    showSuccess(`已复制 ${logs.length} 条日志到剪贴板`);
+  } catch (error) {
+    console.error('复制失败:', error);
+    
+    // 如果 clipboard API 失败，尝试使用旧方法
+    try {
+      const logText = logs.map(log => log.message).join('\n');
+      const textarea = document.createElement('textarea');
+      textarea.value = logText;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      showSuccess(`已复制 ${logs.length} 条日志到剪贴板`);
+    } catch (fallbackError) {
+      console.error('备用复制方法也失败:', fallbackError);
+      showError('复制失败: ' + (error.message || '未知错误'));
+    }
+  }
 }
 
 function handleClearLogs() {
