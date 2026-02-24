@@ -127,7 +127,10 @@ function renderTools() {
     return;
   }
 
-  const toolsHTML = recommendedTools.map(tool => {
+  const currentPlatform = environmentData.system?.platform || 'win32';
+  const toolsHTML = recommendedTools
+    .filter(tool => !tool.platforms || tool.platforms.includes(currentPlatform))
+    .map(tool => {
     const detected = environmentData.tools[tool.id];
     const isInstalled = detected?.installed || false;
     const version = detected?.version || null;
