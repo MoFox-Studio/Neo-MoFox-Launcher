@@ -309,14 +309,30 @@ class InstallWizardService {
   }
 
   /**
-   * 检查端口是否可用
+   * 检查端口是否可用（同时检查已有实例配置和系统占用）
+   * @param {number} port
+   * @param {string|null} [excludeInstanceId] - 续装时排除自己的实例 ID
    */
-  async checkPortAvailable(port) {
+  async checkPortAvailable(port, excludeInstanceId = null) {
+    // 1. 检查是否与已有实例的端口冲突
+    const instances = storageService.getInstances();
+    const conflicting = instances.find(inst => {
+      if (excludeInstanceId && inst.id === excludeInstanceId) return false;
+      return inst.wsPort === port;
+    });
+    if (conflicting) {
+      return {
+        available: false,
+        error: `端口 ${port} 已被实例「${conflicting.displayName}」(${conflicting.id}) 占用，请更换端口`,
+      };
+    }
+
+    // 2. 检查系统级端口占用
     return new Promise((resolve) => {
       const server = net.createServer();
       server.once('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-          resolve({ available: false, error: `端口 ${port} 已被占用` });
+          resolve({ available: false, error: `端口 ${port} 已被系统中其他程序占用` });
         } else {
           resolve({ available: false, error: err.message });
         }
@@ -449,8 +465,11 @@ class InstallWizardService {
       return { valid: false, errors };
     }
 
-    // 检查端口可用性
-    const portAvailable = await this.checkPortAvailable(parseInt(inputs.wsPort, 10));
+    // 检查端口可用性（同时检查实例配置冲突和系统占用）
+    const portAvailable = await this.checkPortAvailable(
+      parseInt(inputs.wsPort, 10),
+      isResume ? instanceId : null  // 续装时排除自己
+    );
     if (!portAvailable.available) {
       errors.push({ field: 'wsPort', error: portAvailable.error });
       return { valid: false, errors };

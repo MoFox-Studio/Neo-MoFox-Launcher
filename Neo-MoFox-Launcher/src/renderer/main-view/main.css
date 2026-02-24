@@ -308,6 +308,68 @@
 .instance-status-dot.running { background-color: var(--status-running); box-shadow: 0 0 8px var(--status-running); }
 .instance-status-dot.stopped { background-color: var(--md-sys-color-outline); }
 .instance-status-dot.error { background-color: var(--status-error); }
+.instance-status-dot.starting,
+.instance-status-dot.restarting { background-color: var(--md-sys-color-tertiary, #ffd60a); animation: status-pulse 1.2s ease-in-out infinite; }
+.instance-status-dot.stopping { background-color: var(--status-error); animation: status-pulse 1.2s ease-in-out infinite; }
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ─── 状态指示器（圆点 + 文字） ─── */
+.instance-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.instance-status-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+
+/* ─── 运行中的卡片高亮 ─── */
+.instance-card.instance-running {
+  border: 1.5px solid var(--status-running);
+  box-shadow: 0 0 12px rgba(76, 175, 80, 0.15);
+}
+
+.instance-card.instance-running .instance-icon {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--status-running);
+}
+
+.instance-card.instance-error {
+  border: 1.5px solid var(--status-error);
+}
+
+.instance-card.instance-error .instance-icon {
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--status-error);
+}
+
+/* ─── 运行中 icon 样式 ─── */
+.instance-icon.running {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--status-running);
+}
+
+/* ─── 危险按钮（停止） ─── */
+.md3-btn-danger {
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--status-error, #f44336);
+  border: 1px solid transparent;
+}
+.md3-btn-danger:hover {
+  background: rgba(244, 67, 54, 0.22);
+}
+.md3-btn-danger:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
 
 .instance-card-body {
   padding: 20px 24px;
