@@ -559,21 +559,67 @@ body {
 .system-info-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  min-width: 0;
 }
 
 .info-label {
   font-size: 13px;
   color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.info-value {
+.system-info-grid .info-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  text-overflow: unset;
+  overflow: visible;
+  max-width: none;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.system-info-grid .info-value-mono {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
   text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  text-overflow: unset;
+  overflow: visible;
+  max-width: none;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+/* ─── Memory Usage Bar ─────────────────────────────────────── */
+.mem-usage-bar {
+  display: inline-block;
+  width: 80px;
+  height: 8px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 4px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.mem-usage-fill {
+  display: block;
+  height: 100%;
+  background: var(--md-sys-color-primary);
+  border-radius: 4px;
+  transition: width 0.5s ease;
 }
 
 /* ─── Empty State ──────────────────────────────────────────── */

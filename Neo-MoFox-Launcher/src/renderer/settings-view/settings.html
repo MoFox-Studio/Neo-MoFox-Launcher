@@ -214,7 +214,7 @@
             <span class="material-symbols-rounded">android</span>
           </div>
           <div class="about-name">Neo-MoFox Launcher</div>
-          <div class="about-version" id="about-version">v0.1.0</div>
+          <div class="about-version" id="about-version" title="试试多点几次？">v0.1.0</div>
           <div class="about-desc">Neo-MoFox 的桌面启动管理器，基于 Electron 构建。</div>
           <div class="about-links">
             <button class="action-chip" id="btn-open-github">
@@ -235,6 +235,15 @@
       </section>
 
     </main>
+  </div>
+
+  <!-- ✨ 妙妙特效 Canvas 层 -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- 🦊 狐狸彩蛋容器 -->
+  <div class="fox-easter-egg hidden" id="fox-easter-egg">
+    <div class="fox-speech-bubble" id="fox-message"></div>
+    <div class="fox-emoji" id="fox-emoji">🦊</div>
   </div>
 
   <script type="module" src="settings.js"></script>

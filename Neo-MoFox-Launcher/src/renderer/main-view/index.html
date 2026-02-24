@@ -72,11 +72,13 @@
           <span class="instance-count-badge" id="instance-count">0</span>
         </div>
         <div class="section-actions">
-          <button class="icon-btn" id="btn-open-environment" title="环境管理">
+          <button class="action-btn-tonal" id="btn-open-environment" title="环境管理">
             <span class="material-symbols-rounded">build_circle</span>
+            <span>环境管理</span>
           </button>
-          <button class="icon-btn" id="btn-open-settings" title="设置">
+          <button class="action-btn-tonal" id="btn-open-settings" title="设置">
             <span class="material-symbols-rounded">settings</span>
+            <span>设置</span>
           </button>
         </div>
       </div>
@@ -249,6 +251,50 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- 🧲 开发者致谢彩蛋面板 (Ctrl+Shift+M) -->
+  <div class="credits-overlay hidden" id="credits-overlay">
+    <div class="credits-panel">
+      <div class="credits-header">
+        <span class="credits-fox">🦊</span>
+        <h2>Neo-MoFox Launcher</h2>
+        <p class="credits-subtitle">made with ❤️ by MoFox Studio</p>
+      </div>
+      <div class="credits-body">
+        <div class="credits-section">
+          <span class="material-symbols-rounded">code</span>
+          <div>
+            <div class="credits-label">技术栈</div>
+            <div class="credits-value">Electron · Material Design 3 · NapCat</div>
+          </div>
+        </div>
+        <div class="credits-section">
+          <span class="material-symbols-rounded">schedule</span>
+          <div>
+            <div class="credits-label">编译时间</div>
+            <div class="credits-value" id="credits-build-time">—</div>
+          </div>
+        </div>
+        <div class="credits-section">
+          <span class="material-symbols-rounded">memory</span>
+          <div>
+            <div class="credits-label">运行环境</div>
+            <div class="credits-value" id="credits-runtime">—</div>
+          </div>
+        </div>
+        <div class="credits-section">
+          <span class="material-symbols-rounded">favorite</span>
+          <div>
+            <div class="credits-label">致谢</div>
+            <div class="credits-value">感谢每一位使用者和贡献者</div>
+          </div>
+        </div>
+      </div>
+      <div class="credits-footer">
+        <span class="credits-hint">按 Esc 或再次 Ctrl+Shift+M 关闭</span>
+      </div>
     </div>
   </div>
 

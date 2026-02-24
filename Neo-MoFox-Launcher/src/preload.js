@@ -151,6 +151,7 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   envGetExtensionCategories: () => ipcRenderer.invoke('env-get-extension-categories'),
   envGetToolCategories: () => ipcRenderer.invoke('env-get-tool-categories'),
   envPerformFullCheck: () => ipcRenderer.invoke('env-perform-full-check'),
+  envGetDetailedSystemInfo: () => ipcRenderer.invoke('env-get-detailed-system-info'),
   envDetectVSCode: () => ipcRenderer.invoke('env-detect-vscode'),
   envGetInstalledExtensions: () => ipcRenderer.invoke('env-get-installed-extensions'),
   envDetectTool: (toolName, command) => ipcRenderer.invoke('env-detect-tool', toolName, command),

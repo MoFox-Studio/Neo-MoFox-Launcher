@@ -1,5 +1,6 @@
 import { el } from './modules/elements.js';
 import { updateQuotes } from './modules/quotes.js';
+import { applyGreeting } from './modules/greetings.js';
 import { initTheme } from '../theme.js';
 import {
   loadInstances,
@@ -21,6 +22,9 @@ async function init() {
 
   // 应用主题（第一时间执行，避免闪烁）
   await initTheme();
+
+  // 🎉 应用节日/时段问候语
+  applyGreeting();
 
   // 更新名言
   updateQuotes();
@@ -76,3 +80,49 @@ el.editInstanceModal.addEventListener('click', (e) => {
     el.editInstanceModal.classList.add('hidden');
   }
 });
+
+// ─── 🧲 Ctrl+Shift+M 开发者致谢面板彩蛋 ─────────────────────────────────
+
+function initCreditsPanel() {
+  const overlay = document.getElementById('credits-overlay');
+  if (!overlay) return;
+
+  // 填充运行环境信息
+  const runtimeEl = document.getElementById('credits-runtime');
+  if (runtimeEl) {
+    const platform = navigator.platform || 'Unknown';
+    const lang = navigator.language || 'Unknown';
+    runtimeEl.textContent = `${platform} · ${lang}`;
+  }
+
+  // 填充当前时间作为「会话开始时间」
+  const buildTimeEl = document.getElementById('credits-build-time');
+  if (buildTimeEl) {
+    buildTimeEl.textContent = new Date().toLocaleString('zh-CN');
+  }
+
+  function toggleCredits() {
+    overlay.classList.toggle('hidden');
+  }
+
+  // Ctrl+Shift+M 触发
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') {
+      e.preventDefault();
+      toggleCredits();
+    }
+    // Esc 关闭
+    if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
+      overlay.classList.add('hidden');
+    }
+  });
+
+  // 点击遮罩层关闭
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.add('hidden');
+    }
+  });
+}
+
+initCreditsPanel();

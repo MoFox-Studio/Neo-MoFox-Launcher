@@ -155,6 +155,46 @@
   border-bottom: none; /* Removed underline */
 }
 
+.section-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ─── Tonal Action Buttons (Settings / Environment) ─────────────────── */
+.action-btn-tonal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+.action-btn-tonal .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.action-btn-tonal:hover {
+  background: var(--md-sys-color-secondary-container);
+  filter: brightness(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
+}
+
+.action-btn-tonal:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -663,4 +703,129 @@
   .main-quote .quote-text {
     font-size: 1.25rem;
   }
+}
+
+/* ─── 🧲 Credits Panel Easter Egg (Ctrl+Shift+M) ──────────────────── */
+.credits-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: creditsFadeIn 0.3s ease;
+}
+
+.credits-overlay.hidden {
+  display: none;
+}
+
+.credits-panel {
+  background: var(--md-sys-color-surface-container-high, #2d2d35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: 40px 48px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  animation: creditsPanelIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.credits-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.credits-fox {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 8px;
+  animation: creditsFloat 3s ease-in-out infinite;
+}
+
+.credits-header h2 {
+  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 4px;
+}
+
+.credits-subtitle {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-primary);
+  font-weight: 500;
+}
+
+.credits-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.credits-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 16px;
+  background: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.05);
+  border-radius: 14px;
+  transition: background 0.2s;
+}
+
+.credits-section:hover {
+  background: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.1);
+}
+
+.credits-section > .material-symbols-rounded {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.credits-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.credits-value {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface);
+  line-height: 1.4;
+}
+
+.credits-footer {
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(var(--md-sys-color-on-surface-rgb, 230, 225, 229), 0.08);
+}
+
+.credits-hint {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.6;
+}
+
+@keyframes creditsFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes creditsPanelIn {
+  from { transform: scale(0.85) translateY(20px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes creditsFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }

@@ -1400,6 +1400,11 @@ ipcMain.handle('env-perform-full-check', async () => {
   return await environmentService.performFullCheck();
 });
 
+// 获取详细硬件信息
+ipcMain.handle('env-get-detailed-system-info', async () => {
+  return await environmentService.getDetailedSystemInfo();
+});
+
 // 检测 VS Code
 ipcMain.handle('env-detect-vscode', async () => {
   return await environmentService.detectVSCode();

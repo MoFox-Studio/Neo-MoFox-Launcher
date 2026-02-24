@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
+    "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
   },
   "config": {
@@ -55,7 +56,11 @@
         },
         {
           "name": "@electron-forge/maker-zip",
-          "platforms": ["win32", "linux", "darwin"]
+          "platforms": [
+            "win32",
+            "linux",
+            "darwin"
+          ]
         },
         {
           "name": "@electron-forge/maker-deb",
@@ -69,8 +74,21 @@
               "genericName": "Bot Launcher",
               "description": "Neo-MoFox Launcher - MoFox QQ Bot 管理器",
               "section": "utils",
-              "categories": ["Utility", "Network"],
-              "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libsecret-1-0"]
+              "categories": [
+                "Utility",
+                "Network"
+              ],
+              "depends": [
+                "libgtk-3-0",
+                "libnotify4",
+                "libnss3",
+                "libxss1",
+                "libxtst6",
+                "xdg-utils",
+                "libatspi2.0-0",
+                "libuuid1",
+                "libsecret-1-0"
+              ]
             }
           }
         }

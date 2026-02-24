@@ -3,6 +3,7 @@ const { promisify } = require('util');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const si = require('systeminformation');
 
 const execAsync = promisify(exec);
 
@@ -184,7 +185,7 @@ class EnvironmentService {
   }
 
   /**
-   * 获取系统信息
+   * 获取系统信息（基础，performFullCheck 用）
    */
   getSystemInfo() {
     return {
@@ -196,6 +197,130 @@ class EnvironmentService {
       homeDir: os.homedir(),
       tmpDir: os.tmpdir()
     };
+  }
+
+  /**
+   * 获取详细硬件信息 —— 使用 systeminformation 库
+   * 跨平台：Windows / Linux / macOS / FreeBSD 全覆盖
+   */
+  async getDetailedSystemInfo() {
+    const basic = this.getSystemInfo();
+
+    // 并行查询所有硬件信息
+    const [osInfo, cpuInfo, memInfo, memLayout, graphics, baseboard, diskLayout, blockDevices] =
+      await Promise.all([
+        si.osInfo().catch(() => null),
+        si.cpu().catch(() => null),
+        si.mem().catch(() => null),
+        si.memLayout().catch(() => []),
+        si.graphics().catch(() => null),
+        si.baseboard().catch(() => null),
+        si.diskLayout().catch(() => []),
+        si.blockDevices().catch(() => []),
+      ]);
+
+    // ── 操作系统 ──
+    const osName = osInfo?.distro || basic.type;
+    const osVersion = osInfo?.release
+      ? (osInfo.build ? `${osInfo.release} (Build ${osInfo.build})` : osInfo.release)
+      : basic.release;
+
+    // ── CPU ──
+    const cpuModel = cpuInfo?.brand
+      ? `${cpuInfo.manufacturer || ''} ${cpuInfo.brand}`.trim()
+      : (os.cpus()[0]?.model?.trim() || '未知');
+    const cpuCores = cpuInfo?.physicalCores || '?';
+    const cpuLogical = cpuInfo?.cores || os.cpus().length;
+    const cpuSpeed = cpuInfo?.speed ? `${cpuInfo.speed} GHz` : (cpuInfo?.speedMax ? `${cpuInfo.speedMax} GHz` : '');
+
+    // ── 内存 ──
+    const totalMemGB = memInfo ? (memInfo.total / 1024 / 1024 / 1024).toFixed(1) : '?';
+    const usedMemGB = memInfo ? ((memInfo.total - memInfo.available) / 1024 / 1024 / 1024).toFixed(1) : '?';
+    const freeMemGB = memInfo ? (memInfo.available / 1024 / 1024 / 1024).toFixed(1) : '?';
+    const memUsage = memInfo ? Math.round(((memInfo.total - memInfo.available) / memInfo.total) * 100) : 0;
+
+    // ── GPU ── 过滤虚拟显卡
+    const virtualGpuKeywords = [
+      'Microsoft Basic', 'Virtual', 'IddDriver',
+      'Hyper-V', 'VMware', 'VirtualBox', 'Parsec',
+      'Remote Desktop', 'Citrix', 'RDP',
+    ];
+    const gpus = (graphics?.controllers || [])
+      .filter(g => g.model && !virtualGpuKeywords.some(k => g.model.toLowerCase().includes(k.toLowerCase())))
+      .map(g => ({
+        name: g.model || '未知',
+        vram: g.vram ? `${g.vram} MB` : (g.memoryTotal ? `${g.memoryTotal} MB` : '未知'),
+        driver: g.driverVersion || '未知',
+      }));
+
+    // ── 主板 ──
+    const mbMfr = (baseboard?.manufacturer || '').trim();
+    const mbModel = (baseboard?.model || '').trim();
+    const motherboard = (mbMfr || mbModel) ? `${mbMfr} ${mbModel}`.trim() : '未知';
+
+    // ── 硬盘 ──
+    const disks = diskLayout.length > 0
+      ? diskLayout.map(d => ({
+          model: (d.name || d.vendor || '未知').trim(),
+          size: d.size ? `${Math.round(d.size / 1024 / 1024 / 1024)} GB` : '未知',
+          interface: d.interfaceType || d.type || '未知',
+        }))
+      : [];
+
+    // ── 显示器 ── 过滤无意义名称
+    const uselessMonitorNames = ['default monitor', 'generic pnp monitor', 'generic monitor', 'unknown'];
+    const monitors = (graphics?.displays || [])
+      .filter(d => {
+        const name = (d.model || d.deviceName || '').trim().toLowerCase();
+        return name && !uselessMonitorNames.some(u => name.includes(u));
+      })
+      .map(d => ({
+        name: (d.model || d.deviceName || '').trim(),
+        resolution: (d.currentResX && d.currentResY) ? `${d.currentResX}×${d.currentResY}` : '',
+        size: d.sizeX && d.sizeY
+          ? `${(Math.sqrt(d.sizeX * d.sizeX + d.sizeY * d.sizeY) / 25.4).toFixed(1)}英寸`
+          : '',
+        connection: d.connection || '',
+      }));
+
+    // ── 内存条 ──
+    const ramSticks = (Array.isArray(memLayout) ? memLayout : [])
+      .filter(m => m.size > 0)
+      .map(m => ({
+        manufacturer: (m.manufacturer || '未知').trim(),
+        size: m.size ? `${Math.round(m.size / 1024 / 1024 / 1024)} GB` : '未知',
+        speed: m.clockSpeed ? `${m.clockSpeed} MHz` : '未知',
+        type: m.type || '',
+      }));
+
+    return {
+      ...basic,
+      osName,
+      osVersion,
+      cpuModel,
+      cpuCores,
+      cpuLogical,
+      cpuSpeed,
+      totalMem: `${totalMemGB} GB`,
+      usedMem: `${usedMemGB} GB`,
+      freeMem: `${freeMemGB} GB`,
+      memUsage,
+      gpus,
+      motherboard,
+      disks,
+      monitors,
+      ramSticks,
+      uptime: this._formatUptime(os.uptime()),
+    };
+  }
+
+  _formatUptime(seconds) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}天 ${h}小时`;
+    if (h > 0) return `${h}小时 ${m}分钟`;
+    return `${m}分钟`;
   }
 
   /**

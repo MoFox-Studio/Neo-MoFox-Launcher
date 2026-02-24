@@ -4,6 +4,7 @@
 
 // ─── 状态管理 ────────────────────────────────────────────────
 let environmentData = null;
+let detailedSystemInfo = null;
 let recommendedTools = null;
 let recommendedExtensions = null;
 let extensionCategories = null;
@@ -99,11 +100,19 @@ async function loadEnvironmentData() {
     environmentData = await window.mofoxAPI.envPerformFullCheck();
     installedExtensions = environmentData.extensions || [];
 
-    // 渲染各个部分
+    // 渲染工具和扩展（不等待硬件查询）
     renderTools();
     renderVSCodeInfo();
     renderExtensions();
-    renderSystemInfo();
+
+    // 异步获取详细硬件信息并渲染系统信息
+    renderSystemInfo(); // 先渲染基础信息
+    window.mofoxAPI.envGetDetailedSystemInfo().then(info => {
+      detailedSystemInfo = info;
+      renderSystemInfo(); // 用详细硬件数据重新渲染
+    }).catch(err => {
+      console.warn('详细硬件信息获取失败:', err);
+    });
 
   } catch (error) {
     console.error('加载环境数据失败:', error);
@@ -279,39 +288,217 @@ function renderSystemInfo() {
   }
 
   const system = environmentData.system;
+  const hw = detailedSystemInfo || null; // 可能还没加载完
+
+  // ── 操作系统信息 ──
+  const osName = hw?.osName || system.type;
+  const osVersion = hw?.osVersion || system.release;
+  const osArch = hw?.arch || system.arch;
+  const hostname = hw?.hostname || system.hostname;
+  const uptime = hw?.uptime || '';
+
+  // ── CPU ──
+  const cpuModel = hw?.cpuModel || '检测中...';
+  const cpuCores = hw?.cpuCores || '?';
+  const cpuLogical = hw?.cpuLogical || '?';
+  const cpuSpeed = hw?.cpuSpeed || '';
+
+  // ── 内存 ──
+  const totalMem = hw?.totalMem || '检测中...';
+  const usedMem = hw?.usedMem || '?';
+  const freeMem = hw?.freeMem || '?';
+  const memUsage = hw?.memUsage || 0;
+
+  // ── GPU ──
+  const gpus = hw?.gpus || [];
+  // ── 主板 ──
+  const motherboard = hw?.motherboard || '检测中...';
+  // ── 硬盘 ──
+  const disks = hw?.disks || [];
+  // ── 显示器 ──
+  const monitors = hw?.monitors || [];
+  // ── 内存条 ──
+  const ramSticks = hw?.ramSticks || [];
 
   const systemInfoHTML = `
+    <!-- 操作系统 -->
     <div class="system-info-card">
       <div class="system-info-header">
         <div class="system-info-icon">
           <span class="material-symbols-rounded">computer</span>
         </div>
-        <h3 class="system-info-title">系统信息</h3>
+        <h3 class="system-info-title">操作系统</h3>
       </div>
       <div class="system-info-items">
         <div class="system-info-item">
-          <span class="info-label">操作系统</span>
-          <span class="info-value">${system.type}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">平台</span>
-          <span class="info-value">${system.platform}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">架构</span>
-          <span class="info-value">${system.arch}</span>
+          <span class="info-label">系统</span>
+          <span class="info-value">${osName}</span>
         </div>
         <div class="system-info-item">
           <span class="info-label">版本</span>
-          <span class="info-value">${system.release}</span>
+          <span class="info-value-mono">${osVersion}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">架构</span>
+          <span class="info-value-mono">${osArch}</span>
         </div>
         <div class="system-info-item">
           <span class="info-label">主机名</span>
-          <span class="info-value">${system.hostname}</span>
+          <span class="info-value-mono">${hostname}</span>
+        </div>
+        ${uptime ? `
+        <div class="system-info-item">
+          <span class="info-label">运行时间</span>
+          <span class="info-value">${uptime}</span>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- CPU -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">memory</span>
+        </div>
+        <h3 class="system-info-title">处理器</h3>
+      </div>
+      <div class="system-info-items">
+        <div class="system-info-item">
+          <span class="info-label">型号</span>
+          <span class="info-value">${cpuModel}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">核心数</span>
+          <span class="info-value-mono">${cpuCores} 核 / ${cpuLogical} 线程</span>
+        </div>
+        ${cpuSpeed ? `
+        <div class="system-info-item">
+          <span class="info-label">频率</span>
+          <span class="info-value-mono">${cpuSpeed}</span>
+        </div>` : ''}
+      </div>
+    </div>
+
+    <!-- 内存 -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">memory_alt</span>
+        </div>
+        <h3 class="system-info-title">内存</h3>
+      </div>
+      <div class="system-info-items">
+        <div class="system-info-item">
+          <span class="info-label">总计</span>
+          <span class="info-value-mono">${totalMem}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">已用 / 可用</span>
+          <span class="info-value-mono">${usedMem} / ${freeMem}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">使用率</span>
+          <span class="info-value-mono">
+            <span class="mem-usage-bar"><span class="mem-usage-fill" style="width: ${memUsage}%"></span></span>
+            ${memUsage}%
+          </span>
+        </div>
+        ${ramSticks.length > 0 ? ramSticks.map((r, i) => `
+        <div class="system-info-item">
+          <span class="info-label">插槽 ${i + 1}</span>
+          <span class="info-value">${r.manufacturer} ${r.size}${r.type ? ' ' + r.type : ''} @ ${r.speed}</span>
+        </div>`).join('') : ''}
+      </div>
+    </div>
+
+    <!-- GPU -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">videocam</span>
+        </div>
+        <h3 class="system-info-title">显卡</h3>
+      </div>
+      <div class="system-info-items">
+        ${gpus.length > 0 ? gpus.map((g, i) => `
+        <div class="system-info-item">
+          <span class="info-label">GPU ${gpus.length > 1 ? i + 1 : ''}</span>
+          <span class="info-value">${g.name}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">显存</span>
+          <span class="info-value-mono">${g.vram}</span>
+        </div>
+        <div class="system-info-item">
+          <span class="info-label">驱动</span>
+          <span class="info-value-mono">${g.driver}</span>
+        </div>
+        `).join('') : `
+        <div class="system-info-item">
+          <span class="info-label">状态</span>
+          <span class="info-value">${hw ? '未检测到' : '检测中...'}</span>
+        </div>`}
+      </div>
+    </div>
+
+    <!-- 主板 -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">developer_board</span>
+        </div>
+        <h3 class="system-info-title">主板</h3>
+      </div>
+      <div class="system-info-items">
+        <div class="system-info-item">
+          <span class="info-label">型号</span>
+          <span class="info-value">${motherboard}</span>
         </div>
       </div>
     </div>
 
+    <!-- 硬盘 -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">hard_drive</span>
+        </div>
+        <h3 class="system-info-title">硬盘</h3>
+      </div>
+      <div class="system-info-items">
+        ${disks.length > 0 ? disks.map(d => `
+        <div class="system-info-item">
+          <span class="info-label">${d.model}</span>
+          <span class="info-value-mono">${d.size} (${d.interface})</span>
+        </div>
+        `).join('') : `
+        <div class="system-info-item">
+          <span class="info-label">状态</span>
+          <span class="info-value">${hw ? '未检测到' : '检测中...'}</span>
+        </div>`}
+      </div>
+    </div>
+
+    ${monitors.length > 0 ? `
+    <!-- 显示器 -->
+    <div class="system-info-card">
+      <div class="system-info-header">
+        <div class="system-info-icon">
+          <span class="material-symbols-rounded">monitor</span>
+        </div>
+        <h3 class="system-info-title">显示器</h3>
+      </div>
+      <div class="system-info-items">
+        ${monitors.map((m, i) => `
+        <div class="system-info-item">
+          <span class="info-label">显示器 ${monitors.length > 1 ? i + 1 : ''}</span>
+          <span class="info-value">${m.name}${m.size ? ' (' + m.size + ')' : ''}${m.resolution ? ' ' + m.resolution : ''}${m.connection ? ' [' + m.connection + ']' : ''}</span>
+        </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- 系统路径 -->
     <div class="system-info-card">
       <div class="system-info-header">
         <div class="system-info-icon">
@@ -322,15 +509,16 @@ function renderSystemInfo() {
       <div class="system-info-items">
         <div class="system-info-item">
           <span class="info-label">用户目录</span>
-          <span class="info-value" title="${system.homeDir}">${truncatePath(system.homeDir)}</span>
+          <span class="info-value-mono" title="${system.homeDir}">${truncatePath(system.homeDir)}</span>
         </div>
         <div class="system-info-item">
           <span class="info-label">临时目录</span>
-          <span class="info-value" title="${system.tmpDir}">${truncatePath(system.tmpDir)}</span>
+          <span class="info-value-mono" title="${system.tmpDir}">${truncatePath(system.tmpDir)}</span>
         </div>
       </div>
     </div>
 
+    <!-- 已安装工具 -->
     <div class="system-info-card">
       <div class="system-info-header">
         <div class="system-info-icon">
@@ -342,7 +530,7 @@ function renderSystemInfo() {
         ${Object.entries(environmentData.tools).map(([name, info]) => `
           <div class="system-info-item">
             <span class="info-label">${name}</span>
-            <span class="info-value">${info.installed ? (info.version || '已安装') : '未安装'}</span>
+            <span class="info-value-mono">${info.installed ? (info.version || '已安装') : '未安装'}</span>
           </div>
         `).join('')}
       </div>
