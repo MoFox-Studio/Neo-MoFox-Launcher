@@ -53,6 +53,8 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+
+
   // ─── 禁用鼠标侧键导航（主进程层面拦截） ──────────────────────────────
   mainWindow.webContents.on('will-navigate', (event, url) => {
     // 仅允许 file:// 协议的本地页面导航
@@ -1141,6 +1143,25 @@ ipcMain.handle('instance-export-logs', async (event, instanceId, type, logs) => 
   } catch (error) {
     throw new Error('导出失败: ' + error.message);
   }
+});
+
+ipcMain.handle('instance-get-logs', (event, instanceId) => {
+  const instanceData = instanceProcesses.get(instanceId);
+  if (!instanceData || !instanceData.logs) {
+    return {
+      mofox: [],
+      napcat: []
+    };
+  }
+  
+  // 按类型分组返回日志
+  const mofoxLogs = instanceData.logs.filter(log => log.type === 'mofox');
+  const napcatLogs = instanceData.logs.filter(log => log.type === 'napcat');
+  
+  return {
+    mofox: mofoxLogs,
+    napcat: napcatLogs
+  };
 });
 
 // ─── 实例文件管理 ───────────────────────────────────────────────────────────

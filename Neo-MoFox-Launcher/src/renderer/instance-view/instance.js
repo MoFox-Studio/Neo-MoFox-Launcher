@@ -103,11 +103,14 @@ async function init() {
     updateStatus(state.instanceStatus);
   }
 
+  // 加载历史日志（即使实例在后台启动，也能看到之前的日志）
+  await loadHistoryLogs();
+
   // 检查是否需要自动启动
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('autoStart') === 'true') {
-    // 只有在实例未运行时才自动启动
-    if (state.instanceStatus === 'stopped' || state.instanceStatus === 'error') {
+    // 只有在实例完全停止时才自动启动
+    if (state.instanceStatus === 'stopped') {
       console.log('自动启动标志位已设置，正在启动实例...');
       // 延迟一点点以确保UI加载完成
       setTimeout(() => {
@@ -158,6 +161,43 @@ async function loadInstanceData() {
   } catch (error) {
     console.warn('[Instance] 无法加载实例数据:', error);
     // 默认保持 hasNapcat = true 以兼容旧数据
+  }
+}
+
+// ─── 加载历史日志 ─────────────────────────────────────────────────────
+
+async function loadHistoryLogs() {
+  if (!state.instanceId) {
+    console.warn('[Instance] 无法加载历史日志: 缺少实例ID');
+    return;
+  }
+  
+  try {
+    if (window.mofoxAPI?.getInstanceLogs) {
+      console.log('[Instance] 正在加载历史日志...');
+      const historyLogs = await window.mofoxAPI.getInstanceLogs(state.instanceId);
+      
+      if (historyLogs) {
+        // 加载 MoFox 日志
+        if (Array.isArray(historyLogs.mofox)) {
+          state.logs.mofox = historyLogs.mofox;
+          el.mofoxLogCount.textContent = state.logs.mofox.length;
+          console.log(`[Instance] 已加载 ${state.logs.mofox.length} 条 MoFox 日志`);
+        }
+        
+        // 加载 NapCat 日志（如果安装了）
+        if (state.hasNapcat && Array.isArray(historyLogs.napcat)) {
+          state.logs.napcat = historyLogs.napcat;
+          el.napcatLogCount.textContent = state.logs.napcat.length;
+          console.log(`[Instance] 已加载 ${state.logs.napcat.length} 条 NapCat 日志`);
+        }
+        
+        // 渲染当前标签页的日志
+        renderLogs();
+      }
+    }
+  } catch (error) {
+    console.warn('[Instance] 加载历史日志失败:', error);
   }
 }
 
@@ -512,11 +552,17 @@ function updateStatus(status) {
 
   // 更新按钮状态
   const isRunning = status === 'running';
-  const isStopped = status === 'stopped' || status === 'error';
+  const isStopped = status === 'stopped'; // 只有真正停止时才是 stopped
   const isTransitioning = status === 'starting' || status === 'stopping' || status === 'restarting';
+  const isError = status === 'error';
   
+  // 启动按钮：只有在完全停止时才能启动
   el.btnStart.disabled = !isStopped;
-  el.btnStop.disabled = !(isRunning || status === 'restarting' || status === 'starting');
+  
+  // 停止按钮：在运行、错误、或转换状态时都可以停止（用于强制停止异常进程）
+  el.btnStop.disabled = !(isRunning || isError || status === 'restarting' || status === 'starting');
+  
+  // 重启按钮：只在正常运行时可用
   el.btnRestart.disabled = !isRunning;
   
   // 更新返回按钮 - 多开模式下始终可用
