@@ -402,6 +402,7 @@
 .log-stats {
   display: flex;
   gap: 24px;
+  align-items: center;
 }
 
 .stat-item {
@@ -421,6 +422,58 @@
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
   font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── 资源监控迷你条 ───────────────────────────────────────────────── */
+.stat-divider-v {
+  width: 1px;
+  height: 18px;
+  background: var(--md-sys-color-outline-variant);
+  flex-shrink: 0;
+}
+
+.resource-stat {
+  gap: 6px;
+}
+
+.resource-bar-mini {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  background: rgba(var(--md-sys-color-on-surface-variant-rgb, 200, 200, 200), 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.resource-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  min-width: 0;
+  width: 0%;
+  transition: width 0.6s ease, background-color 0.4s ease;
+  background-color: #4caf50;
+}
+
+.resource-bar-fill.level-mid  { background-color: var(--md-sys-color-tertiary, #ffd60a); }
+.resource-bar-fill.level-high { background-color: var(--status-error, #f44336); }
+
+.resource-val {
+  min-width: 32px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--md-sys-color-on-surface) !important;
+}
+
+.resource-detail {
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: var(--md-sys-color-on-surface-variant) !important;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 /* ─── 日志内容 ──────────────────────────────────────────────────────── */

@@ -2,6 +2,7 @@ import { el } from './modules/elements.js';
 import { updateQuotes } from './modules/quotes.js';
 import { applyGreeting } from './modules/greetings.js';
 import { initTheme } from '../theme.js';
+import { startSystemMonitor } from './modules/system-monitor.js';
 import {
   loadInstances,
   createNewInstance,
@@ -34,6 +35,9 @@ async function init() {
   
   // 监听实例状态变化（多开实时更新）
   setupInstanceStatusListener();
+  
+  // 启动系统资源监控（CPU / 内存）
+  startSystemMonitor();
   
   // 每30秒更新一次名言
   setInterval(updateQuotes, 30000);

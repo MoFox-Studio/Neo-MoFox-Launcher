@@ -327,6 +327,44 @@ function killMofoxProcess() {
   instanceProcesses.clear();
 }
 
+// ─── 系统资源实时监控 ─────────────────────────────────
+let _prevCpuInfo = null;
+
+function _getCpuTimes() {
+  const cpus = os.cpus();
+  let totalIdle = 0, totalTick = 0;
+  for (const cpu of cpus) {
+    for (const type in cpu.times) totalTick += cpu.times[type];
+    totalIdle += cpu.times.idle;
+  }
+  return { idle: totalIdle / cpus.length, total: totalTick / cpus.length };
+}
+
+function getResourceUsage() {
+  // ── Memory ──
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const usedMem = totalMem - freeMem;
+  const memPercent = Math.round((usedMem / totalMem) * 100);
+
+  // ── CPU（两次采样差值法）──
+  const cur = _getCpuTimes();
+  let cpuPercent = 0;
+  if (_prevCpuInfo) {
+    const idleDiff = cur.idle - _prevCpuInfo.idle;
+    const totalDiff = cur.total - _prevCpuInfo.total;
+    cpuPercent = totalDiff > 0 ? Math.round((1 - idleDiff / totalDiff) * 100) : 0;
+  }
+  _prevCpuInfo = cur;
+
+  return {
+    cpuPercent,
+    memPercent,
+    memUsedGB: +(usedMem / 1073741824).toFixed(1),
+    memTotalGB: +(totalMem / 1073741824).toFixed(1),
+  };
+}
+
 // ─── 系统信息 ───────────────────────────────────────
 function getSystemInfo() {
   const cpus = os.cpus();
@@ -374,6 +412,10 @@ ipcMain.handle('get-logs', () => {
 
 ipcMain.handle('get-system-info', () => {
   return getSystemInfo();
+});
+
+ipcMain.handle('get-resource-usage', () => {
+  return getResourceUsage();
 });
 
 ipcMain.handle('get-platform-info', () => {

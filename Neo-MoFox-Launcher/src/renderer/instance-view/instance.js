@@ -65,6 +65,19 @@ const el = {
   mofoxUptime: document.getElementById('mofoxUptime'),
   napcatUptime: document.getElementById('napcatUptime'),
 
+  // 系统资源监控
+  instCpuBar: document.getElementById('inst-cpu-bar'),
+  instCpuVal: document.getElementById('inst-cpu-val'),
+  instMemBar: document.getElementById('inst-mem-bar'),
+  instMemVal: document.getElementById('inst-mem-val'),
+  instMemDetail: document.getElementById('inst-mem-detail'),
+  // NapCat 标签页副本（共享同一套系统数据）
+  instCpuBarNc: document.querySelector('.inst-cpu-bar-nc'),
+  instCpuValNc: document.querySelector('.inst-cpu-val-nc'),
+  instMemBarNc: document.querySelector('.inst-mem-bar-nc'),
+  instMemValNc: document.querySelector('.inst-mem-val-nc'),
+  instMemDetailNc: document.querySelector('.inst-mem-detail-nc'),
+
   // 设置对话框
   settingsDialog: document.getElementById('settingsDialog'),
   btnCloseSettings: document.getElementById('btnCloseSettings'),
@@ -774,6 +787,40 @@ function startStatsUpdate() {
       }
     }
   }, 1000);
+
+  // 每 2 秒轮询系统 CPU / 内存使用率
+  refreshResourceUsage(); // 立即执行一次
+  setInterval(refreshResourceUsage, 2000);
+}
+
+async function refreshResourceUsage() {
+  try {
+    const data = await window.mofoxAPI.getResourceUsage();
+    if (!data) return;
+    applyResourceBar(el.instCpuBar, el.instCpuVal, data.cpuPercent);
+    applyResourceBar(el.instMemBar, el.instMemVal, data.memPercent);
+    if (el.instMemDetail) {
+      el.instMemDetail.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
+    }
+    // 同步到 NapCat 标签页副本
+    applyResourceBar(el.instCpuBarNc, el.instCpuValNc, data.cpuPercent);
+    applyResourceBar(el.instMemBarNc, el.instMemValNc, data.memPercent);
+    if (el.instMemDetailNc) {
+      el.instMemDetailNc.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
+    }
+  } catch (e) {
+    // 静默失败，不影响日志界面
+  }
+}
+
+function applyResourceBar(barEl, valEl, percent) {
+  if (!barEl || !valEl) return;
+  const p = Math.max(0, Math.min(100, percent));
+  barEl.style.width = p + '%';
+  barEl.classList.remove('level-mid', 'level-high');
+  if (p >= 85) barEl.classList.add('level-high');
+  else if (p >= 60) barEl.classList.add('level-mid');
+  valEl.textContent = p + '%';
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────

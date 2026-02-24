@@ -52,6 +52,29 @@
               <span class="stat-value" id="active-instances">0</span>
               <span class="stat-label">活跃实例</span>
             </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item stat-cpu">
+              <div class="stat-ring-wrapper">
+                <svg class="stat-ring" viewBox="0 0 36 36">
+                  <circle class="stat-ring-bg" cx="18" cy="18" r="15.9" />
+                  <circle class="stat-ring-fill" id="cpu-ring" cx="18" cy="18" r="15.9"
+                          stroke-dasharray="0, 100" />
+                </svg>
+                <span class="stat-ring-value" id="cpu-value">0%</span>
+              </div>
+              <span class="stat-label">CPU</span>
+            </div>
+            <div class="stat-item stat-mem">
+              <div class="stat-ring-wrapper">
+                <svg class="stat-ring" viewBox="0 0 36 36">
+                  <circle class="stat-ring-bg" cx="18" cy="18" r="15.9" />
+                  <circle class="stat-ring-fill" id="mem-ring" cx="18" cy="18" r="15.9"
+                          stroke-dasharray="0, 100" />
+                </svg>
+                <span class="stat-ring-value" id="mem-value">0%</span>
+              </div>
+              <span class="stat-label" id="mem-detail">内存</span>
+            </div>
           </div>
         </div>
         <div class="hero-quote">

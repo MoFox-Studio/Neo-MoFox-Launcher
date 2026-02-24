@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   getStatus: () => ipcRenderer.invoke('get-status'),
   getLogs: () => ipcRenderer.invoke('get-logs'),
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+  getResourceUsage: () => ipcRenderer.invoke('get-resource-usage'),
   getPlatformInfo: () => ipcRenderer.invoke('get-platform-info'),
   getProjectInfo: () => ipcRenderer.invoke('get-project-info'),
 
