@@ -337,14 +337,15 @@ class EnvironmentService {
     }
 
     // 检测常用开发工具（使用小写 ID 与前端匹配）
+    const isWin = os.platform() === 'win32';
     const commonTools = {
-      'python': 'python --version',
+      'python': isWin ? 'python --version' : 'python3 --version',
       'nodejs': 'node --version',
       'git': 'git --version',
       'npm': 'npm --version',
       'uv': 'uv --version',
       'vscode': 'code --version',
-      'windows-terminal': 'wt.exe --version',
+      ...(isWin ? { 'windows-terminal': 'wt.exe --version' } : {}),
     };
 
     const toolsStatus = await this.detectAllTools(commonTools);
