@@ -666,6 +666,11 @@ function bindEvents() {
       icon.textContent = 'visibility';
     }
   });
+
+  // 获取 API Key 按钮 - 用系统浏览器打开 SiliconFlow
+  document.getElementById('btn-get-api-key').addEventListener('click', () => {
+    window.mofoxAPI.openExternal('https://cloud.siliconflow.cn/i/0ww8zcOn');
+  });
   
   el.btnBrowseDir.addEventListener('click', async () => {
     const path = await window.mofoxAPI.selectProjectPath();
