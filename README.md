@@ -261,16 +261,20 @@ Neo-MoFox-Launcher/
 
 ### 构建打包（可选）
 
-如果你想构建独立的可执行文件：
+如果你想构建独立的可分发程序，项目使用 [Electron Forge](https://www.electronforge.io/) 进行打包：
 
 ```bash
-# 构建 Windows 安装包和便携版
-npm run build
+# 打包应用（不生成安装程序）
+npm run package
 
-# 输出目录：dist/
-# - Neo-MoFox-Launcher-Setup-x.x.x.exe    (安装版)
-# - Neo-MoFox-Launcher-Portable-x.x.x.exe (便携版)
+# 构建所有平台的安装包（Windows Squirrel 安装包 + ZIP 压缩包）
+npm run make
+
+# 仅构建 Linux deb 包
+npm run make:deb
 ```
+
+构建产物会输出到 `out/` 目录。
 
 > **注意**: 目前项目仍在开发中，建议直接使用 `npm start` 运行。
 
