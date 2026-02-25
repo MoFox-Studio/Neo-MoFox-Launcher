@@ -1,0 +1,62 @@
+appId: com.mofox-studio.neo-mofox-launcher
+productName: Neo-MoFox Launcher
+
+directories:
+  buildResources: assets
+
+files:
+  - "**/*"
+  - "!**/{.vscode,.github}"
+  - "!**/*.{md,log}"
+  - "!**/logs/**"
+  - "!**/{.git,.idea}/**"
+  - "!dist/**"
+
+asar: true
+
+win:
+  executableName: neo-mofox-launcher
+  icon: assets/icon.ico
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  target:
+    - target: nsis
+    - target: portable
+
+nsis:
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  allowToChangeInstallationDirectory: true
+  oneClick: false
+  perMachine: true
+  differentialPackage: false
+
+portable:
+  artifactName: ${productName}-${version}-${arch}-portable.${ext}
+
+linux:
+  executableName: neo-mofox-launcher
+  icon: assets/icon.png
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  target:
+    - target: AppImage
+    - target: deb
+  maintainer: MoFox Studio
+  category: Utility
+  desktop:
+    entry:
+      Name: Neo-MoFox Launcher
+      StartupWMClass: neo-mofox-launcher
+
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0

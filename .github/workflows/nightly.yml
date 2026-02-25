@@ -4,14 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/nightly.yml'  # 推送此文件时触发（用于测试，确认能跑后可删除）
+      - '.github/workflows/nightly.yml'
   schedule:
     # 每天 UTC 00:00 (北京时间 08:00) 执行
     - cron: '0 0 * * *'
   workflow_dispatch: # 允许手动触发
 
 jobs:
-  # 先检查最近 24 小时内是否有新提交
+  # 检查最近 24 小时内是否有新提交
   check-commits:
     runs-on: ubuntu-latest
     outputs:
@@ -29,7 +29,6 @@ jobs:
           BUILD_DATE=$(date +'%Y%m%d')
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
 
-          # 手动触发时跳过提交检查，直接构建
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "has_new_commits=true" >> $GITHUB_OUTPUT
             echo "Manual trigger, skipping commit check."
@@ -39,17 +38,23 @@ jobs:
           COMMITS=$(git log --oneline --since="24 hours ago" | wc -l)
           if [ "$COMMITS" -gt 0 ]; then
             echo "has_new_commits=true" >> $GITHUB_OUTPUT
-            echo "Found $COMMITS new commit(s) in last 24 hours, proceeding with build."
+            echo "Found $COMMITS new commit(s) in last 24 hours."
           else
             echo "has_new_commits=false" >> $GITHUB_OUTPUT
             echo "No new commits in last 24 hours, skipping build."
           fi
 
-  # Windows 构建 (.exe)
+  # ============================================================
+  # Windows 构建 (NSIS 安装包 + 便携版) - x64 / ia32 / arm64
+  # ============================================================
   build-windows:
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, ia32, arm64]
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
@@ -63,51 +68,61 @@ jobs:
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
-      - name: Cache Electron and Electron Forge
+      - name: Cache Electron
         uses: actions/cache@v4
         with:
           path: |
             ~\AppData\Local\electron\Cache
-            ~\AppData\Local\electron-forge
-            ~\AppData\Local\Temp\electron-packager
-          key: ${{ runner.os }}-electron-forge-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-${{ matrix.arch }}-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-electron-forge-
-            ${{ runner.os }}-electron-
+            ${{ runner.os }}-electron-${{ matrix.arch }}-
 
       - name: Install dependencies
         working-directory: Neo-MoFox-Launcher
         run: npm ci
 
-      - name: Build Windows package
+      - name: Build Windows ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
-        run: npm run package
+        run: npx electron-builder --win --${{ matrix.arch }}
 
-      - name: Create ZIP archive
+      - name: Rename artifacts
         shell: pwsh
         working-directory: Neo-MoFox-Launcher
         run: |
-          $packageDir = Get-ChildItem -Path "out" -Directory -Recurse | Where-Object { $_.Name -like "*-win32-*" } | Select-Object -First 1
-          if ($packageDir) {
-            $zipName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win.zip"
-            Compress-Archive -Path "$($packageDir.FullName)\*" -DestinationPath "out\$zipName" -Force
-            Write-Host "Created $zipName"
-          } else {
-            Write-Error "Package directory not found"
-            exit 1
+          Get-ChildItem -Path "dist" -Filter "*.exe" | ForEach-Object {
+            Write-Host "Found: $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
+          }
+          $setup = Get-ChildItem -Path "dist" -Filter "*-setup.exe" | Select-Object -First 1
+          $portable = Get-ChildItem -Path "dist" -Filter "*-portable.exe" | Select-Object -First 1
+          if ($setup) {
+            $newName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win-${{ matrix.arch }}-setup.exe"
+            Copy-Item $setup.FullName "dist\$newName"
+            Write-Host "Setup: $newName"
+          }
+          if ($portable) {
+            $newName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win-${{ matrix.arch }}-portable.exe"
+            Copy-Item $portable.FullName "dist\$newName"
+            Write-Host "Portable: $newName"
           }
 
-      - name: Upload Windows artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: Neo-MoFox-Launcher/out/Neo-MoFox-Launcher-*-nightly-win.zip
+          name: windows-${{ matrix.arch }}
+          path: Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-win-${{ matrix.arch }}-*.exe
 
-  # Linux 构建 (.deb)
+  # ============================================================
+  # Linux 构建 (deb 包) - x64 / ia32 / arm64
+  # ============================================================
   build-linux:
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, ia32, arm64]
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
@@ -121,49 +136,71 @@ jobs:
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
-      - name: Install dependencies
-        working-directory: Neo-MoFox-Launcher
-        run: npm ci
-
-      - name: Cache Electron and Electron Forge
+      - name: Cache Electron
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/electron
-            ~/.cache/electron-forge
-            /tmp/electron-packager
-          key: ${{ runner.os }}-electron-forge-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ matrix.arch }}-${{ hashFiles('Neo-MoFox-Launcher/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-electron-forge-
-            ${{ runner.os }}-electron-
+            ${{ runner.os }}-electron-${{ matrix.arch }}-
 
-      - name: Install Linux build dependencies
+      - name: Install dependencies
+        working-directory: Neo-MoFox-Launcher
+        run: npm ci
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg fakeroot
 
-      - name: Build Linux deb package
+      - name: Setup cross-compilation for arm64
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Setup cross-compilation for ia32
+        if: matrix.arch == 'ia32'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
+
+      - name: Build Linux deb ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
-        run: npm run make:deb
+        run: npx electron-builder --linux deb --${{ matrix.arch }}
 
       - name: Rename artifacts
         working-directory: Neo-MoFox-Launcher
         run: |
-          DEB_FILE=$(find out/make/deb -name "*.deb" | head -1)
-          NEW_NAME="Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly.deb"
-          cp "$DEB_FILE" "out/$NEW_NAME"
-          echo "Renamed to $NEW_NAME"
+          echo "Build output:"
+          find dist -name "*.deb" -exec ls -lh {} \;
+          DEB_FILE=$(find dist -name "*.deb" | head -1)
+          if [ -n "$DEB_FILE" ]; then
+            NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.deb"
+            cp "$DEB_FILE" "$NEW_NAME"
+            echo "Renamed to: $NEW_NAME"
+          else
+            echo "ERROR: No .deb file found!"
+            exit 1
+          fi
 
-      - name: Upload Linux artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-build
-          path: Neo-MoFox-Launcher/out/Neo-MoFox-Launcher-*-nightly.deb
+          name: linux-${{ matrix.arch }}
+          path: Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.deb
 
+  # ============================================================
   # 发布到 GitHub Releases
+  # ============================================================
   release:
     needs: [check-commits, build-windows, build-linux]
-    if: needs.check-commits.outputs.has_new_commits == 'true'
+    if: |
+      always() &&
+      needs.check-commits.outputs.has_new_commits == 'true' &&
+      (needs.build-windows.result == 'success' || needs.build-linux.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -180,26 +217,43 @@ jobs:
         with:
           path: artifacts
 
-      - name: Generate changelog
-        id: changelog
+      - name: List all artifacts
         run: |
-          echo "## 🌙 每夜构建版本 - ${{ env.BUILD_DATE }}" > changelog.md
-          echo "" >> changelog.md
-          echo "### 📝 最近提交" >> changelog.md
+          echo "📦 所有构建产物:"
+          find artifacts -type f | sort
+
+      - name: Generate changelog
+        run: |
+          cat > changelog.md << 'HEADER'
+          ## 🌙 每夜构建版本 - ${{ env.BUILD_DATE }}
+
+          ### 📝 最近提交
+          HEADER
           git log --oneline --since="24 hours ago" --format="- %h %s" >> changelog.md
-          echo "" >> changelog.md
-          echo "### 📦 构建信息" >> changelog.md
-          echo "- 🗓️ 构建日期: ${{ env.BUILD_DATE }}" >> changelog.md
-          echo "- 🔖 提交哈希: $(git rev-parse --short HEAD)" >> changelog.md
-          echo "- 🚀 自动构建: GitHub Actions" >> changelog.md
-          echo "" >> changelog.md
-          echo "---" >> changelog.md
-          echo "" >> changelog.md
-          echo "> ⚠️ **注意**: 这是一个自动化每夜构建版本，可能存在不稳定因素，仅供测试使用。" >> changelog.md
-          echo ">" >> changelog.md
-          echo "> 📥 请根据您的操作系统下载对应的安装包：" >> changelog.md
-          echo "> - Windows 用户请下载 `.zip` 文件，解压后运行" >> changelog.md
-          echo "> - Linux 用户请下载 `.deb` 文件" >> changelog.md
+          cat >> changelog.md << 'FOOTER'
+
+          ### 📦 构建信息
+          - 🗓️ 构建日期: ${{ env.BUILD_DATE }}
+          - 🔖 提交哈希: $(git rev-parse --short HEAD)
+          - 🚀 自动构建: GitHub Actions
+
+          ---
+
+          > ⚠️ **注意**: 这是自动化每夜构建版本，可能存在不稳定因素，仅供测试使用。
+          >
+          > 📥 **下载说明：**
+          > | 文件 | 说明 |
+          > |------|------|
+          > | `*-win-x64-setup.exe` | Windows x64 安装包 |
+          > | `*-win-x64-portable.exe` | Windows x64 便携版 |
+          > | `*-win-ia32-setup.exe` | Windows x86 安装包 |
+          > | `*-win-ia32-portable.exe` | Windows x86 便携版 |
+          > | `*-win-arm64-setup.exe` | Windows ARM64 安装包 |
+          > | `*-win-arm64-portable.exe` | Windows ARM64 便携版 |
+          > | `*-linux-x64.deb` | Linux x64 deb 包 |
+          > | `*-linux-ia32.deb` | Linux x86 deb 包 |
+          > | `*-linux-arm64.deb` | Linux ARM64 deb 包 |
+          FOOTER
 
       - name: Delete existing nightly release (if any)
         env:
@@ -211,12 +265,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🧹 清理旧的每夜构建版本，保留最新的 6 个版本..."
+          echo "🧹 清理旧的每夜构建版本，保留最新的 6 个..."
           gh release list --limit 100 | grep "nightly-" | awk '{print $1}' | tail -n +7 | while read tag; do
             echo "删除旧版本: $tag"
             gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
           done
           echo "✅ 清理完成"
+
+      - name: Collect release files
+        run: |
+          mkdir -p release-files
+          find artifacts -type f \( -name "*.exe" -o -name "*.deb" \) -exec cp {} release-files/ \;
+          echo "📦 准备发布的文件:"
+          ls -lh release-files/
 
       - name: Create nightly release
         env:
@@ -226,6 +287,5 @@ jobs:
             --title "🌙 每夜构建 ${{ env.BUILD_DATE }}" \
             --notes-file changelog.md \
             --prerelease \
-            artifacts/windows-build/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win.zip \
-            artifacts/linux-build/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly.deb
+            release-files/*
           echo "✅ 发布完成: nightly-${{ env.BUILD_DATE }}"

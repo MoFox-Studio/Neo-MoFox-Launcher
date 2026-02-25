@@ -254,6 +254,9 @@ Neo-MoFox-Launcher/
 - [@iarna/toml](https://www.npmjs.com/package/@iarna/toml) - TOML 配置文件读写
 - [tree-kill](https://www.npmjs.com/package/tree-kill) - 进程树管理
 
+**构建工具**
+- [electron-builder](https://www.electron.build/) - 应用打包与分发（NSIS 安装器）
+
 **UI 设计**
 - Material Design 3 - 设计系统
 - Material Symbols - 图标字体
@@ -261,20 +264,31 @@ Neo-MoFox-Launcher/
 
 ### 构建打包（可选）
 
-如果你想构建独立的可分发程序，项目使用 [Electron Forge](https://www.electronforge.io/) 进行打包：
+如果你想构建独立的可分发程序，项目使用 [electron-builder](https://www.electron.build/) 进行打包，Windows 平台使用 NSIS 安装器：
 
 ```bash
-# 打包应用（不生成安装程序）
-npm run package
+# 仅打包不生成安装器（调试用）
+npm run build:dir
 
-# 构建所有平台的安装包（Windows Squirrel 安装包 + ZIP 压缩包）
-npm run make
+# 构建 Windows 安装包（NSIS 安装器 + 便携版）
+npm run build:win
 
-# 仅构建 Linux deb 包
-npm run make:deb
+# 构建 Windows ARM64 安装包
+npm run build:win:arm64
+
+# 构建 Linux 安装包（AppImage + deb）
+npm run build:linux
+
+# 构建 Linux ARM64 安装包
+npm run build:linux:arm64
 ```
 
-构建产物会输出到 `out/` 目录。
+构建产物会输出到 `dist/` 目录。
+
+**Windows 安装包特性：**
+- NSIS 安装向导，支持自定义安装路径
+- 自动创建桌面快捷方式
+- 同时生成便携版（portable）
 
 > **注意**: 目前项目仍在开发中，建议直接使用 `npm start` 运行。
 

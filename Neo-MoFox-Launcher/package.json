@@ -7,92 +7,29 @@
     "start": "chcp 65001 >nul 2>&1 & electron .",
     "start:win": "chcp 65001 >nul 2>&1 & electron .",
     "start:linux": "electron .",
-    "package": "electron-forge package",
-    "make": "electron-forge make",
-    "make:deb": "electron-forge make --targets @electron-forge/maker-deb",
     "dev": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
-    "dev:linux": "electron . --dev"
+    "dev:linux": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --x64",
+    "build:win:ia32": "electron-builder --win --ia32",
+    "build:win:arm64": "electron-builder --win --arm64",
+    "build:win:all": "electron-builder --win --x64 --ia32 --arm64",
+    "build:linux": "electron-builder --linux --x64",
+    "build:linux:ia32": "electron-builder --linux --ia32",
+    "build:linux:arm64": "electron-builder --linux --arm64",
+    "build:linux:all": "electron-builder --linux --x64 --ia32 --arm64",
+    "build:dir": "electron-builder --dir"
   },
   "author": "MoFox Studio",
   "license": "AGPL-3.0",
   "devDependencies": {
-    "@electron-forge/cli": "^7.5.0",
-    "@electron-forge/maker-deb": "^7.5.0",
-    "@electron-forge/maker-squirrel": "^7.5.0",
-    "@electron-forge/maker-zip": "^7.5.0",
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.0.0"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
-  },
-  "config": {
-    "forge": {
-      "packagerConfig": {
-        "name": "Neo-MoFox Launcher",
-        "executableName": "neo-mofox-launcher",
-        "icon": "assets/icon",
-        "asar": true,
-        "ignore": [
-          "^/dist($|/)",
-          "^/\\.git($|/)",
-          "^/\\.vscode($|/)",
-          "^/\\.idea($|/)",
-          "\\.md$",
-          "^/logs($|/)",
-          "\\.log$"
-        ]
-      },
-      "makers": [
-        {
-          "name": "@electron-forge/maker-squirrel",
-          "config": {
-            "name": "neo_mofox_launcher",
-            "setupIcon": "assets/icon.ico",
-            "noMsi": true
-          }
-        },
-        {
-          "name": "@electron-forge/maker-zip",
-          "platforms": [
-            "win32",
-            "linux",
-            "darwin"
-          ]
-        },
-        {
-          "name": "@electron-forge/maker-deb",
-          "config": {
-            "options": {
-              "maintainer": "MoFox Studio",
-              "homepage": "https://github.com/MoFox-Studio/Neo-MoFox-Launcher",
-              "icon": "assets/icon.png",
-              "name": "neo-mofox-launcher",
-              "productName": "Neo-MoFox Launcher",
-              "genericName": "Bot Launcher",
-              "description": "Neo-MoFox Launcher - MoFox QQ Bot 管理器",
-              "section": "utils",
-              "categories": [
-                "Utility",
-                "Network"
-              ],
-              "depends": [
-                "libgtk-3-0",
-                "libnotify4",
-                "libnss3",
-                "libxss1",
-                "libxtst6",
-                "xdg-utils",
-                "libatspi2.0-0",
-                "libuuid1",
-                "libsecret-1-0"
-              ]
-            }
-          }
-        }
-      ]
-    }
   }
 }
