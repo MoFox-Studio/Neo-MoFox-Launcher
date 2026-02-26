@@ -180,6 +180,14 @@
             </div>
             
             <div class="form-group">
+              <label for="input-qq-nickname">Bot QQ 昵称 *</label>
+              <input type="text" id="input-qq-nickname" placeholder="例如: 我的小狐狸" maxlength="32" required>
+              <span class="form-hint">Bot 的 QQ 昵称，用于适配器识别</span>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
               <label for="input-owner-qq">主人 QQ 号 *</label>
               <input type="text" id="input-owner-qq" placeholder="例如: 987654321" pattern="\d{5,12}" required>
               <span class="form-hint">Bot 管理员的 QQ 号</span>
@@ -312,6 +320,10 @@
           <div class="install-step-item" data-step="write-model">
             <span class="step-icon material-symbols-rounded">pending</span>
             <span class="step-text">写入 model.toml</span>
+          </div>
+          <div class="install-step-item" data-step="write-adapter">
+            <span class="step-icon material-symbols-rounded">pending</span>
+            <span class="step-text">写入适配器配置</span>
           </div>
           <div class="install-step-item" data-step="napcat">
             <span class="step-icon material-symbols-rounded">pending</span>

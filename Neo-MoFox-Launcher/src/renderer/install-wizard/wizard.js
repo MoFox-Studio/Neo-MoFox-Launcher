@@ -10,6 +10,7 @@ const state = {
   inputs: {
     instanceName: '',
     qqNumber: '',
+    qqNickname: '',
     ownerQQNumber: '',
     apiKey: '',
     wsPort: 8095,
@@ -46,6 +47,7 @@ const el = {
   // Phase 2
   inputInstanceName: document.getElementById('input-instance-name'),
   inputQqNumber: document.getElementById('input-qq-number'),
+  inputQqNickname: document.getElementById('input-qq-nickname'),
   inputOwnerQq: document.getElementById('input-owner-qq'),
   inputApiKey: document.getElementById('input-api-key'),
   inputWsPort: document.getElementById('input-ws-port'),
@@ -242,7 +244,7 @@ function collectInputs() {
   const installNapcat = el.inputInstallNapcat.checked;
   
   // 根据是否安装 NapCat 构建安装步骤列表
-  const baseSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model'];
+  const baseSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'write-adapter'];
   const napcatSteps = ['napcat', 'napcat-config'];
   const finalSteps = ['register'];
   
@@ -257,6 +259,7 @@ function collectInputs() {
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
     qqNumber: el.inputQqNumber.value.trim(),
+    qqNickname: el.inputQqNickname.value.trim(),
     ownerQQNumber: el.inputOwnerQq.value.trim(),
     apiKey: el.inputApiKey.value.trim(),
     wsPort: parseInt(el.inputWsPort.value, 10) || 8095,
@@ -290,6 +293,7 @@ function resetFormInputs() {
   // Clear all form inputs
   el.inputInstanceName.value = '';
   el.inputQqNumber.value = '';
+  el.inputQqNickname.value = '';
   el.inputOwnerQq.value = '';
   el.inputApiKey.value = '';
   el.inputWsPort.value = '8095';
@@ -317,6 +321,7 @@ function resetFormInputs() {
   state.inputs = {
     instanceName: '',
     qqNumber: '',
+    qqNickname: '',
     ownerQQNumber: '',
     apiKey: '',
     wsPort: 8095,
@@ -419,7 +424,7 @@ async function startInstall() {
   
   // 根据 installSteps 配置显示/隐藏步骤
   const configuredSteps = state.inputs.installSteps || [];
-  const allSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'napcat', 'napcat-config', 'register'];
+  const allSteps = ['clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model', 'write-adapter', 'napcat', 'napcat-config', 'register'];
   
   allSteps.forEach(step => {
     const stepItem = el.installSteps.querySelector(`[data-step="${step}"]`);
@@ -446,7 +451,8 @@ async function startInstall() {
     'deps': { name: '安装依赖', progress: 40 },
     'gen-config': { name: '生成配置', progress: 55 },
     'write-core': { name: '写入 core.toml', progress: 65 },
-    'write-model': { name: '写入 model.toml', progress: 75 },
+    'write-model': { name: '写入 model.toml', progress: 72 },
+    'write-adapter': { name: '写入适配器配置', progress: 78 },
     'napcat': { name: '配置 NapCat', progress: 85 },
     'napcat-config': { name: '配置 NapCat', progress: 90 },
     'register': { name: '注册实例', progress: 95 },

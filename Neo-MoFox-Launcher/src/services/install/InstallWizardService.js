@@ -38,6 +38,7 @@ const AVAILABLE_STEPS = [
   'gen-config',    // 生成配置文件
   'write-core',    // 写入 core.toml
   'write-model',   // 写入 model.toml
+  'write-adapter', // 写入 napcat_adapter 配置
   'napcat',        // 安装 NapCat
   'napcat-config', // 写入 NapCat 配置
   'register',      // 注册实例
@@ -437,6 +438,11 @@ class InstallWizardService {
 
     const qqResult = this.validateQQNumber(inputs.qqNumber, 'Bot QQ 号');
     if (!qqResult.valid) errors.push({ field: 'qqNumber', error: qqResult.error });
+
+    // 校验 QQ 昵称
+    if (!inputs.qqNickname || inputs.qqNickname.trim().length === 0) {
+      errors.push({ field: 'qqNickname', error: 'Bot QQ 昵称不能为空' });
+    }
 
     const ownerResult = this.validateQQNumber(inputs.ownerQQNumber, '管理员 QQ 号');
     if (!ownerResult.valid) errors.push({ field: 'ownerQQNumber', error: ownerResult.error });
@@ -909,6 +915,57 @@ class InstallWizardService {
   }
 
   /**
+   * 3.6.1 写入 napcat_adapter 配置
+   * 将 bot.qq_id 和 bot.qq_nickname 写入 config/plugins/napcat_adapter/config.toml
+   * 如果文件或目录不存在则自动创建
+   */
+  async writeAdapterConfig(neoMofoxDir, qqNumber, qqNickname, wsPort) {
+    this._emitProgress('write-adapter', 0, '正在写入适配器配置...');
+
+    const adapterDir = path.join(neoMofoxDir, 'config', 'plugins', 'napcat_adapter');
+    const adapterTomlPath = path.join(adapterDir, 'config.toml');
+
+    try {
+      // 确保目录存在
+      fs.mkdirSync(adapterDir, { recursive: true });
+
+      // 如果文件已存在则读取，否则从空对象开始
+      let data = {};
+      if (fs.existsSync(adapterTomlPath)) {
+        data = storageService.readToml(adapterTomlPath);
+      }
+
+      // 确保 plugin 对象存在，启用插件
+      if (!data.plugin) data.plugin = {};
+      data.plugin.enabled = true;
+      if (!data.plugin.config_version) data.plugin.config_version = '2.0.0';
+
+      // 确保 bot 对象存在
+      if (!data.bot) data.bot = {};
+      data.bot.qq_id = String(qqNumber);
+      data.bot.qq_nickname = String(qqNickname || '');
+
+      // 确保 napcat_server 对象存在，写入 ws 端口
+      if (!data.napcat_server) data.napcat_server = {};
+      if (!data.napcat_server.mode) data.napcat_server.mode = 'reverse';
+      if (!data.napcat_server.host) data.napcat_server.host = 'localhost';
+      data.napcat_server.port = parseInt(wsPort, 10) || 8095;
+
+      storageService.writeToml(adapterTomlPath, data);
+
+      this._emitOutput(`[write-adapter] 配置路径: ${adapterTomlPath}`);
+      this._emitOutput(`[write-adapter] qq_id: ${qqNumber}`);
+      this._emitOutput(`[write-adapter] qq_nickname: ${qqNickname}`);
+      this._emitOutput(`[write-adapter] ws port: ${wsPort}`);
+
+      this._emitProgress('write-adapter', 100, '适配器配置写入完成');
+      return { success: true };
+    } catch (e) {
+      throw new Error(`写入适配器配置失败: ${e.message}`);
+    }
+  }
+
+  /**
    * 3.7 安装 NapCat
    * - Windows：下载 OneKey 无头绿色版 ZIP，解压 + 运行 NapCatInstaller.exe
    * - Linux：参照官方 install.sh 的 Shell (Rootless) 模式，
@@ -1087,6 +1144,7 @@ class InstallWizardService {
     const updates = {
       displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
+      qqNickname: inputs.qqNickname || '',
       ownerQQNumber: inputs.ownerQQNumber,
       apiKey: inputs.apiKey,
       channel: inputs.channel || 'main',
@@ -1159,6 +1217,7 @@ class InstallWizardService {
       id: instanceId,
       displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
+      qqNickname: inputs.qqNickname || '',
       ownerQQNumber: inputs.ownerQQNumber,
       apiKey: inputs.apiKey,
       channel: inputs.channel || 'main',
@@ -1216,6 +1275,12 @@ class InstallWizardService {
       if (shouldRun('write-model')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-model', substep: 0 } });
         await this.writeModelToml(neoMofoxDir, inputs.apiKey);
+      }
+
+      // 3.6.1 写入适配器配置 (napcat_adapter/config.toml)
+      if (shouldRun('write-adapter')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'write-adapter', substep: 0 } });
+        await this.writeAdapterConfig(neoMofoxDir, inputs.qqNumber, inputs.qqNickname || '', inputs.wsPort);
       }
 
       // 3.7 安装 NapCat
