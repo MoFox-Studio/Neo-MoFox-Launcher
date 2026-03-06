@@ -716,3 +716,180 @@ body {
     white-space: nowrap;
   }
 }
+
+/*  New System Dashboard  */
+.system-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  grid-auto-rows: minmax(140px, auto);
+}
+
+/* Card Base */
+.sys-card {
+  background: var(--md-sys-color-surface-container); 
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.sys-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--md-sys-elevation-level2);
+  border-color: var(--md-sys-color-primary);
+}
+
+/* Header Card (Row 1, Full Width) */
+.sys-overview-card {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #006064 0%, #00838f 100%);
+  color: white;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 16px;
+  min-height: 120px;
+  box-shadow: var(--md-sys-elevation-level2);
+}
+
+.sys-overview-icon {
+  width: 64px; height: 64px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  margin-right: 24px;
+}
+
+.sys-overview-section {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.sys-overview-label {
+  font-size: 12px; opacity: 0.8; font-weight: 500;
+}
+
+.sys-overview-val-large {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+}
+
+.sys-overview-val-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; font-weight: 600; opacity: 1;
+}
+
+/* Row 2: Processor (2 cols) & Memory (1 col, actually looks like 2 different sizes) */
+/* Let's try explicit grid placement for standard 3-col layout */
+.sys-card-cpu {
+  grid-column: span 2;
+}
+.sys-card-mem {
+  grid-column: span 1;
+}
+
+/* Row 3: GPU (1), Storage (1), Mobo (1) */
+.sys-card-gpu, .sys-card-storage, .sys-card-mobo {
+  grid-column: span 1;
+}
+
+/* Row 4: Display (2), Paths (1) */
+.sys-card-display {
+  grid-column: span 2; /* Or 1.5? Grid 3 cols makes this tricky. Standard 3 is fine. */
+}
+.sys-card-paths {
+  grid-column: span 1; /* Actually paths needs more horizontal space usually */
+}
+/* Wait, image Row 4: Display (Left, wide), Paths (Right, wide) ?? 
+   Actually in image, Display is wide (left), Key Paths is wide (right).
+   If grid is 3 cols... 
+   Maybe Display span 2, Paths span 1 ??
+   Let's check image again.
+   Row 4: Display (Left, same width as GPU+Storage?), Key Paths (Right, same as Mobo?)
+   Actually, looking carefully at gap alignment:
+   Gap between GPU and Storage -> aligns with ? 
+   Gap between Storage and Mobo -> aligns with ?
+   
+   It looks like a 4 column grid.
+   Row 1: Span 4.
+   Row 2: CPU Span 2, Mem Span 2.
+   Row 3: GPU Span 1.25? No.
+   
+   Let's stick to 3 columns.
+   Row 2: CPU span 2, Mem span 1.
+   Row 3: GPU span 1, Storage span 1, Mobo span 1.
+   Row 4: Display span 2, Paths span 1.
+*/
+
+.sys-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.sys-card-icon {
+  width: 36px; height: 36px; 
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.sys-card-title {
+  font-size: 15px; font-weight: 700; color: var(--md-sys-color-on-surface);
+}
+
+.sys-card-content {
+  display: flex; flex-direction: column; gap: 8px; flex: 1;
+}
+
+.sys-big-text-right {
+  font-size: 14px; font-weight: 700; text-align: right; color: var(--md-sys-color-on-surface);
+  align-self: flex-end; width: 100%; margin-bottom: 8px;
+}
+.sys-big-text-stat {
+    font-size: 24px; font-weight: 700; text-align: right; color: var(--md-sys-color-on-surface);
+}
+
+
+.sys-detail-row {
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding-bottom: 8px; margin-bottom: 8px;
+}
+.sys-detail-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+.sys-label {
+  font-size: 12px; color: var(--md-sys-color-on-surface-variant); font-weight: 500;
+}
+.sys-value {
+    font-size: 13px; font-weight: 600; color: var(--md-sys-color-on-surface);
+}
+.sys-value-mono {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--md-sys-color-on-surface);
+}
+
+/* Specifics for Components */
+.mem-progress {
+  height: 8px; background: var(--md-sys-color-surface-variant); border-radius: 4px; overflow: hidden; margin: 8px 0;
+}
+.mem-progress-bar {
+  height: 100%; background: var(--md-sys-color-primary); border-radius: 4px;
+}
+
+.storage-list {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 120px; overflow-y: auto;
+  padding-right: 4px;
+}
+.storage-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px; background: var(--md-sys-color-surface); border-radius: 8px;
+}
+
+::-webkit-scrollbar { width: 4px; }
+
