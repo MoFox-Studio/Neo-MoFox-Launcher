@@ -10,10 +10,6 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch: # 允许手动触发
 
-  permissions:
-    contents: write          # 允许修改代码库内容
-    releases: write         # 允许创建和修改 Releases
-
 jobs:
   # 检查最近 24 小时内是否有新提交
   check-commits:
