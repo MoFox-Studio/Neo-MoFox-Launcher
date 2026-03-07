@@ -8,6 +8,9 @@ on:
   schedule:
     # 每天 UTC 00:00 (北京时间 08:00) 执行
     - cron: '0 0 * * *'
+  permissions:
+    contents: write          # 允许修改代码库内容
+    releases: write         # 允许创建和修改 Releases
   workflow_dispatch: # 允许手动触发
 
 jobs:
