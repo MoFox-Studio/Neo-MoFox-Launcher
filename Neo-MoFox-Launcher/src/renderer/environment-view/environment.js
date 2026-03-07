@@ -182,18 +182,12 @@ function renderVSCodeInfo() {
   const vscodeInstalled = environmentData.vscode?.installed || false;
 
   if (vscodeInstalled) {
-    // 显示扩展标签页
-    elements.extensionsTab.style.display = 'flex';
-
     // 显示 VS Code 信息
     elements.vscodeInfo.style.display = 'flex';
     elements.vscodeNotFound.style.display = 'none';
     elements.vscodeVersion.textContent = environmentData.vscode.version || '--';
     elements.vscodePath.textContent = environmentData.vscode.path || '未知路径';
   } else {
-    // 隐藏扩展标签页
-    elements.extensionsTab.style.display = 'none';
-
     // 显示未安装提示
     elements.vscodeInfo.style.display = 'none';
     elements.vscodeNotFound.style.display = 'block';
@@ -203,6 +197,26 @@ function renderVSCodeInfo() {
 // ─── 渲染 VS Code 扩展 ───────────────────────────────────────
 function renderExtensions() {
   if (!environmentData?.vscode?.installed) {
+    // 显示未安装 VS Code 的提示
+    elements.extensionsContainer.innerHTML = `
+      <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 24px; text-align: center;">
+        <span class="material-symbols-rounded" style="font-size: 64px; color: var(--md-sys-color-outline); margin-bottom: 16px;">error_outline</span>
+        <h3 style="font-size: 20px; font-weight: 500; color: var(--md-sys-color-on-surface); margin-bottom: 8px;">未安装 Visual Studio Code</h3>
+        <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px; max-width: 400px;">您需要先安装 VS Code 才能管理扩展。请前往"开发工具"标签页下载安装。</p>
+        <button class="md3-btn md3-btn-filled" id="goToToolsTab">
+          <span class="material-symbols-rounded">arrow_back</span>
+          <span>前往开发工具</span>
+        </button>
+      </div>
+    `;
+    
+    // 为按钮添加事件监听
+    const goToToolsBtn = document.getElementById('goToToolsTab');
+    if (goToToolsBtn) {
+      goToToolsBtn.addEventListener('click', () => {
+        switchTab('tools');
+      });
+    }
     return;
   }
 
