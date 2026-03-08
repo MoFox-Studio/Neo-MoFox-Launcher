@@ -113,6 +113,17 @@ const RECOMMENDED_VSCODE_EXTENSIONS = [
     required: true,
     installCommand: 'code --install-extension tamasfe.even-better-toml',
     marketplaceUrl: 'vscode:extension/tamasfe.even-better-toml'
+  },
+  {
+    id: 'ms-ceintl.vscode-language-pack-zh-hans',
+    name: 'Chinese (Simplified) Language Pack for Visual Studio Code',
+    publisher: 'Microsoft',
+    description: '简体中文语言包，提供界面本地化支持',
+    icon: '🌐',
+    category: 'langauage',
+    required: false,
+    installCommand: 'code --install-extension ms-ceintl.vscode-language-pack-zh-hans',
+    marketplaceUrl: 'vscode:extension/ms-ceintl.vscode-language-pack-zh-hans'
   }
 ];
 
@@ -120,6 +131,7 @@ const RECOMMENDED_VSCODE_EXTENSIONS = [
  * 扩展分类
  */
 const EXTENSION_CATEGORIES = {
+  langauage: { name: '语言支持', icon: 'language', color: '#4caf50' },
   essential: { name: '插件开发必需', icon: 'extension', color: '#3776ab' },
   config: { name: '配置文件支持', icon: 'settings', color: '#ff9800' }
 };

@@ -182,18 +182,12 @@ function renderVSCodeInfo() {
   const vscodeInstalled = environmentData.vscode?.installed || false;
 
   if (vscodeInstalled) {
-    // 显示扩展标签页
-    elements.extensionsTab.style.display = 'flex';
-
     // 显示 VS Code 信息
     elements.vscodeInfo.style.display = 'flex';
     elements.vscodeNotFound.style.display = 'none';
     elements.vscodeVersion.textContent = environmentData.vscode.version || '--';
     elements.vscodePath.textContent = environmentData.vscode.path || '未知路径';
   } else {
-    // 隐藏扩展标签页
-    elements.extensionsTab.style.display = 'none';
-
     // 显示未安装提示
     elements.vscodeInfo.style.display = 'none';
     elements.vscodeNotFound.style.display = 'block';
@@ -203,6 +197,26 @@ function renderVSCodeInfo() {
 // ─── 渲染 VS Code 扩展 ───────────────────────────────────────
 function renderExtensions() {
   if (!environmentData?.vscode?.installed) {
+    // 显示未安装 VS Code 的提示
+    elements.extensionsContainer.innerHTML = `
+      <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 64px 24px; text-align: center;">
+        <span class="material-symbols-rounded" style="font-size: 64px; color: var(--md-sys-color-outline); margin-bottom: 16px;">error_outline</span>
+        <h3 style="font-size: 20px; font-weight: 500; color: var(--md-sys-color-on-surface); margin-bottom: 8px;">未安装 Visual Studio Code</h3>
+        <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px; max-width: 400px;">您需要先安装 VS Code 才能管理扩展。请前往"开发工具"标签页下载安装。</p>
+        <button class="md3-btn md3-btn-filled" id="goToToolsTab">
+          <span class="material-symbols-rounded">arrow_back</span>
+          <span>前往开发工具</span>
+        </button>
+      </div>
+    `;
+    
+    // 为按钮添加事件监听
+    const goToToolsBtn = document.getElementById('goToToolsTab');
+    if (goToToolsBtn) {
+      goToToolsBtn.addEventListener('click', () => {
+        switchTab('tools');
+      });
+    }
     return;
   }
 
@@ -323,224 +337,172 @@ function renderSystemInfo() {
   // ── 内存条 ──
   const ramSticks = hw?.ramSticks || [];
 
-  const systemInfoHTML = `
-    <!-- 操作系统 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">computer</span>
+  const dashboardHTML = `
+    <div class="system-dashboard">
+      <!-- 1. System Overview (Full Width) -->
+      <div class="sys-overview-card">
+        <div style="display:flex; align-items:center;">
+            <div class="sys-overview-icon">
+                <span class="material-symbols-rounded" style="font-size: 32px;">computer</span>
+            </div>
+            <div class="sys-overview-section">
+                <div class="sys-overview-label">操作系统</div>
+                <div class="sys-overview-val-large">${osName}</div>
+            </div>
         </div>
-        <h3 class="system-info-title">操作系统</h3>
+        
+        <div style="display:flex; gap: 48px;">
+            <div class="sys-overview-section">
+                <div class="sys-overview-label">版本号</div>
+                <div class="sys-overview-val-mono">${osVersion}</div>
+            </div>
+            <div class="sys-overview-section">
+                <div class="sys-overview-label">架构</div>
+                <div class="sys-overview-val-mono">${osArch}</div>
+            </div>
+            <div class="sys-overview-section">
+                <div class="sys-overview-label">主机名</div>
+                <div class="sys-overview-val-mono">${hostname}</div>
+            </div>
+        </div>
       </div>
-      <div class="system-info-items">
-        <div class="system-info-item">
-          <span class="info-label">系统</span>
-          <span class="info-value">${osName}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">版本</span>
-          <span class="info-value-mono">${osVersion}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">架构</span>
-          <span class="info-value-mono">${osArch}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">主机名</span>
-          <span class="info-value-mono">${hostname}</span>
-        </div>
-        ${uptime ? `
-        <div class="system-info-item">
-          <span class="info-label">运行时间</span>
-          <span class="info-value">${uptime}</span>
-        </div>` : ''}
-      </div>
-    </div>
 
-    <!-- CPU -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">memory</span>
+      <!-- 2. Processor -->
+      <div class="sys-card sys-card-cpu">
+        <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">memory</span></div>
+           <div class="sys-card-title">处理器</div>
         </div>
-        <h3 class="system-info-title">处理器</h3>
+        <div class="sys-card-content">
+            <div class="sys-big-text-right">${cpuModel}</div>
+            <div class="sys-detail-row">
+                <span class="sys-label">核心规格</span>
+                <span class="sys-value-mono">${cpuCores} 物理核 / ${cpuLogical} 逻辑核</span>
+            </div>
+             <div class="sys-detail-row">
+                <span class="sys-label">基准频率</span>
+                <span class="sys-value-mono">${cpuSpeed}</span>
+            </div>
+        </div>
       </div>
-      <div class="system-info-items">
-        <div class="system-info-item">
-          <span class="info-label">型号</span>
-          <span class="info-value">${cpuModel}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">核心数</span>
-          <span class="info-value-mono">${cpuCores} 核 / ${cpuLogical} 线程</span>
-        </div>
-        ${cpuSpeed ? `
-        <div class="system-info-item">
-          <span class="info-label">频率</span>
-          <span class="info-value-mono">${cpuSpeed}</span>
-        </div>` : ''}
-      </div>
-    </div>
 
-    <!-- 内存 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">memory_alt</span>
+      <!-- 3. Memory -->
+      <div class="sys-card sys-card-mem">
+        <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">memory_alt</span></div>
+           <div class="sys-card-title">内存资源</div>
         </div>
-        <h3 class="system-info-title">内存</h3>
+        <div class="sys-card-content">
+             <div class="sys-detail-row" style="border:none;">
+                 <span class="sys-label">总量</span>
+                 <span class="sys-big-text-stat">${totalMem}</span>
+             </div>
+             
+             <div class="sys-detail-row" style="border:none; margin-bottom:0; padding-bottom:0; justify-content: flex-start; gap: 8px; margin-top: auto;">
+                 <span class="sys-label">使用情况</span>
+                 <span style="flex:1"></span>
+                 <span class="sys-value-mono">${memUsage}%</span>
+             </div>
+             <div class="mem-progress">
+                <div class="mem-progress-bar" style="width: ${memUsage}%"></div>
+             </div>
+             <div class="sys-detail-row" style="border:none; padding-top:0;">
+                <span style="flex:1"></span>
+                <span class="sys-value-mono" style="font-size: 11px; opacity: 0.7;">${usedMem} 已用 / ${freeMem} 可用</span>
+             </div>
+        </div>
       </div>
-      <div class="system-info-items">
-        <div class="system-info-item">
-          <span class="info-label">总计</span>
-          <span class="info-value-mono">${totalMem}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">已用 / 可用</span>
-          <span class="info-value-mono">${usedMem} / ${freeMem}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">使用率</span>
-          <span class="info-value-mono">
-            <span class="mem-usage-bar"><span class="mem-usage-fill" style="width: ${memUsage}%"></span></span>
-            ${memUsage}%
-          </span>
-        </div>
-        ${ramSticks.length > 0 ? ramSticks.map((r, i) => `
-        <div class="system-info-item">
-          <span class="info-label">插槽 ${i + 1}</span>
-          <span class="info-value">${r.manufacturer} ${r.size}${r.type ? ' ' + r.type : ''} @ ${r.speed}</span>
-        </div>`).join('') : ''}
-      </div>
-    </div>
 
-    <!-- GPU -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">videocam</span>
+      <!-- 4. GPU -->
+      <div class="sys-card sys-card-gpu">
+         <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">videocam</span></div>
+           <div class="sys-card-title">显卡</div>
         </div>
-        <h3 class="system-info-title">显卡</h3>
+        <div class="sys-card-content">
+            ${gpus.length > 0 ? `
+              <div class="sys-value" style="font-size: 14px; margin-bottom: 8px;">${gpus[0].name}</div>
+              <div style="flex:1; border-bottom: 1px dashed var(--md-sys-color-outline-variant); margin-bottom: 8px;"></div>
+              <div class="sys-detail-row" style="border:none;">
+                  <span class="sys-label">显存</span>
+                  <span class="sys-value-mono">${gpus[0].vram}</span>
+              </div>
+            ` : '<div class="sys-value">未检测到显卡</div>'}
+        </div>
       </div>
-      <div class="system-info-items">
-        ${gpus.length > 0 ? gpus.map((g, i) => `
-        <div class="system-info-item">
-          <span class="info-label">GPU ${gpus.length > 1 ? i + 1 : ''}</span>
-          <span class="info-value">${g.name}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">显存</span>
-          <span class="info-value-mono">${g.vram}</span>
-        </div>
-        <div class="system-info-item">
-          <span class="info-label">驱动</span>
-          <span class="info-value-mono">${g.driver}</span>
-        </div>
-        `).join('') : `
-        <div class="system-info-item">
-          <span class="info-label">状态</span>
-          <span class="info-value">${hw ? '未检测到' : '检测中...'}</span>
-        </div>`}
-      </div>
-    </div>
 
-    <!-- 主板 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">developer_board</span>
+      <!-- 5. Storage -->
+      <div class="sys-card sys-card-storage">
+         <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">hard_drive</span></div>
+           <div class="sys-card-title">存储设备</div>
         </div>
-        <h3 class="system-info-title">主板</h3>
-      </div>
-      <div class="system-info-items">
-        <div class="system-info-item">
-          <span class="info-label">型号</span>
-          <span class="info-value">${motherboard}</span>
+        <div class="storage-list">
+             ${disks.length > 0 ? disks.map(d => `
+                <div class="storage-item">
+                    <span class="sys-value" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 120px;" title="${d.model}">${d.model}</span>
+                    <span class="sys-value-mono" style="font-size:11px;">${d.size}</span>
+                </div>
+             `).join('') : '<div>未检测到硬盘</div>'}
         </div>
       </div>
-    </div>
 
-    <!-- 硬盘 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">hard_drive</span>
+      <!-- 6. Motherboard/Other -->
+       <div class="sys-card sys-card-mobo">
+         <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">developer_board</span></div>
+           <div class="sys-card-title">主板/其他</div>
         </div>
-        <h3 class="system-info-title">硬盘</h3>
-      </div>
-      <div class="system-info-items">
-        ${disks.length > 0 ? disks.map(d => `
-        <div class="system-info-item">
-          <span class="info-label">${d.model}</span>
-          <span class="info-value-mono">${d.size} (${d.interface})</span>
+        <div class="sys-card-content">
+             <div class="sys-detail-row">
+                <span class="sys-label">主板型号</span>
+             </div>
+             <div class="sys-value" style="text-align:right; margin-bottom: 12px; font-size: 12px;">${motherboard}</div>
+             
+             <div class="sys-detail-row">
+                <span class="sys-label">运行时长</span>
+                <span class="sys-value-mono">${uptime}</span>
+             </div>
         </div>
-        `).join('') : `
-        <div class="system-info-item">
-          <span class="info-label">状态</span>
-          <span class="info-value">${hw ? '未检测到' : '检测中...'}</span>
-        </div>`}
       </div>
-    </div>
 
-    ${monitors.length > 0 ? `
-    <!-- 显示器 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">monitor</span>
+      <!-- 7. Display -->
+       <div class="sys-card sys-card-display">
+         <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">monitor</span></div>
+           <div class="sys-card-title">显示器</div>
         </div>
-        <h3 class="system-info-title">显示器</h3>
-      </div>
-      <div class="system-info-items">
-        ${monitors.map((m, i) => `
-        <div class="system-info-item">
-          <span class="info-label">显示器 ${monitors.length > 1 ? i + 1 : ''}</span>
-          <span class="info-value">${m.name}${m.size ? ' (' + m.size + ')' : ''}${m.resolution ? ' ' + m.resolution : ''}${m.connection ? ' [' + m.connection + ']' : ''}</span>
+        <div class="sys-card-content">
+             ${monitors.length > 0 ? monitors.map(m => `
+                 <div class="sys-detail-row">
+                    <span class="sys-value">${m.name}</span>
+                    <span class="sys-value-mono">${m.resolution} @ ${m.refreshRate || '?Hz'}</span>
+                 </div>
+             `).join('') : '<div>未检测到显示器</div>'}
         </div>
-        `).join('')}
       </div>
-    </div>` : ''}
 
-    <!-- 系统路径 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">folder</span>
+      <!-- 8. Key Paths -->
+       <div class="sys-card sys-card-paths">
+         <div class="sys-card-header">
+           <div class="sys-card-icon"><span class="material-symbols-rounded">folder</span></div>
+           <div class="sys-card-title">关键路径</div>
         </div>
-        <h3 class="system-info-title">系统路径</h3>
-      </div>
-      <div class="system-info-items">
-        <div class="system-info-item">
-          <span class="info-label">用户目录</span>
-          <span class="info-value-mono" title="${system.homeDir}">${truncatePath(system.homeDir)}</span>
+        <div class="sys-card-content">
+            <div class="sys-detail-row">
+                <span class="sys-label">用户目录</span>
+                <span class="sys-value-mono" style="font-size: 11px; max-width: 150px; overflow:hidden; text-overflow:ellipsis;" title="${system.homeDir}">${truncatePath(system.homeDir)}</span>
+            </div>
+             <div class="sys-detail-row">
+                <span class="sys-label">临时目录</span>
+                <span class="sys-value-mono" style="font-size: 11px; max-width: 150px; overflow:hidden; text-overflow:ellipsis;" title="${system.tmpDir}">${truncatePath(system.tmpDir)}</span>
+            </div>
         </div>
-        <div class="system-info-item">
-          <span class="info-label">临时目录</span>
-          <span class="info-value-mono" title="${system.tmpDir}">${truncatePath(system.tmpDir)}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 已安装工具 -->
-    <div class="system-info-card">
-      <div class="system-info-header">
-        <div class="system-info-icon">
-          <span class="material-symbols-rounded">build</span>
-        </div>
-        <h3 class="system-info-title">已安装工具</h3>
-      </div>
-      <div class="system-info-items">
-        ${Object.entries(environmentData.tools).map(([name, info]) => `
-          <div class="system-info-item">
-            <span class="info-label">${name}</span>
-            <span class="info-value-mono">${info.installed ? (info.version || '已安装') : '未安装'}</span>
-          </div>
-        `).join('')}
       </div>
     </div>
   `;
 
-  elements.systemInfo.innerHTML = systemInfoHTML;
+  elements.systemInfo.innerHTML = dashboardHTML;
 }
 
 // ─── 工具函数 ────────────────────────────────────────────────

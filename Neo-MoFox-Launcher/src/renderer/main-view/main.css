@@ -514,7 +514,7 @@
     0 12px 32px rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.12),
     0 0 20px var(--glow-primary-soft);
   transform: translateY(-5px) scale(1.015);
-  animation: none;
+  animation: breathingBorder 4s ease-in-out infinite, cardEntrance 0.5s cubic-bezier(0.2, 0, 0, 1) 0s 1 normal forwards;
 }
 
 .add-card-content {

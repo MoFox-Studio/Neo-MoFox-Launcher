@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS = {
 
   // 外观
   theme: 'dark',             // 'dark' | 'light' | 'auto'
-  accentColor: '#7c6bbd',
+  accentColor: '#367BF0',
 
   // Napcat
   autoOpenNapcatWebUI: true,  // 实例启动后自动打开 Napcat WebUI
