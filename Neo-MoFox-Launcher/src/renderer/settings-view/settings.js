@@ -156,17 +156,7 @@ function bindEvents() {
     window.location.href = '../main-view/index.html';
   });
 
-  // 侧边导航
-  el.navItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const target = item.dataset.section;
-      el.navItems.forEach(n => n.classList.remove('active'));
-      item.classList.add('active');
-      el.sections.forEach(s => {
-        s.classList.toggle('active', s.id === `section-${target}`);
-      });
-    });
-  });
+  // 侧边导航已移至悬浮底栏组件 (floating-nav.js)，无需在此绑定
 
   // 主题切换
   [el.themeDark, el.themeLight, el.themeAuto].forEach(btn => {

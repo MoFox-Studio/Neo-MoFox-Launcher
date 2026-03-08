@@ -52,17 +52,7 @@ el.btnAddInstance?.addEventListener('click', () => {
   window.location.href = '../install-wizard/wizard.html';
 });
 
-// 环境管理 → 环境管理页
-document.getElementById('btn-open-environment')
-  ?.addEventListener('click', () => {
-    window.location.href = '../environment-view/index.html';
-  });
-
-// 设置 → 设置页
-(el.btnOpenSettings ?? document.getElementById('btn-open-settings'))
-  ?.addEventListener('click', () => {
-    window.location.href = '../settings-view/settings.html';
-  });
+// 环境管理和设置导航已移至悬浮底栏组件 (floating-nav.js)
 
 // ─── Edit Instance Modal ──────────────────────────────────────────────
 
