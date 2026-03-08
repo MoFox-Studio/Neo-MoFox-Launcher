@@ -113,7 +113,8 @@ jobs:
           path: Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-win-${{ matrix.arch }}-*.exe
 
   # ============================================================
-  # Linux 构建 (deb 包) - x64 / ia32 / arm64
+  # Linux 构建 (deb 包) - x64 / arm64
+  # 注意: Electron 不再为 Linux 提供 ia32 支持
   # ============================================================
   build-linux:
     needs: check-commits
@@ -122,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, ia32, arm64]
+        arch: [x64, arm64]
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
@@ -159,13 +160,6 @@ jobs:
         if: matrix.arch == 'arm64'
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-      - name: Setup cross-compilation for ia32
-        if: matrix.arch == 'ia32'
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
 
       - name: Build Linux deb ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
@@ -251,8 +245,9 @@ jobs:
           > | `*-win-arm64-setup.exe` | Windows ARM64 安装包 |
           > | `*-win-arm64-portable.exe` | Windows ARM64 便携版 |
           > | `*-linux-x64.deb` | Linux x64 deb 包 |
-          > | `*-linux-ia32.deb` | Linux x86 deb 包 |
           > | `*-linux-arm64.deb` | Linux ARM64 deb 包 |
+          >
+          > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持。
           FOOTER
 
       - name: Delete existing nightly release (if any)
