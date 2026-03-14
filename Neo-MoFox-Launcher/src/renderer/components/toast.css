@@ -20,8 +20,8 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10000;
   min-width: 200px;
-  max-width: 500px;
-  pointer-events: none;
+  max-width: 600px;
+  pointer-events: all;
 }
 
 .toast.show {
@@ -29,9 +29,64 @@
   transform: translateX(-50%) translateY(0);
 }
 
-.toast .material-symbols-rounded {
+.toast .toast-icon {
   font-size: 20px;
   flex-shrink: 0;
+}
+
+.toast .toast-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast .toast-action {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: inherit;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.toast .toast-action:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.toast .toast-action:active {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.toast .toast-close {
+  padding: 4px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s, background-color 0.2s;
+  margin-left: -8px;
+}
+
+.toast .toast-close .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.toast .toast-close:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.toast .toast-close:active {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Toast 类型变体 */

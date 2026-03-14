@@ -24,6 +24,9 @@ const DEFAULT_SETTINGS = {
 
   // Napcat
   autoOpenNapcatWebUI: true,  // 实例启动后自动打开 Napcat WebUI
+  
+  // 更新
+  autoCheckUpdates: true,     // 启动时自动检查实例更新
 };
 
 // ─── SettingsService 类 ──────────────────────────────────────────────────

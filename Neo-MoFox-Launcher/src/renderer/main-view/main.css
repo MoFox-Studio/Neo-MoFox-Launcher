@@ -1178,3 +1178,78 @@
     -webkit-mask-image: linear-gradient(to top, transparent, black);
   }
 }
+
+/* ─── Update Checker Modal Styles ────────────────────────────────────── */
+.update-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.update-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 12px;
+  background-color: var(--md-sys-color-surface-container);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.update-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: var(--md-sys-color-primary);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.update-item:hover {
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+.update-item:hover::before {
+  opacity: 0.08;
+}
+
+.update-item:active {
+  transform: scale(0.98);
+}
+
+.update-item-content {
+  flex: 1;
+  z-index: 1;
+}
+
+.update-item-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.update-item-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.update-item-info .material-symbols-rounded {
+  font-size: 16px;
+}
+
+.update-item-arrow {
+  opacity: 0.5;
+  transition: transform 0.2s;
+  z-index: 1;
+}
+
+.update-item:hover .update-item-arrow {
+  transform: translateX(4px);
+  opacity: 0.8;
+}
