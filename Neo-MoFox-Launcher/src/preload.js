@@ -99,7 +99,17 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   startInstance: (instanceId) => ipcRenderer.invoke('instance-start', instanceId),
   stopInstance: (instanceId) => ipcRenderer.invoke('instance-stop', instanceId),
   restartInstance: (instanceId) => ipcRenderer.invoke('instance-restart', instanceId),
+  
+  // 分离控制（独立启停 MoFox 或 NapCat）
+  startMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-start-mofox-only', instanceId),
+  stopMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-stop-mofox-only', instanceId),
+  restartMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-restart-mofox-only', instanceId),
+  startNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-start-napcat-only', instanceId),
+  stopNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-stop-napcat-only', instanceId),
+  restartNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-restart-napcat-only', instanceId),
+  
   getInstanceStatus: (instanceId) => ipcRenderer.invoke('instance-status', instanceId),
+  getSeparatedStatus: (instanceId) => ipcRenderer.invoke('instance-status-separated', instanceId),
   getAllInstanceStatuses: () => ipcRenderer.invoke('instance-status-all'),
   getInstanceStats: (instanceId) => ipcRenderer.invoke('instance-stats', instanceId),
   getInstanceLogs: (instanceId) => ipcRenderer.invoke('instance-get-logs', instanceId),

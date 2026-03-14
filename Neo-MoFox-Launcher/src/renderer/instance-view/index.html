@@ -60,19 +60,22 @@
         <button class="icon-button" id="btnSettings" title="实例设置">
           <span class="material-symbols-rounded">settings</span>
         </button>
-        <div class="control-buttons">
-          <button class="control-button start-button" id="btnStart">
-            <span class="material-symbols-rounded">play_arrow</span>
-            启动
-          </button>
-          <button class="control-button stop-button" id="btnStop" disabled>
-            <span class="material-symbols-rounded">stop</span>
-            停止
-          </button>
-          <button class="control-button restart-button" id="btnRestart" disabled>
-            <span class="material-symbols-rounded">refresh</span>
-            重启
-          </button>
+        <div class="unified-control-wrapper">
+          <span class="control-label">一键控制</span>
+          <div class="control-buttons">
+            <button class="control-button start-button" id="btnStart">
+              <span class="material-symbols-rounded">play_arrow</span>
+              启动
+            </button>
+            <button class="control-button stop-button" id="btnStop" disabled>
+              <span class="material-symbols-rounded">stop</span>
+              停止
+            </button>
+            <button class="control-button restart-button" id="btnRestart" disabled>
+              <span class="material-symbols-rounded">refresh</span>
+              重启
+            </button>
+          </div>
         </div>
       </div>
     </header>
@@ -130,6 +133,17 @@
         <!-- MoFox 日志 -->
         <div class="tab-pane active" data-tab="mofox">
           <div class="log-header">
+            <div class="log-control-buttons">
+              <button class="control-button-small start-button" id="btnStartMofox" title="启动 MoFox">
+                <span class="material-symbols-rounded">play_arrow</span>
+              </button>
+              <button class="control-button-small stop-button" id="btnStopMofox" disabled title="停止 MoFox">
+                <span class="material-symbols-rounded">stop</span>
+              </button>
+              <button class="control-button-small restart-button" id="btnRestartMofox" disabled title="重启 MoFox">
+                <span class="material-symbols-rounded">refresh</span>
+              </button>
+            </div>
             <div class="log-stats">
               <span class="stat-item">
                 <span class="material-symbols-rounded">schedule</span>
@@ -166,6 +180,17 @@
         <!-- Napcat 日志 -->
         <div class="tab-pane" data-tab="napcat">
           <div class="log-header">
+            <div class="log-control-buttons">
+              <button class="control-button-small start-button" id="btnStartNapcat" title="启动 NapCat">
+                <span class="material-symbols-rounded">play_arrow</span>
+              </button>
+              <button class="control-button-small stop-button" id="btnStopNapcat" disabled title="停止 NapCat">
+                <span class="material-symbols-rounded">stop</span>
+              </button>
+              <button class="control-button-small restart-button" id="btnRestartNapcat" disabled title="重启 NapCat">
+                <span class="material-symbols-rounded">refresh</span>
+              </button>
+            </div>
             <div class="log-stats">
               <span class="stat-item">
                 <span class="material-symbols-rounded">schedule</span>

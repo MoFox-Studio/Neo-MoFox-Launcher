@@ -9,6 +9,8 @@ const state = {
   instanceId: '',
   instanceName: '',
   instanceStatus: 'stopped',
+  mofoxStatus: 'stopped', // MoFox 分离状态
+  napcatStatus: 'stopped', // NapCat 分离状态
   hasNapcat: true, // 是否安装了 NapCat，默认 true，从实例数据中加载
   logs: {
     mofox: [],
@@ -33,6 +35,15 @@ const el = {
   btnStart: document.getElementById('btnStart'),
   btnStop: document.getElementById('btnStop'),
   btnRestart: document.getElementById('btnRestart'),
+  
+  // 分离控制按钮
+  btnStartMofox: document.getElementById('btnStartMofox'),
+  btnStopMofox: document.getElementById('btnStopMofox'),
+  btnRestartMofox: document.getElementById('btnRestartMofox'),
+  btnStartNapcat: document.getElementById('btnStartNapcat'),
+  btnStopNapcat: document.getElementById('btnStopNapcat'),
+  btnRestartNapcat: document.getElementById('btnRestartNapcat'),
+  
   instanceTitle: document.getElementById('instanceTitle'),
   statusDot: document.getElementById('statusDot'),
   statusText: document.getElementById('statusText'),
@@ -101,18 +112,54 @@ async function init() {
   // 从主进程加载实例的真实运行状态（而不是默认 stopped）
   try {
     if (state.instanceId && window.mofoxAPI?.getInstanceStatus) {
-      const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
-      if (realStatus && realStatus !== 'stopped') {
-        console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
-        updateStatus(realStatus);
-        
-        // 如果实例已在运行，加载运行时统计信息
-        if (realStatus === 'running') {
-          const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
-          if (stats) updateStats(stats);
+      // 尝试获取分离状态
+      if (window.mofoxAPI?.getSeparatedStatus) {
+        try {
+          const separatedStatus = await window.mofoxAPI.getSeparatedStatus(state.instanceId);
+          if (separatedStatus) {
+            state.mofoxStatus = separatedStatus.mofox || 'stopped';
+            state.napcatStatus = separatedStatus.napcat || 'stopped';
+            console.log(`[Instance] 加载分离状态 - MoFox: ${state.mofoxStatus}, NapCat: ${state.napcatStatus}`);
+            updateSeparatedButtonStates();
+            
+            // 如果任一组件在运行，加载运行时统计信息
+            if (state.mofoxStatus === 'running' || state.napcatStatus === 'running') {
+              const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
+              if (stats) updateStats(stats);
+            }
+          }
+        } catch (e) {
+          console.warn('[Instance] 无法加载分离状态，回退到整体状态:', e);
+          // 回退到整体状态
+          const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
+          if (realStatus && realStatus !== 'stopped') {
+            console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
+            updateStatus(realStatus);
+            
+            // 如果实例已在运行，加载运行时统计信息
+            if (realStatus === 'running') {
+              const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
+              if (stats) updateStats(stats);
+            }
+          } else {
+            updateStatus('stopped');
+          }
         }
       } else {
-        updateStatus('stopped');
+        // 旧版本不支持分离状态，使用整体状态
+        const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
+        if (realStatus && realStatus !== 'stopped') {
+          console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
+          updateStatus(realStatus);
+          
+          // 如果实例已在运行，加载运行时统计信息
+          if (realStatus === 'running') {
+            const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
+            if (stats) updateStats(stats);
+          }
+        } else {
+          updateStatus('stopped');
+        }
       }
     } else {
       updateStatus(state.instanceStatus);
@@ -262,11 +309,21 @@ function setupEventListeners() {
     navigateToMain();
   });
 
-  // 控制按钮
+  // 一键控制按钮
   el.btnStart.addEventListener('click', handleStart);
   el.btnStop.addEventListener('click', handleStop);
   el.btnRestart.addEventListener('click', handleRestart);
   el.btnSettings.addEventListener('click', handleSettings);
+
+  // 分离控制按钮 - MoFox
+  el.btnStartMofox?.addEventListener('click', handleStartMofox);
+  el.btnStopMofox?.addEventListener('click', handleStopMofox);
+  el.btnRestartMofox?.addEventListener('click', handleRestartMofox);
+
+  // 分离控制按钮 - NapCat
+  el.btnStartNapcat?.addEventListener('click', handleStartNapcat);
+  el.btnStopNapcat?.addEventListener('click', handleStopNapcat);
+  el.btnRestartNapcat?.addEventListener('click', handleRestartNapcat);
 
   // 标签页切换
   el.tabButtons.forEach(btn => {
@@ -322,10 +379,23 @@ function setupEventListeners() {
 // ─── IPC 监听器 ───────────────────────────────────────────────────────
 
 function setupIPCListeners() {
-  // 监听状态变化
+  // 监听状态变化（支持分离状态）
   window.mofoxAPI?.onInstanceStatusChange?.((data) => {
     if (data.instanceId === state.instanceId) {
-      updateStatus(data.status);
+      // 如果有分离状态信息，优先使用
+      if (data.mofoxStatus !== undefined) {
+        state.mofoxStatus = data.mofoxStatus;
+      }
+      if (data.napcatStatus !== undefined) {
+        state.napcatStatus = data.napcatStatus;
+      }
+      
+      // 如果有分离状态，更新按钮；否则使用整体状态
+      if (data.mofoxStatus !== undefined || data.napcatStatus !== undefined) {
+        updateSeparatedButtonStates();
+      } else {
+        updateStatus(data.status);
+      }
     }
   });
 
@@ -414,6 +484,110 @@ async function handleRestart() {
     addLog('mofox', { level: 'error', message: '重启失败: ' + error.message });
     updateStatus('error');
     showError('重启失败: ' + error.message);
+  }
+}
+
+// ─── 分离控制处理函数 ─────────────────────────────────────────────────
+
+async function handleStartMofox() {
+  try {
+    updateMofoxStatus('starting');
+    
+    const result = await window.mofoxAPI.startMoFoxOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('启动 MoFox 失败:', error);
+    addLog('mofox', { level: 'error', message: '启动失败: ' + error.message });
+    updateMofoxStatus('error');
+    showError('启动 MoFox 失败: ' + error.message);
+  }
+}
+
+async function handleStopMofox() {
+  try {
+    updateMofoxStatus('stopping');
+    
+    const result = await window.mofoxAPI.stopMoFoxOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('停止 MoFox 失败:', error);
+    addLog('mofox', { level: 'error', message: '停止失败: ' + error.message });
+    updateMofoxStatus('error');
+    showError('停止 MoFox 失败: ' + error.message);
+  }
+}
+
+async function handleRestartMofox() {
+  try {
+    updateMofoxStatus('restarting');
+    
+    const result = await window.mofoxAPI.restartMoFoxOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('重启 MoFox 失败:', error);
+    addLog('mofox', { level: 'error', message: '重启失败: ' + error.message });
+    updateMofoxStatus('error');
+    showError('重启 MoFox 失败: ' + error.message);
+  }
+}
+
+async function handleStartNapcat() {
+  try {
+    updateNapcatStatus('starting');
+    
+    const result = await window.mofoxAPI.startNapCatOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('启动 NapCat 失败:', error);
+    addLog('napcat', { level: 'error', message: '启动失败: ' + error.message });
+    updateNapcatStatus('error');
+    showError('启动 NapCat 失败: ' + error.message);
+  }
+}
+
+async function handleStopNapcat() {
+  try {
+    updateNapcatStatus('stopping');
+    
+    const result = await window.mofoxAPI.stopNapCatOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('停止 NapCat 失败:', error);
+    addLog('napcat', { level: 'error', message: '停止失败: ' + error.message });
+    updateNapcatStatus('error');
+    showError('停止 NapCat 失败: ' + error.message);
+  }
+}
+
+async function handleRestartNapcat() {
+  try {
+    updateNapcatStatus('restarting');
+    
+    const result = await window.mofoxAPI.restartNapCatOnly(state.instanceId);
+    
+    if (!result.success) {
+      throw new Error(result.error || '未知错误');
+    }
+  } catch (error) {
+    console.error('重启 NapCat 失败:', error);
+    addLog('napcat', { level: 'error', message: '重启失败: ' + error.message });
+    updateNapcatStatus('error');
+    showError('重启 NapCat 失败: ' + error.message);
   }
 }
 
@@ -572,17 +746,15 @@ function updateStatus(status) {
   
   el.statusText.textContent = statusTexts[status] || status;
 
-  // 更新按钮状态
+  // 更新一键控制按钮状态
   const isRunning = status === 'running';
-  const isStopped = status === 'stopped'; // 只有真正停止时才是 stopped
-  const isTransitioning = status === 'starting' || status === 'stopping' || status === 'restarting';
-  const isError = status === 'error';
+  const isStopped = status === 'stopped';
   
   // 启动按钮：只有在完全停止时才能启动
   el.btnStart.disabled = !isStopped;
   
-  // 停止按钮：在运行、错误、或转换状态时都可以停止（用于强制停止异常进程）
-  el.btnStop.disabled = !(isRunning || isError || status === 'restarting' || status === 'starting');
+  // 停止按钮：只在正常运行时可以停止
+  el.btnStop.disabled = !isRunning;
   
   // 重启按钮：只在正常运行时可用
   el.btnRestart.disabled = !isRunning;
@@ -596,6 +768,64 @@ function updateStatus(status) {
   } else {
     el.btnBack.title = '返回主界面（实例将在后台继续运行）';
   }
+}
+
+// ─── 分离状态更新函数 ─────────────────────────────────────────────────
+
+function updateMofoxStatus(status) {
+  state.mofoxStatus = status;
+  updateSeparatedButtonStates();
+}
+
+function updateNapcatStatus(status) {
+  state.napcatStatus = status;
+  updateSeparatedButtonStates();
+}
+
+function updateSeparatedButtonStates() {
+  // 更新 MoFox 按钮状态
+  const mofoxRunning = state.mofoxStatus === 'running';
+  const mofoxStopped = state.mofoxStatus === 'stopped';
+  
+  if (el.btnStartMofox) {
+    el.btnStartMofox.disabled = !mofoxStopped;
+  }
+  if (el.btnStopMofox) {
+    el.btnStopMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
+  }
+  if (el.btnRestartMofox) {
+    el.btnRestartMofox.disabled = !mofoxRunning;
+  }
+  
+  // 更新 NapCat 按钮状态
+  const napcatRunning = state.napcatStatus === 'running';
+  const napcatStopped = state.napcatStatus === 'stopped';
+  
+  if (el.btnStartNapcat) {
+    el.btnStartNapcat.disabled = !napcatStopped;
+  }
+  if (el.btnStopNapcat) {
+    el.btnStopNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
+  }
+  if (el.btnRestartNapcat) {
+    el.btnRestartNapcat.disabled = !napcatRunning;
+  }
+  
+  // 更新整体状态（使用优先级最高的状态）
+  const statusPriority = {
+    'starting': 6,
+    'restarting': 5,
+    'running': 4,
+    'stopping': 3,
+    'error': 2,
+    'stopped': 1
+  };
+  
+  const mofoxPriority = statusPriority[state.mofoxStatus] || 0;
+  const napcatPriority = statusPriority[state.napcatStatus] || 0;
+  
+  const overallStatus = mofoxPriority >= napcatPriority ? state.mofoxStatus : state.napcatStatus;
+  updateStatus(overallStatus);
 }
 
 // ─── 日志管理 ─────────────────────────────────────────────────────────

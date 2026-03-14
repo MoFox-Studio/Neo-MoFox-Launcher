@@ -114,6 +114,27 @@
   gap: 16px;
 }
 
+.unified-control-wrapper {
+  position: relative;
+  padding: 12px 16px;
+  border: 2px solid var(--md-sys-color-primary);
+  border-radius: 24px;
+  background: rgba(var(--md-sys-color-primary-rgb, 103, 80, 164), 0.08);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-sys-color-primary);
+  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .control-buttons {
   display: flex;
   gap: 8px;
@@ -397,12 +418,81 @@
   background-color: var(--md-sys-color-surface-container-low);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.log-control-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.control-button-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.control-button-small .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.control-button-small.start-button {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.control-button-small.start-button:hover:not(:disabled) {
+  background-color: var(--md-sys-color-primary);
+  box-shadow: var(--md-sys-elevation-level2);
+  transform: scale(1.05);
+}
+
+.control-button-small.stop-button {
+  background-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+}
+
+.control-button-small.stop-button:hover:not(:disabled) {
+  background-color: var(--md-sys-color-error);
+  box-shadow: var(--md-sys-elevation-level2);
+  transform: scale(1.05);
+}
+
+.control-button-small.restart-button {
+  background-color: var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-on-tertiary);
+}
+
+.control-button-small.restart-button:hover:not(:disabled) {
+  background-color: var(--md-sys-color-tertiary);
+  box-shadow: var(--md-sys-elevation-level2);
+  transform: scale(1.05);
+}
+
+.control-button-small:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .log-stats {
   display: flex;
   gap: 24px;
   align-items: center;
+  flex: 1;
 }
 
 .stat-item {

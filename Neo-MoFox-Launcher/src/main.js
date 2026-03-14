@@ -685,52 +685,79 @@ function sendInstanceLog(instanceId, type, message, level = 'info') {
   }
 }
 
-function updateInstanceStatus(instanceId, status) {
+function updateInstanceStatus(instanceId) {
   const instanceData = instanceProcesses.get(instanceId);
-  if (instanceData) {
-    instanceData.status = status;
+  if (!instanceData) return;
+  
+  // 计算整体状态：如果任一组件在运行，则整体为运行中
+  let overallStatus = 'stopped';
+  const mofoxStatus = instanceData.mofoxStatus || 'stopped';
+  const napcatStatus = instanceData.napcatStatus || 'stopped';
+  
+  // 转换状态优先级：starting > restarting > running > stopping > error > stopped
+  const statusPriority = {
+    'starting': 6,
+    'restarting': 5,
+    'running': 4,
+    'stopping': 3,
+    'error': 2,
+    'stopped': 1
+  };
+  
+  const mofoxPriority = statusPriority[mofoxStatus] || 0;
+  const napcatPriority = statusPriority[napcatStatus] || 0;
+  
+  if (mofoxPriority >= napcatPriority) {
+    overallStatus = mofoxStatus;
+  } else {
+    overallStatus = napcatStatus;
   }
   
+  // 向后兼容：设置旧的 status 字段
+  instanceData.status = overallStatus;
+  
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('instance-status-change', { instanceId, status });
+    mainWindow.webContents.send('instance-status-change', { 
+      instanceId, 
+      status: overallStatus,
+      mofoxStatus,
+      napcatStatus
+    });
   }
 }
 
 function updateInstanceStats(instanceId) {
   const instanceData = instanceProcesses.get(instanceId);
-  if (!instanceData || !instanceData.process) return;
+  if (!instanceData) return;
   
+  const now = Date.now();
   const stats = {
     mofox: {
-      uptime: Math.floor((Date.now() - instanceData.startTime) / 1000),
+      uptime: instanceData.mofoxStartTime ? Math.floor((now - instanceData.mofoxStartTime) / 1000) : 0,
       memory: 0,
       cpu: 0
     },
     napcat: {
-      uptime: Math.floor((Date.now() - instanceData.startTime) / 1000),
+      uptime: instanceData.napcatStartTime ? Math.floor((now - instanceData.napcatStartTime) / 1000) : 0,
       memory: 0,
       cpu: 0
     }
   };
+  
+  // 向后兼容：使用 mofox 的启动时间作为整体启动时间
+  instanceData.startTime = instanceData.mofoxStartTime || instanceData.napcatStartTime || 0;
   
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('instance-stats-update', { instanceId, stats });
   }
 }
 
-// ── 实例启动核心逻辑 ─────────────────────────────────────────────────────────────
-async function startInstanceInternal(instanceId, instance) {
+// ── MoFox 独立启动函数 ───────────────────────────────────────────────────────
+async function startMoFoxProcess(instanceId, instance) {
   const mofoxPath = instance.neomofoxDir;
-  const napcatPath = instance.napcatDir;
-  const hasNapcat = !!(napcatPath); // 检查是否安装了 NapCat
   
   if (!mofoxPath || !fs.existsSync(mofoxPath)) {
     throw new Error('MoFox 路径无效: ' + mofoxPath);
-  }
-  
-  // 只在安装了 NapCat 时才检查路径
-  if (hasNapcat && !fs.existsSync(napcatPath)) {
-    throw new Error('Napcat 路径无效: ' + napcatPath);
   }
   
   const mainPy = path.join(mofoxPath, 'main.py');
@@ -742,33 +769,27 @@ async function startInstanceInternal(instanceId, instance) {
   if (!instanceProcesses.has(instanceId)) {
     instanceProcesses.set(instanceId, {
       process: null,
-      status: 'stopped',
+      mofoxStatus: 'stopped',
+      napcatStatus: 'stopped',
       logs: [],
       stats: {},
-      startTime: 0,
+      mofoxStartTime: 0,
+      napcatStartTime: 0,
       webuiOpened: false,
-      generation: 0
+      mofoxGeneration: 0,
+      napcatGeneration: 0
     });
   }
   
   const instanceData = instanceProcesses.get(instanceId);
-  instanceData.generation = (instanceData.generation || 0) + 1;
-  const currentGeneration = instanceData.generation;
-  instanceData.status = 'starting';
-  instanceData.startTime = Date.now();
-  instanceData.mofoxProcess = null;
-  instanceData.napcatProcess = null;
-  instanceData.webuiOpened = false;
-  updateInstanceStatus(instanceId, 'starting');
+  instanceData.mofoxGeneration = (instanceData.mofoxGeneration || 0) + 1;
+  const currentGeneration = instanceData.mofoxGeneration;
+  instanceData.mofoxStatus = 'starting';
+  instanceData.mofoxStartTime = Date.now();
+  updateInstanceStatus(instanceId);
   
   sendInstanceLog(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
-  if (hasNapcat) {
-    sendInstanceLog(instanceId, 'napcat', '正在启动 Napcat...', 'info');
-  } else {
-    sendInstanceLog(instanceId, 'mofox', '未安装 NapCat，仅启动 MoFox 核心', 'info');
-  }
   
-  // ── 启动 MoFox ──────────────────────────────────────────────────────
   // 查找 Python 可执行文件
   const pythonExe = platformHelper.findVenvPython(mofoxPath);
   
@@ -791,8 +812,8 @@ async function startInstanceInternal(instanceId, instance) {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   
-  instanceData.process = mofoxProc;
   instanceData.mofoxProcess = mofoxProc;
+  instanceData.process = mofoxProc; // 保持向后兼容
   sendInstanceLog(instanceId, 'mofox', `MoFox PID: ${mofoxProc.pid}`, 'info');
   
   mofoxProc.stdout.on('data', (data) => {
@@ -815,143 +836,350 @@ async function startInstanceInternal(instanceId, instance) {
   
   mofoxProc.on('close', (code) => {
     sendInstanceLog(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code})`, 'info');
-    // 使用 generation 检查：如果 generation 已经变了，说明这是旧进程的事件，忽略
-    if (instanceData.generation !== currentGeneration) {
-      console.log(`[Instance ${instanceId}] 忽略旧 MoFox 进程 close 事件 (gen ${currentGeneration} vs ${instanceData.generation})`);
+    if (instanceData.mofoxGeneration !== currentGeneration) {
+      console.log(`[Instance ${instanceId}] 忽略旧 MoFox 进程 close 事件`);
       return;
     }
     instanceData.mofoxProcess = null;
-    // 检查是否需要等待 NapCat 进程（只在安装了 NapCat 时）
-    const shouldWaitForNapcat = hasNapcat && instanceData.napcatProcess;
-    if (!shouldWaitForNapcat) {
-      instanceData.process = null;
-      if (instanceData.status === 'stopping') {
-        updateInstanceStatus(instanceId, 'stopped');
-      } else if (instanceData.status === 'restarting') {
-        // 重启中，不更新状态，等待 restart handler 自行处理
-        console.log(`[Instance ${instanceId}] MoFox 进程在重启期间退出，等待重启流程`);
-      } else {
-        updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
-      }
+    if (instanceData.mofoxStatus === 'stopping') {
+      instanceData.mofoxStatus = 'stopped';
+    } else if (instanceData.mofoxStatus === 'restarting') {
+      console.log(`[Instance ${instanceId}] MoFox 进程在重启期间退出，等待重启流程`);
+    } else {
+      instanceData.mofoxStatus = code === 0 ? 'stopped' : 'error';
     }
+    // 如果两个进程都停止了，清空 process 引用
+    if (!instanceData.napcatProcess) {
+      instanceData.process = null;
+    }
+    updateInstanceStatus(instanceId);
   });
   
   mofoxProc.on('error', (err) => {
     sendInstanceLog(instanceId, 'mofox', `MoFox 启动失败: ${err.message}`, 'error');
-    if (instanceData.generation !== currentGeneration) return;
+    if (instanceData.mofoxGeneration !== currentGeneration) return;
     instanceData.mofoxProcess = null;
-    updateInstanceStatus(instanceId, 'error');
+    instanceData.mofoxStatus = 'error';
+    updateInstanceStatus(instanceId);
   });
-  
-  // ── 启动 Napcat ────────────────────────────────────────────────────
-  // 只在安装了 NapCat 时才启动
-  if (hasNapcat) {
-    // 查找 Napcat Shell 目录
-    let napcatShellPath;
-    // 在 napcatDir 下查找 NapCat.*.Shell 子目录
-    const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
-    napcatShellPath = napcatShellDirs.length > 0 
-      ? path.join(napcatPath, napcatShellDirs[0]) 
-      : napcatPath;
-  
-  // 使用 PlatformHelper 获取 NapCat 启动命令
-  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatShellPath, instance.qqNumber);
-  
-  let napcatCmd, napcatArgs;
-  if (napcatStartInfo) {
-    napcatCmd = napcatStartInfo.cmd;
-    napcatArgs = napcatStartInfo.args;
-    sendInstanceLog(instanceId, 'napcat', `使用启动命令: ${napcatCmd} ${napcatArgs.join(' ')}`, 'info');
-  } else {
-    sendInstanceLog(instanceId, 'napcat', '警告: 未找到 Napcat 启动文件', 'warning');
-  }
-  
-  if (napcatCmd) {
-    const napcatProc = spawn(napcatCmd, napcatArgs, {
-      cwd: napcatShellPath,
-      env: process.env,
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    
-    instanceData.napcatProcess = napcatProc;
-    sendInstanceLog(instanceId, 'napcat', `Napcat PID: ${napcatProc.pid}`, 'info');
-    
-    napcatProc.stdout.on('data', (data) => {
-      const lines = data.toString('utf-8').split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          sendInstanceLog(instanceId, 'napcat', line, 'info');
-          
-          // 检测 WebUI URL 并自动打开（仅首次）
-          const webuiMatch = line.match(/WebUI User Panel Url:\s*(https?:\/\/[^\s]+)/i);
-          if (webuiMatch && !instanceData.webuiOpened) {
-            const url = webuiMatch[1];
-            const settings = settingsService.readSettings();
-            if (settings.autoOpenNapcatWebUI) {
-              instanceData.webuiOpened = true;
-              sendInstanceLog(instanceId, 'napcat', `自动打开 WebUI: ${url}`, 'info');
-              shell.openExternal(url).catch(err => {
-                sendInstanceLog(instanceId, 'napcat', `打开 WebUI 失败: ${err.message}`, 'error');
-              });
-            }
-          }
-        }
-      });
-    });
-    
-    napcatProc.stderr.on('data', (data) => {
-      const lines = data.toString('utf-8').split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          sendInstanceLog(instanceId, 'napcat', line, 'warning');
-        }
-      });
-    });
-    
-    napcatProc.on('close', (code) => {
-      sendInstanceLog(instanceId, 'napcat', `Napcat 进程已退出 (code: ${code})`, 'info');
-      // 使用 generation 检查：如果 generation 已经变了，说明这是旧进程的事件，忽略
-      if (instanceData.generation !== currentGeneration) {
-        console.log(`[Instance ${instanceId}] 忽略旧 Napcat 进程 close 事件 (gen ${currentGeneration} vs ${instanceData.generation})`);
-        return;
-      }
-      instanceData.napcatProcess = null;
-      // 检查两个进程是否都停止了
-      if (!instanceData.mofoxProcess) {
-        instanceData.process = null;
-        if (instanceData.status === 'stopping') {
-          updateInstanceStatus(instanceId, 'stopped');
-        } else if (instanceData.status === 'restarting') {
-          console.log(`[Instance ${instanceId}] Napcat 进程在重启期间退出，等待重启流程`);
-        } else {
-          updateInstanceStatus(instanceId, code === 0 ? 'stopped' : 'error');
-        }
-      }
-    });
-    
-    napcatProc.on('error', (err) => {
-      sendInstanceLog(instanceId, 'napcat', `Napcat 启动失败: ${err.message}`, 'error');
-      if (instanceData.generation !== currentGeneration) return;
-      instanceData.napcatProcess = null;
-    });
-  }
-  } // hasNapcat 条件结束
-  // ── Napcat 启动结束 ───────────────────────────────────
   
   // 延迟检测启动状态
   setTimeout(() => {
     const mofoxRunning = instanceData.mofoxProcess && !instanceData.mofoxProcess.killed;
-    const napcatRunning = hasNapcat && instanceData.napcatProcess && !instanceData.napcatProcess.killed;
-    
-    if ((mofoxRunning || napcatRunning) && instanceData.status === 'starting') {
-      updateInstanceStatus(instanceId, 'running');
+    if (mofoxRunning && instanceData.mofoxStatus === 'starting') {
+      instanceData.mofoxStatus = 'running';
+      updateInstanceStatus(instanceId);
       sendInstanceLog(instanceId, 'mofox', 'MoFox 正在运行', 'info');
-      if (napcatRunning) {
-        sendInstanceLog(instanceId, 'napcat', 'Napcat 正在运行', 'info');
-      }
     }
   }, 3000);
+}
+// ── NapCat 独立启动函数 ──────────────────────────────────────────────────────
+async function startNapcatProcess(instanceId, instance) {
+  const napcatPath = instance.napcatDir;
+  
+  if (!napcatPath) {
+    throw new Error('未安装 NapCat');
+  }
+  
+  if (!fs.existsSync(napcatPath)) {
+    throw new Error('NapCat 路径无效: ' + napcatPath);
+  }
+  
+  // 初始化实例数据
+  if (!instanceProcesses.has(instanceId)) {
+    instanceProcesses.set(instanceId, {
+      process: null,
+      mofoxStatus: 'stopped',
+      napcatStatus: 'stopped',
+      logs: [],
+      stats: {},
+      mofoxStartTime: 0,
+      napcatStartTime: 0,
+      webuiOpened: false,
+      mofoxGeneration: 0,
+      napcatGeneration: 0
+    });
+  }
+  
+  const instanceData = instanceProcesses.get(instanceId);
+  instanceData.napcatGeneration = (instanceData.napcatGeneration || 0) + 1;
+  const currentGeneration = instanceData.napcatGeneration;
+  instanceData.napcatStatus = 'starting';
+  instanceData.napcatStartTime = Date.now();
+  updateInstanceStatus(instanceId);
+  
+  sendInstanceLog(instanceId, 'napcat', '正在启动 NapCat...', 'info');
+  
+  // 在 napcatDir 下查找 NapCat.*.Shell 子目录
+  const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
+  const napcatShellPath = napcatShellDirs.length > 0 
+    ? path.join(napcatPath, napcatShellDirs[0]) 
+    : napcatPath;
+
+  // 使用 PlatformHelper 获取 NapCat 启动命令
+  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatShellPath, instance.qqNumber);
+  
+  if (!napcatStartInfo) {
+    sendInstanceLog(instanceId, 'napcat', '错误: 未找到 NapCat 启动文件', 'error');
+    instanceData.napcatStatus = 'error';
+    updateInstanceStatus(instanceId);
+    throw new Error('未找到 NapCat 启动文件');
+  }
+  
+  const napcatCmd = napcatStartInfo.cmd;
+  const napcatArgs = napcatStartInfo.args;
+  sendInstanceLog(instanceId, 'napcat', `使用启动命令: ${napcatCmd} ${napcatArgs.join(' ')}`, 'info');
+  
+  const napcatProc = spawn(napcatCmd, napcatArgs, {
+    cwd: napcatShellPath,
+    env: process.env,
+    shell: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  
+  instanceData.napcatProcess = napcatProc;
+  if (!instanceData.mofoxProcess) {
+    instanceData.process = napcatProc; // 如果 MoFox 未运行，设置 process 引用
+  }
+  sendInstanceLog(instanceId, 'napcat', `NapCat PID: ${napcatProc.pid}`, 'info');
+  
+  napcatProc.stdout.on('data', (data) => {
+    const lines = data.toString('utf-8').split('\n');
+    lines.forEach(line => {
+      if (line.trim()) {
+        sendInstanceLog(instanceId, 'napcat', line, 'info');
+        
+        // 检测 WebUI URL 并自动打开（仅首次）
+        const webuiMatch = line.match(/WebUI User Panel Url:\s*(https?:\/\/[^\s]+)/i);
+        if (webuiMatch && !instanceData.webuiOpened) {
+          const url = webuiMatch[1];
+          const settings = settingsService.readSettings();
+          if (settings.autoOpenNapcatWebUI) {
+            instanceData.webuiOpened = true;
+            sendInstanceLog(instanceId, 'napcat', `自动打开 WebUI: ${url}`, 'info');
+            shell.openExternal(url).catch(err => {
+              sendInstanceLog(instanceId, 'napcat', `打开 WebUI 失败: ${err.message}`, 'error');
+            });
+          }
+        }
+      }
+    });
+  });
+  
+  napcatProc.stderr.on('data', (data) => {
+    const lines = data.toString('utf-8').split('\n');
+    lines.forEach(line => {
+      if (line.trim()) {
+        sendInstanceLog(instanceId, 'napcat', line, 'warning');
+      }
+    });
+  });
+  
+  napcatProc.on('close', (code) => {
+    sendInstanceLog(instanceId, 'napcat', `NapCat 进程已退出 (code: ${code})`, 'info');
+    if (instanceData.napcatGeneration !== currentGeneration) {
+      console.log(`[Instance ${instanceId}] 忽略旧 NapCat 进程 close 事件`);
+      return;
+    }
+    instanceData.napcatProcess = null;
+    if (instanceData.napcatStatus === 'stopping') {
+      instanceData.napcatStatus = 'stopped';
+    } else if (instanceData.napcatStatus === 'restarting') {
+      console.log(`[Instance ${instanceId}] NapCat 进程在重启期间退出，等待重启流程`);
+    } else {
+      instanceData.napcatStatus = code === 0 ? 'stopped' : 'error';
+    }
+    // 如果两个进程都停止了，清空 process 引用
+    if (!instanceData.mofoxProcess) {
+      instanceData.process = null;
+    }
+    updateInstanceStatus(instanceId);
+  });
+  
+  napcatProc.on('error', (err) => {
+    sendInstanceLog(instanceId, 'napcat', `NapCat 启动失败: ${err.message}`, 'error');
+    if (instanceData.napcatGeneration !== currentGeneration) return;
+    instanceData.napcatProcess = null;
+    instanceData.napcatStatus = 'error';
+    updateInstanceStatus(instanceId);
+  });
+  
+  // 延迟检测启动状态
+  setTimeout(() => {
+    const napcatRunning = instanceData.napcatProcess && !instanceData.napcatProcess.killed;
+    if (napcatRunning && instanceData.napcatStatus === 'starting') {
+      instanceData.napcatStatus = 'running';
+      updateInstanceStatus(instanceId);
+      sendInstanceLog(instanceId, 'napcat', 'NapCat 正在运行', 'info');
+    }
+  }, 3000);
+}
+
+// ── 实例启动核心逻辑（启动全部）──────────────────────────────────────────────
+async function startInstanceInternal(instanceId, instance) {
+  const hasNapcat = !!(instance.napcatDir);
+  
+  sendInstanceLog(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
+  if (hasNapcat) {
+    sendInstanceLog(instanceId, 'napcat', '正在启动 NapCat...', 'info');
+  } else {
+    sendInstanceLog(instanceId, 'mofox', '未安装 NapCat，仅启动 MoFox 核心', 'info');
+  }
+  
+  // 调用独立函数启动 MoFox
+  await startMoFoxProcess(instanceId, instance);
+  
+  // 调用独立函数启动 NapCat（如果安装了）
+  if (hasNapcat) {
+    await startNapcatProcess(instanceId, instance);
+  }
+}
+
+// ── MoFox 独立停止函数 ───────────────────────────────────────────────────────
+async function stopMoFoxProcess(instanceId) {
+  const instanceData = instanceProcesses.get(instanceId);
+  if (!instanceData || !instanceData.mofoxProcess) {
+    throw new Error('MoFox 未在运行');
+  }
+  
+  instanceData.mofoxStatus = 'stopping';
+  updateInstanceStatus(instanceId);
+  sendInstanceLog(instanceId, 'mofox', '正在停止 MoFox...', 'info');
+  
+  const mofoxProc = instanceData.mofoxProcess;
+  
+  // 发送 SIGTERM 优雅关闭
+  platformHelper.killProcessTree(mofoxProc, 'SIGTERM');
+  
+  // 等待进程退出（最多 5 秒）
+  await new Promise((resolve) => {
+    let resolved = false;
+    const checkDone = () => {
+      if (resolved) return;
+      if (mofoxProc.killed || mofoxProc.exitCode !== null) {
+        resolved = true;
+        resolve();
+      }
+    };
+    
+    mofoxProc.on('close', checkDone);
+    checkDone(); // 检查是否已经退出
+    
+    // 超时强杀
+    setTimeout(() => {
+      if (!resolved) {
+        try { mofoxProc.kill('SIGKILL'); } catch (e) { /* ignore */ }
+        setTimeout(() => {
+          resolved = true;
+          resolve();
+        }, 500);
+      }
+    }, 4000);
+  });
+  
+  instanceData.mofoxProcess = null;
+  instanceData.mofoxStatus = 'stopped';
+  if (!instanceData.napcatProcess) {
+    instanceData.process = null;
+  }
+  updateInstanceStatus(instanceId);
+  sendInstanceLog(instanceId, 'mofox', 'MoFox 已停止', 'info');
+}
+
+// ── NapCat 独立停止函数 ──────────────────────────────────────────────────────
+async function stopNapcatProcess(instanceId) {
+  const instanceData = instanceProcesses.get(instanceId);
+  if (!instanceData || !instanceData.napcatProcess) {
+    throw new Error('NapCat 未在运行');
+  }
+  
+  instanceData.napcatStatus = 'stopping';
+  updateInstanceStatus(instanceId);
+  sendInstanceLog(instanceId, 'napcat', '正在停止 NapCat...', 'info');
+  
+  const napcatProc = instanceData.napcatProcess;
+  
+  // 发送 SIGTERM 优雅关闭
+  platformHelper.killProcessTree(napcatProc, 'SIGTERM');
+  
+  // 等待进程退出（最多 5 秒）
+  await new Promise((resolve) => {
+    let resolved = false;
+    const checkDone = () => {
+      if (resolved) return;
+      if (napcatProc.killed || napcatProc.exitCode !== null) {
+        resolved = true;
+        resolve();
+      }
+    };
+    
+    napcatProc.on('close', checkDone);
+    checkDone(); // 检查是否已经退出
+    
+    // 超时强杀
+    setTimeout(() => {
+      if (!resolved) {
+        try { napcatProc.kill('SIGKILL'); } catch (e) { /* ignore */ }
+        setTimeout(() => {
+          resolved = true;
+          resolve();
+        }, 500);
+      }
+    }, 4000);
+  });
+  
+  instanceData.napcatProcess = null;
+  instanceData.napcatStatus = 'stopped';
+  if (!instanceData.mofoxProcess) {
+    instanceData.process = null;
+  }
+  updateInstanceStatus(instanceId);
+  sendInstanceLog(instanceId, 'napcat', 'NapCat 已停止', 'info');
+}
+
+// ── MoFox 独立重启函数 ───────────────────────────────────────────────────────
+async function restartMoFoxProcess(instanceId) {
+  const instance = storageService.getInstance(instanceId);
+  if (!instance) {
+    throw new Error('实例不存在');
+  }
+  
+  const instanceData = instanceProcesses.get(instanceId);
+  if (instanceData && instanceData.mofoxProcess) {
+    instanceData.mofoxStatus = 'restarting';
+    updateInstanceStatus(instanceId);
+    sendInstanceLog(instanceId, 'mofox', '正在重启 MoFox...', 'info');
+    
+    await stopMoFoxProcess(instanceId);
+    await new Promise(resolve => setTimeout(resolve, 500)); // 等待清理
+  }
+  
+  await startMoFoxProcess(instanceId, instance);
+}
+
+// ── NapCat 独立重启函数 ──────────────────────────────────────────────────────
+async function restartNapcatProcess(instanceId) {
+  const instance = storageService.getInstance(instanceId);
+  if (!instance) {
+    throw new Error('实例不存在');
+  }
+  
+  const hasNapcat = !!(instance.napcatDir);
+  if (!hasNapcat) {
+    throw new Error('未安装 NapCat');
+  }
+  
+  const instanceData = instanceProcesses.get(instanceId);
+  if (instanceData && instanceData.napcatProcess) {
+    instanceData.napcatStatus = 'restarting';
+    updateInstanceStatus(instanceId);
+    sendInstanceLog(instanceId, 'napcat', '正在重启 NapCat...', 'info');
+    
+    await stopNapcatProcess(instanceId);
+    await new Promise(resolve => setTimeout(resolve, 500)); // 等待清理
+  }
+  
+  await startNapcatProcess(instanceId, instance);
 }
 
 ipcMain.handle('instance-start', async (event, instanceId) => {
@@ -996,43 +1224,24 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
     const instanceData = instanceProcesses.get(instanceId);
     if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {
       // 即使没有进程引用，也确保状态重置为 stopped
-      if (instanceData && instanceData.status !== 'stopped') {
-        updateInstanceStatus(instanceId, 'stopped');
+      if (instanceData) {
+        instanceData.mofoxStatus = 'stopped';
+        instanceData.napcatStatus = 'stopped';
+        updateInstanceStatus(instanceId);
       }
       throw new Error('实例未在运行');
     }
     
-    updateInstanceStatus(instanceId, 'stopping');
-    sendInstanceLog(instanceId, 'mofox', '正在停止 MoFox...', 'info');
-    if (instanceData.napcatProcess) {
-      sendInstanceLog(instanceId, 'napcat', '正在停止 Napcat...', 'info');
-    }
-    
-    // 停止 MoFox
+    // 停止所有运行中的进程
+    const promises = [];
     if (instanceData.mofoxProcess) {
-      platformHelper.killProcessTree(instanceData.mofoxProcess, 'SIGTERM');
+      promises.push(stopMoFoxProcess(instanceId).catch(e => console.error('停止 MoFox 失败:', e)));
     }
-    
-    // 停止 Napcat
     if (instanceData.napcatProcess) {
-      platformHelper.killProcessTree(instanceData.napcatProcess, 'SIGTERM');
+      promises.push(stopNapcatProcess(instanceId).catch(e => console.error('停止 NapCat 失败:', e)));
     }
     
-    // 超时强杀
-    setTimeout(() => {
-      if (instanceData.mofoxProcess) {
-        try { instanceData.mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-        instanceData.mofoxProcess = null;
-        sendInstanceLog(instanceId, 'mofox', 'MoFox 已停止', 'info');
-      }
-      if (instanceData.napcatProcess) {
-        try { instanceData.napcatProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-        instanceData.napcatProcess = null;
-        sendInstanceLog(instanceId, 'napcat', 'Napcat 已停止', 'info');
-      }
-      instanceData.process = null;
-      updateInstanceStatus(instanceId, 'stopped');
-    }, 5000);
+    await Promise.all(promises);
     
     return { success: true };
   } catch (error) {
@@ -1130,6 +1339,145 @@ ipcMain.handle('instance-restart', async (event, instanceId) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// ─── 分离启动控制（单独启动 MoFox 或 NapCat） ──────────────────────
+
+ipcMain.handle('instance-start-mofox-only', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error('实例不存在');
+    }
+    
+    const instanceData = instanceProcesses.get(instanceId);
+    if (instanceData && instanceData.mofoxProcess && instanceData.mofoxStatus === 'running') {
+      throw new Error('MoFox 已在运行中');
+    }
+    
+    await startMoFoxProcess(instanceId, instance);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error('实例不存在');
+    }
+    
+    if (!instance.napcatDir) {
+      throw new Error('此实例未安装 NapCat');
+    }
+    
+    const instanceData = instanceProcesses.get(instanceId);
+    if (instanceData && instanceData.napcatProcess && instanceData.napcatStatus === 'running') {
+      throw new Error('NapCat 已在运行中');
+    }
+    
+    await startNapcatProcess(instanceId, instance);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-stop-mofox-only', async (event, instanceId) => {
+  try {
+    const instanceData = instanceProcesses.get(instanceId);
+    if (!instanceData || !instanceData.mofoxProcess) {
+      throw new Error('MoFox 未在运行');
+    }
+    
+    await stopMoFoxProcess(instanceId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => {
+  try {
+    const instanceData = instanceProcesses.get(instanceId);
+    if (!instanceData || !instanceData.napcatProcess) {
+      throw new Error('NapCat 未在运行');
+    }
+    
+    await stopNapcatProcess(instanceId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-restart-mofox-only', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error('实例不存在');
+    }
+    
+    const instanceData = instanceProcesses.get(instanceId);
+    if (instanceData && instanceData.mofoxProcess) {
+      // 停止 MoFox
+      await stopMoFoxProcess(instanceId);
+      // 等待进程完全退出
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // 重新启动 MoFox
+    await startMoFoxProcess(instanceId, instance);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error('实例不存在');
+    }
+    
+    if (!instance.napcatDir) {
+      throw new Error('此实例未安装 NapCat');
+    }
+    
+    const instanceData = instanceProcesses.get(instanceId);
+    if (instanceData && instanceData.napcatProcess) {
+      // 停止 NapCat
+      await stopNapcatProcess(instanceId);
+      // 等待进程完全退出
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // 重新启动 NapCat
+    await startNapcatProcess(instanceId, instance);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ─── 获取分离状态 ─────────────────────────────────────────────────────
+
+ipcMain.handle('instance-status-separated', (event, instanceId) => {
+  const instanceData = instanceProcesses.get(instanceId);
+  if (!instanceData) {
+    return {
+      mofox: 'stopped',
+      napcat: 'stopped'
+    };
+  }
+  
+  return {
+    mofox: instanceData.mofoxStatus || 'stopped',
+    napcat: instanceData.napcatStatus || 'stopped'
+  };
 });
 
 ipcMain.handle('instance-status', (event, instanceId) => {
