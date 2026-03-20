@@ -329,9 +329,118 @@ function updateCardStatus(instanceId, status) {
   const card = document.querySelector(`.instance-card[data-instance-id="${instanceId}"]`);
   if (!card || card.classList.contains('incomplete')) return;
   
-  // 完全重渲染该卡片的方式太重，做轻量级 DOM 更新
-  // 但由于按钮组结构会变化（启动↔停止），最简单的做法是重渲全部
-  renderInstances();
+  // 轻量级 DOM 更新，避免重新渲染所有卡片
+  updateCardDOM(card, inst, status);
+  refreshActiveCount();
+}
+
+// ─── 轻量级更新单个卡片 DOM ──────────────────────────────────────────
+
+function updateCardDOM(card, instance, status) {
+  const isRunning = isActiveStatus(status);
+  const isStopped = status === 'stopped' || status === 'error';
+  const statusLabel = STATUS_TEXT[status] || status;
+  
+  // 更新卡片样式类
+  card.classList.remove('instance-running', 'instance-error');
+  if (isRunning) card.classList.add('instance-running');
+  if (status === 'error') card.classList.add('instance-error');
+  
+  // 更新状态指示器
+  const statusDot = card.querySelector('.instance-status-dot');
+  if (statusDot) {
+    statusDot.className = `instance-status-dot ${status}`;
+  }
+  
+  const statusLabelEl = card.querySelector('.instance-status-label');
+  if (statusLabelEl) {
+    statusLabelEl.textContent = statusLabel;
+  }
+  
+  // 更新图标
+  const icon = card.querySelector('.instance-icon');
+  const iconSymbol = card.querySelector('.instance-icon .material-symbols-rounded');
+  if (icon && iconSymbol) {
+    if (isRunning) {
+      icon.classList.add('running');
+      iconSymbol.textContent = 'play_circle';
+    } else {
+      icon.classList.remove('running');
+      iconSymbol.textContent = 'dns';
+    }
+  }
+  
+  // 更新按钮组（启动/停止按钮切换）
+  const footer = card.querySelector('.instance-card-footer');
+  if (footer) {
+    // 重建按钮组（因为结构不同，使用innerHTML更新）
+    footer.innerHTML = `
+      <button class="md3-btn md3-btn-text md3-btn-sm btn-settings-instance" title="管理实例">
+        <span class="material-symbols-rounded">settings</span>
+        管理
+      </button>
+      ${isRunning ? `
+        <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${status !== 'running' ? 'disabled' : ''}>
+          <span class="material-symbols-rounded">stop</span>
+          停止
+        </button>
+        <button class="md3-btn md3-btn-tonal md3-btn-sm btn-view-instance" title="查看日志">
+          <span class="material-symbols-rounded">terminal</span>
+          日志
+        </button>
+      ` : `
+        <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
+          <span class="material-symbols-rounded">system_update</span>
+          版本
+        </button>
+        <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动" ${!isStopped ? 'disabled' : ''}>
+          <span class="material-symbols-rounded">play_arrow</span>
+          启动
+        </button>
+      `}
+    `;
+    
+    // 重新绑定按钮事件
+    const btnSettings = footer.querySelector('.btn-settings-instance');
+    if (btnSettings) {
+      btnSettings.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditModal(instance);
+      });
+    }
+    
+    const btnVersion = footer.querySelector('.btn-version-instance');
+    if (btnVersion) {
+      btnVersion.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+      });
+    }
+    
+    const btnStart = footer.querySelector('.btn-start-instance');
+    if (btnStart) {
+      btnStart.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await startInstanceFromCard(instance.id);
+      });
+    }
+    
+    const btnStop = footer.querySelector('.btn-stop-instance');
+    if (btnStop) {
+      btnStop.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await stopInstanceFromCard(instance.id);
+      });
+    }
+    
+    const btnView = footer.querySelector('.btn-view-instance');
+    if (btnView) {
+      btnView.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+      });
+    }
+  }
 }
 
 // ─── IPC 事件监听（实时状态推送） ─────────────────────────────────────

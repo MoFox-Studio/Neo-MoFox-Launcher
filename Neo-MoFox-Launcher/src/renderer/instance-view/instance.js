@@ -1006,15 +1006,16 @@ function updateStats(stats) {
 function startStatsUpdate() {
   // 每秒更新一次运行时间
   setInterval(() => {
-    if (state.instanceStatus === 'running') {
+    // 分离模式：分别检查 MoFox 和 NapCat 的状态
+    if (state.mofoxStatus === 'running') {
       state.stats.mofox.uptime += 1;
       el.mofoxUptime.textContent = formatUptime(state.stats.mofox.uptime);
-      
-      // 只在安装了 NapCat 时更新
-      if (state.hasNapcat) {
-        state.stats.napcat.uptime += 1;
-        el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
-      }
+    }
+    
+    // 只在安装了 NapCat 且 NapCat 在运行时更新
+    if (state.hasNapcat && state.napcatStatus === 'running') {
+      state.stats.napcat.uptime += 1;
+      el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
     }
   }, 1000);
 

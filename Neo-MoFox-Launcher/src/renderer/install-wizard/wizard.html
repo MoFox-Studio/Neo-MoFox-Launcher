@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>安装向导 - Neo-MoFox Launcher</title>
-  <!-- 同步主题注入 -->
   <script src="../theme-init.js"></script>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="wizard.css">
@@ -13,7 +12,6 @@
   <script src="../window-controls.js" defer></script>
 </head>
 <body>
-  <!-- ═══ Title Bar ═══ -->
   <header class="title-bar">
     <div class="title-drag-region">
       <span class="app-title">安装向导 - Neo-MoFox Launcher</span>
@@ -30,8 +28,8 @@
       </button>
     </div>
   </header>
+  
   <div class="wizard-container">
-    <!-- 左侧步骤指示器 -->
     <aside class="wizard-sidebar">
       <div class="wizard-logo">
         <span class="material-symbols-rounded">smart_toy</span>
@@ -40,33 +38,40 @@
       
       <nav class="wizard-steps">
         <div class="step-item active" data-step="1">
-          <div class="step-indicator">
-            <span class="step-check material-symbols-rounded">check</span>
-          </div>
-          <div class="step-content">
-            <span class="step-title">1. 环境检测</span>
-            <span class="step-desc">检查必要工具</span>
-          </div>
+          <div class="step-indicator">1</div>
+          <div class="step-content"><span class="step-title">环境检测</span></div>
         </div>
-        
         <div class="step-item" data-step="2">
-          <div class="step-indicator">
-            <span class="step-check material-symbols-rounded">check</span>
-          </div>
-          <div class="step-content">
-            <span class="step-title">2. 配置信息</span>
-            <span class="step-desc">填写 Bot 参数</span>
-          </div>
+          <div class="step-indicator">2</div>
+          <div class="step-content"><span class="step-title">实例信息</span></div>
         </div>
-        
         <div class="step-item" data-step="3">
-          <div class="step-indicator">
-            <span class="step-check material-symbols-rounded">check</span>
-          </div>
-          <div class="step-content">
-            <span class="step-title">3. 安装执行</span>
-            <span class="step-desc">克隆与配置</span>
-          </div>
+          <div class="step-indicator">3</div>
+          <div class="step-content"><span class="step-title">账号配置</span></div>
+        </div>
+        <div class="step-item" data-step="4">
+          <div class="step-indicator">4</div>
+          <div class="step-content"><span class="step-title">模型配置</span></div>
+        </div>
+        <div class="step-item" data-step="5">
+          <div class="step-indicator">5</div>
+          <div class="step-content"><span class="step-title">网络配置</span></div>
+        </div>
+        <div class="step-item" data-step="6">
+          <div class="step-indicator">6</div>
+          <div class="step-content"><span class="step-title">组件选择</span></div>
+        </div>
+        <div class="step-item" data-step="7">
+          <div class="step-indicator">7</div>
+          <div class="step-content"><span class="step-title">安装位置</span></div>
+        </div>
+        <div class="step-item" data-step="8">
+          <div class="step-indicator">8</div>
+          <div class="step-content"><span class="step-title">确认摘要</span></div>
+        </div>
+        <div class="step-item" data-step="9">
+          <div class="step-indicator">9</div>
+          <div class="step-content"><span class="step-title">安装执行</span></div>
         </div>
       </nav>
       
@@ -75,126 +80,119 @@
       </div>
     </aside>
     
-    <!-- 右侧内容区 -->
     <main class="wizard-main">
-      <div class="wizard-main-card">
-      <!-- Phase 1: 环境检测 -->
-      <section class="wizard-phase" id="phase-1">
-        <div class="phase-header">
-          <h1>环境检测</h1>
-          <p>正在检查运行环境是否满足要求...</p>
-        </div>
+      <div class="wizard-content">
+        <!-- Step 1 -->
+        <section class="wizard-step" id="step-1">
+          <div class="step-header">
+            <h1>环境检测</h1>
+            <p>正在检查运行环境是否满足要求...</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-python">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">Python</span>
+                <span class="check-requirement">版本 ≥ 3.11</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">检测中...</span>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-uv">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">uv</span>
+                <span class="check-requirement">包管理器</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">等待中...</span>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-git">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">Git</span>
+                <span class="check-requirement">版本控制</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">等待中...</span>
+              </div>
+            </div>
+          </div>
+          <div class="env-check-result hidden" id="env-check-result">
+            <div class="result-success hidden">
+              <span class="material-symbols-rounded">verified</span>
+              <span>环境检测通过，可以继续安装</span>
+            </div>
+            <div class="result-error hidden">
+              <span class="material-symbols-rounded">error</span>
+              <span class="error-message"></span>
+            </div>
+          </div>
+        </section>
         
-        <div class="env-check-list">
-          <div class="env-check-item" id="check-python">
-            <div class="check-icon">
-              <span class="material-symbols-rounded loading">progress_activity</span>
-              <span class="material-symbols-rounded success hidden">check_circle</span>
-              <span class="material-symbols-rounded error hidden">cancel</span>
-            </div>
-            <div class="check-info">
-              <span class="check-name">Python</span>
-              <span class="check-requirement">版本 ≥ 3.11</span>
-            </div>
-            <div class="check-status">
-              <span class="status-text">检测中...</span>
-            </div>
+        <!-- Step 2 -->
+        <section class="wizard-step hidden" id="step-2">
+          <div class="step-header">
+            <h1>实例信息</h1>
+            <p>为你的 Bot 实例设置名称</p>
           </div>
-          
-          <div class="env-check-item" id="check-uv">
-            <div class="check-icon">
-              <span class="material-symbols-rounded loading">progress_activity</span>
-              <span class="material-symbols-rounded success hidden">check_circle</span>
-              <span class="material-symbols-rounded error hidden">cancel</span>
-            </div>
-            <div class="check-info">
-              <span class="check-name">uv</span>
-              <span class="check-requirement">包管理器</span>
-            </div>
-            <div class="check-status">
-              <span class="status-text">等待中...</span>
-            </div>
-          </div>
-          
-          <div class="env-check-item" id="check-git">
-            <div class="check-icon">
-              <span class="material-symbols-rounded loading">progress_activity</span>
-              <span class="material-symbols-rounded success hidden">check_circle</span>
-              <span class="material-symbols-rounded error hidden">cancel</span>
-            </div>
-            <div class="check-info">
-              <span class="check-name">Git</span>
-              <span class="check-requirement">版本控制</span>
-            </div>
-            <div class="check-status">
-              <span class="status-text">等待中...</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="env-check-result hidden" id="env-check-result">
-          <div class="result-success hidden">
-            <span class="material-symbols-rounded">verified</span>
-            <span>环境检测通过，可以继续安装</span>
-          </div>
-          <div class="result-error hidden">
-            <span class="material-symbols-rounded">error</span>
-            <span class="error-message"></span>
-          </div>
-        </div>
-        
-        <div class="phase-actions">
-          <button class="md3-btn md3-btn-text" id="btn-cancel-1">取消</button>
-          <button class="md3-btn md3-btn-filled" id="btn-recheck" disabled>
-            <span class="material-symbols-rounded">refresh</span>
-            重新检测
-          </button>
-          <button class="md3-btn md3-btn-filled" id="btn-next-1" disabled>
-            下一步
-            <span class="material-symbols-rounded">arrow_forward</span>
-          </button>
-        </div>
-      </section>
-      
-      <!-- Phase 2: 配置信息 -->
-      <section class="wizard-phase hidden" id="phase-2">
-        <div class="phase-header">
-          <h1>配置信息</h1>
-          <p>请填写 Bot 的基本配置信息</p>
-        </div>
-        
-        <form class="config-form" id="config-form">
-          <div class="form-row">
+          <form class="config-form">
             <div class="form-group">
               <label for="input-instance-name">实例名称 *</label>
               <input type="text" id="input-instance-name" placeholder="例如: My Bot" maxlength="32" required>
               <span class="form-hint">1-32 字符，用于标识此实例</span>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 3 -->
+        <section class="wizard-step hidden" id="step-3">
+          <div class="step-header">
+            <h1>账号配置</h1>
+            <p>配置 Bot 的 QQ 账号信息</p>
           </div>
-          
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label for="input-qq-number">Bot QQ 号 *</label>
-              <input type="text" id="input-qq-number" placeholder="例如: 123456789" pattern="\d{5,12}" required>
-              <span class="form-hint">5-12 位纯数字</span>
+          <form class="config-form">
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label for="input-qq-number">Bot QQ 号 *</label>
+                <input type="text" id="input-qq-number" placeholder="例如: 123456789" pattern="\d{5,12}" required>
+                <span class="form-hint">5-12 位纯数字</span>
+              </div>
+              <div class="form-group">
+                <label for="input-qq-nickname">Bot QQ 昵称 *</label>
+                <input type="text" id="input-qq-nickname" placeholder="例如: 我的小狐狸" maxlength="32" required>
+                <span class="form-hint">Bot 的 QQ 昵称</span>
+              </div>
             </div>
-            
-            <div class="form-group">
-              <label for="input-qq-nickname">Bot QQ 昵称 *</label>
-              <input type="text" id="input-qq-nickname" placeholder="例如: 我的小狐狸" maxlength="32" required>
-              <span class="form-hint">Bot 的 QQ 昵称，用于适配器识别</span>
-            </div>
-          </div>
-          
-          <div class="form-row">
             <div class="form-group">
               <label for="input-owner-qq">主人 QQ 号 *</label>
               <input type="text" id="input-owner-qq" placeholder="例如: 987654321" pattern="\d{5,12}" required>
               <span class="form-hint">Bot 管理员的 QQ 号</span>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 4 -->
+        <section class="wizard-step hidden" id="step-4">
+          <div class="step-header">
+            <h1>模型配置</h1>
+            <p>配置大模型 API 密钥</p>
           </div>
-          
-          <div class="form-row">
+          <form class="config-form">
             <div class="form-group">
               <label for="input-api-key">API Key *</label>
               <div class="api-key-row">
@@ -204,47 +202,69 @@
                     <span class="material-symbols-rounded">visibility</span>
                   </button>
                 </div>
-                <button type="button" class="md3-btn md3-btn-tonal btn-get-api-key" id="btn-get-api-key" title="前往 SiliconFlow 获取 API Key">
+                <button type="button" class="md3-btn md3-btn-tonal btn-get-api-key" id="btn-get-api-key">
                   <span class="material-symbols-rounded">key</span>
                   获取密钥
                 </button>
               </div>
               <span class="form-hint">大模型 API 密钥</span>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 5 -->
+        <section class="wizard-step hidden" id="step-5">
+          <div class="step-header">
+            <h1>网络配置</h1>
+            <p>配置 WebSocket 端口和更新通道</p>
           </div>
-          
-          <div class="form-row two-cols">
-            <div class="form-group">
-              <label for="input-ws-port">WebSocket 端口 *</label>
-              <input type="number" id="input-ws-port" value="8095" min="1024" max="65535" required>
-              <span class="form-hint">1024-65535，NapCat 连接端口</span>
-            </div>
-            
-            <div class="form-group">
-              <label for="input-channel">更新通道</label>
-              <div class="custom-select" id="custom-select-channel">
-                <div class="select-selected" id="selected-channel">稳定版 (main)</div>
-                <div class="select-items select-hide" id="options-channel">
-                  <div data-value="main" class="same-as-selected">稳定版 (main)</div>
-                  <div data-value="dev">开发版 (dev)</div>
-                </div>
-                <input type="hidden" id="input-channel" value="main">
+          <form class="config-form">
+            <div class="form-row two-cols">
+              <div class="form-group">
+                <label for="input-ws-port">WebSocket 端口 *</label>
+                <input type="number" id="input-ws-port" value="8095" min="1024" max="65535" required>
+                <span class="form-hint">1024-65535，NapCat 连接端口</span>
               </div>
-              <span class="form-hint">选择跟踪的 GitHub 分支</span>
+              <div class="form-group">
+                <label for="input-channel">更新通道</label>
+                <div class="custom-select" id="custom-select-channel">
+                  <div class="select-selected" id="selected-channel">稳定版 (main)</div>
+                  <div class="select-items select-hide" id="options-channel">
+                    <div data-value="main" class="same-as-selected">稳定版 (main)</div>
+                    <div data-value="dev">开发版 (dev)</div>
+                  </div>
+                  <input type="hidden" id="input-channel" value="main">
+                </div>
+                <span class="form-hint">选择跟踪的 GitHub 分支</span>
+              </div>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 6 -->
+        <section class="wizard-step hidden" id="step-6">
+          <div class="step-header">
+            <h1>组件选择</h1>
+            <p>选择要安装的组件</p>
           </div>
-          
-          <div class="form-row">
+          <form class="config-form">
             <div class="form-group">
               <label class="checkbox-group">
                 <input type="checkbox" id="input-install-napcat" checked>
                 <span class="checkbox-label">安装 NapCat（QQ 连接适配器）</span>
               </label>
-              <span class="form-hint">取消勾选则只安装 Neo-MoFox 核心，不安装 NapCat（适用于已有 NapCat 或使用其他适配器的情况）</span>
+              <span class="form-hint">取消勾选则只安装 Neo-MoFox 核心</span>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 7 -->
+        <section class="wizard-step hidden" id="step-7">
+          <div class="step-header">
+            <h1>安装位置</h1>
+            <p>选择安装目录</p>
           </div>
-          
-          <div class="form-row">
+          <form class="config-form">
             <div class="form-group">
               <label for="input-install-dir">安装目录 *</label>
               <div class="input-group">
@@ -255,131 +275,159 @@
               </div>
               <span class="form-hint">不建议包含中文或空格</span>
             </div>
+          </form>
+        </section>
+        
+        <!-- Step 8 -->
+        <section class="wizard-step hidden" id="step-8">
+          <div class="step-header">
+            <h1>确认摘要</h1>
+            <p>请确认以下配置信息</p>
           </div>
-        </form>
+          <div class="summary-content">
+            <div class="summary-section">
+              <h3>实例信息</h3>
+              <div class="summary-item"><span>实例名称</span><span id="summary-instance-name"></span></div>
+            </div>
+            <div class="summary-section">
+              <h3>账号配置</h3>
+              <div class="summary-item"><span>Bot QQ 号</span><span id="summary-qq-number"></span></div>
+              <div class="summary-item"><span>Bot 昵称</span><span id="summary-qq-nickname"></span></div>
+              <div class="summary-item"><span>主人 QQ</span><span id="summary-owner-qq"></span></div>
+            </div>
+            <div class="summary-section">
+              <h3>网络配置</h3>
+              <div class="summary-item"><span>WS 端口</span><span id="summary-ws-port"></span></div>
+              <div class="summary-item"><span>更新通道</span><span id="summary-channel"></span></div>
+            </div>
+            <div class="summary-section">
+              <h3>安装选项</h3>
+              <div class="summary-item"><span>安装 NapCat</span><span id="summary-install-napcat"></span></div>
+              <div class="summary-item"><span>安装目录</span><span id="summary-install-dir"></span></div>
+            </div>
+          </div>
+          <div class="validation-errors hidden" id="validation-errors">
+            <span class="material-symbols-rounded">warning</span>
+            <ul class="error-list"></ul>
+          </div>
+        </section>
         
-        <div class="validation-errors hidden" id="validation-errors">
-          <span class="material-symbols-rounded">warning</span>
-          <ul class="error-list"></ul>
-        </div>
-        
-        <div class="phase-actions">
-          <button class="md3-btn md3-btn-text" id="btn-back-2">
-            <span class="material-symbols-rounded">arrow_back</span>
-            上一步
-          </button>
-          <button class="md3-btn md3-btn-text" id="btn-reset-form">
-            <span class="material-symbols-rounded">refresh</span>
-            重置表单
-          </button>
-          <button class="md3-btn md3-btn-filled" id="btn-next-2">
-            开始安装
-            <span class="material-symbols-rounded">arrow_forward</span>
-          </button>
-        </div>
-      </section>
-      
-      <!-- Phase 3: 安装执行 -->
-      <section class="wizard-phase hidden" id="phase-3">
-        <div class="phase-header">
-          <h1>正在安装</h1>
-          <p>请耐心等待，安装过程可能需要几分钟...</p>
-        </div>
-        
-        <div class="install-progress">
-          <div class="progress-bar">
+        <!-- Step 9 -->
+        <section class="wizard-step hidden" id="step-9">
+          <div class="carousel-container">
+            <div class="carousel-item active">
+              <span class="material-symbols-rounded carousel-icon">psychology_alt</span>
+              <h2>智能对话</h2>
+              <p>基于大语言模型的自然对话体验</p>
+            </div>
+            <div class="carousel-item">
+              <span class="material-symbols-rounded carousel-icon">memory</span>
+              <h2>记忆系统</h2>
+              <p>记住你的每一次互动</p>
+            </div>
+            <div class="carousel-item">
+              <span class="material-symbols-rounded carousel-icon">extension</span>
+              <h2>插件生态</h2>
+              <p>丰富的插件扩展你的 Bot</p>
+            </div>
+            <div class="carousel-item">
+              <span class="material-symbols-rounded carousel-icon">filter_drama</span>
+              <h2>情感系统</h2>
+              <p>让 AI 更懂你的情绪</p>
+            </div>
+          </div>
+          
+          <div class="install-progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
           </div>
-          <div class="progress-text">
+          <div class="progress-info">
             <span id="progress-step">准备中...</span>
             <span id="progress-percent">0%</span>
           </div>
-        </div>
-        
-        <div class="install-steps" id="install-steps">
-          <div class="install-step-item" data-step="clone">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">克隆 Neo-MoFox 仓库</span>
-          </div>
-          <div class="install-step-item" data-step="venv">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">创建虚拟环境</span>
-          </div>
-          <div class="install-step-item" data-step="deps">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">安装依赖</span>
-          </div>
-          <div class="install-step-item" data-step="gen-config">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">生成配置文件</span>
-          </div>
-          <div class="install-step-item" data-step="write-core">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">写入 core.toml</span>
-          </div>
-          <div class="install-step-item" data-step="write-model">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">写入 model.toml</span>
-          </div>
-          <div class="install-step-item" data-step="write-adapter">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">写入适配器配置</span>
-          </div>
-          <div class="install-step-item" data-step="napcat">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">配置 NapCat</span>
-          </div>
-          <div class="install-step-item" data-step="register">
-            <span class="step-icon material-symbols-rounded">pending</span>
-            <span class="step-text">注册实例</span>
-          </div>
-        </div>
-        
-        <div class="install-log">
-          <div class="log-header">
-            <span>安装日志</span>
-            <div class="log-actions">
-              <button class="md3-icon-btn" id="btn-fullscreen-log" title="全屏显示">
-                <span class="material-symbols-rounded">fullscreen</span>
-              </button>
-              <button class="md3-icon-btn" id="btn-toggle-log" title="展开/折叠">
-                <span class="material-symbols-rounded">expand_less</span>
+          
+          <div class="install-log collapsed">
+            <div class="log-header">
+              <span>安装日志</span>
+              <button class="md3-icon-btn" id="btn-toggle-log">
+                <span class="material-symbols-rounded">expand_more</span>
               </button>
             </div>
+            <div class="log-content" id="install-log-content"></div>
           </div>
-          <div class="log-content" id="install-log-content"></div>
-        </div>
-        
-        <div class="install-result hidden" id="install-result">
-          <div class="result-success hidden">
-            <span class="material-symbols-rounded">celebration</span>
-            <h2>安装完成！</h2>
-            <p>Neo-MoFox 已成功安装，你可以开始使用了。</p>
+          
+          <div class="install-result hidden" id="install-result">
+            <div class="result-success hidden">
+              <span class="material-symbols-rounded">celebration</span>
+              <h2>安装完成！</h2>
+              <p>Neo-MoFox 已成功安装，你可以开始使用了。</p>
+            </div>
+            <div class="result-error hidden">
+              <span class="material-symbols-rounded">error</span>
+              <h2>安装失败</h2>
+              <p class="error-message"></p>
+            </div>
           </div>
-          <div class="result-error hidden">
-            <span class="material-symbols-rounded">error</span>
-            <h2>安装失败</h2>
-            <p class="error-message"></p>
-          </div>
-        </div>
-        
-        <div class="phase-actions">
-          <button class="md3-btn md3-btn-text hidden" id="btn-retry">
-            <span class="material-symbols-rounded">refresh</span>
-            重试
-          </button>
-          <button class="md3-btn md3-btn-text hidden" id="btn-cleanup">
-            <span class="material-symbols-rounded">delete</span>
-            清理并重新开始
-          </button>
-          <button class="md3-btn md3-btn-filled hidden" id="btn-finish">
-            完成
-            <span class="material-symbols-rounded">check</span>
-          </button>
-        </div>
-      </section>
+        </section>
+      </div>
+      
+      <div class="wizard-actions">
+        <button class="md3-btn md3-btn-text" id="btn-back">
+          <span class="material-symbols-rounded">arrow_back</span>
+          上一步
+        </button>
+        <button class="md3-btn md3-btn-filled" id="btn-next">
+          下一步
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+        <button class="md3-btn md3-btn-text hidden" id="btn-cancel">取消</button>
+        <button class="md3-btn md3-btn-text hidden" id="btn-retry">重试</button>
+        <button class="md3-btn md3-btn-text hidden" id="btn-cleanup">清理</button>
+        <button class="md3-btn md3-btn-filled hidden" id="btn-finish">完成</button>
       </div>
     </main>
+  </div>
+
+  <div class="install-steps hidden" id="install-steps">
+    <div class="install-step-item" data-step="clone">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">克隆 Neo-MoFox 仓库</span>
+    </div>
+    <div class="install-step-item" data-step="venv">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">创建虚拟环境</span>
+    </div>
+    <div class="install-step-item" data-step="deps">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">安装依赖</span>
+    </div>
+    <div class="install-step-item" data-step="gen-config">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">生成配置文件</span>
+    </div>
+    <div class="install-step-item" data-step="write-core">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入 core.toml</span>
+    </div>
+    <div class="install-step-item" data-step="write-model">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入 model.toml</span>
+    </div>
+    <div class="install-step-item" data-step="write-adapter">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入适配器配置</span>
+    </div>
+    <div class="install-step-item" data-step="napcat">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">配置 NapCat</span>
+    </div>
+    <div class="install-step-item" data-step="napcat-config">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">配置 NapCat</span>
+    </div>
+    <div class="install-step-item" data-step="register">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">注册实例</span>
+    </div>
   </div>
 
   <script src="../components/dialog.js"></script>

@@ -1502,10 +1502,18 @@ ipcMain.handle('instance-stats', (event, instanceId) => {
     };
   }
   
-  const uptime = Math.floor((Date.now() - instanceData.startTime) / 1000);
+  const now = Date.now();
   return {
-    mofox: { uptime, memory: 0, cpu: 0 },
-    napcat: { uptime, memory: 0, cpu: 0 }
+    mofox: {
+      uptime: instanceData.mofoxStartTime ? Math.floor((now - instanceData.mofoxStartTime) / 1000) : 0,
+      memory: 0,
+      cpu: 0
+    },
+    napcat: {
+      uptime: instanceData.napcatStartTime ? Math.floor((now - instanceData.napcatStartTime) / 1000) : 0,
+      memory: 0,
+      cpu: 0
+    }
   };
 });
 
