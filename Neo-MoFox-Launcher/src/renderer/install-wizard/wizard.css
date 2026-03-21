@@ -607,30 +607,128 @@ body {
   gap: 24px;
 }
 
+.summary-section {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.summary-section:nth-child(1) { animation-delay: 0.05s; }
+.summary-section:nth-child(2) { animation-delay: 0.1s; }
+.summary-section:nth-child(3) { animation-delay: 0.15s; }
+.summary-section:nth-child(4) { animation-delay: 0.2s; }
+
+.summary-section:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.summary-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .summary-section h3 {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 12px;
   color: var(--md-sys-color-primary);
+  margin: 0;
+}
+
+.btn-edit-section {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--md-sys-color-primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.btn-edit-section:hover {
+  opacity: 1;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.btn-edit-section .material-symbols-rounded {
+  font-size: 20px;
 }
 
 .summary-item {
   display: flex;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: var(--md-sys-color-surface-variant);
-  border-radius: 8px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.summary-item span:first-child {
+.summary-item:last-child {
+  margin-bottom: 0;
+}
+
+.summary-item:hover {
+  background: var(--md-sys-color-surface-container-high);
+  transform: translateX(2px);
+}
+
+.summary-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  flex-shrink: 0;
+}
+
+.summary-item-icon .material-symbols-rounded {
+  font-size: 20px;
+}
+
+.summary-item-label {
   color: var(--md-sys-color-on-surface-variant);
   font-size: 14px;
+  flex-shrink: 0;
+  min-width: 80px;
 }
 
-.summary-item span:last-child {
+.summary-item-value {
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
+  flex: 1;
+  text-align: right;
+  word-break: break-all;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ===== Carousel ===== */
@@ -645,9 +743,9 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 40px 0;
   opacity: 0;
   transition: opacity 0.5s;
 }
@@ -656,31 +754,20 @@ body {
   opacity: 1;
 }
 
-.carousel-icon {
-  position: absolute;
-  top: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 240px;
-  color: var(--md-sys-color-primary);
-  font-variation-settings: 'FILL' 1;
-  opacity: 0.15;
-  z-index: 1;
-  pointer-events: none;
-}
-
 .carousel-item h2 {
   font-size: 48px;
   font-weight: 700;
-  z-index: 2;
-  position: relative;
+  margin: 0;
 }
 
 .carousel-item p {
   font-size: 16px;
   color: var(--md-sys-color-on-surface-variant);
-  z-index: 2;
-  position: relative;
+  margin: 8px 0 0 0;
+}
+
+.carousel-item .carousel-icon {
+  display: none;
 }
 
 .install-progress-bar {
@@ -775,3 +862,233 @@ body {
 .install-steps {
   display: none;
 }
+
+/* ===== License Agreement (Step 2) ===== */
+.license-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--md-sys-color-outline-variant);
+}
+
+.license-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+  font-family: var(--font-sans);
+}
+
+.license-tab:hover {
+  background: rgba(var(--md-sys-color-primary-rgb, 208,188,255), 0.08);
+}
+
+.license-tab.active {
+  color: var(--md-sys-color-primary);
+  border-bottom-color: var(--md-sys-color-primary);
+}
+
+.license-content-wrapper {
+  position: relative;
+  height: 350px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  overflow-y: auto;
+}
+
+.license-loading,
+.license-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.license-loading .material-symbols-rounded {
+  font-size: 48px;
+  color: var(--md-sys-color-primary);
+}
+
+.license-error .material-symbols-rounded {
+  font-size: 48px;
+  color: var(--md-sys-color-error);
+}
+
+.rotating {
+  animation: spin 1s linear infinite;
+}
+
+.error-text {
+  font-size: 14px;
+  text-align: center;
+}
+
+.license-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--md-sys-color-on-surface);
+  animation: fadeIn 0.3s;
+}
+
+/* Markdown 渲染样式 */
+.license-content h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 24px 0 16px;
+  color: var(--md-sys-color-primary);
+  border-bottom: 2px solid var(--md-sys-color-outline-variant);
+  padding-bottom: 8px;
+}
+
+.license-content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 20px 0 12px;
+  color: var(--md-sys-color-primary);
+}
+
+.license-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.license-content p {
+  margin: 12px 0;
+}
+
+.license-content ul,
+.license-content ol {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.license-content li {
+  margin: 8px 0;
+}
+
+.license-content code {
+  background: rgba(var(--md-sys-color-primary-rgb, 208,188,255), 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--md-sys-color-primary);
+}
+
+.license-content pre {
+  background: #111;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.license-content pre code {
+  background: transparent;
+  padding: 0;
+  color: #a5d6a7;
+}
+
+.license-content blockquote {
+  border-left: 4px solid var(--md-sys-color-primary);
+  padding-left: 16px;
+  margin: 12px 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-style: italic;
+}
+
+.license-content a {
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.license-content a:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.license-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.license-content th,
+.license-content td {
+  padding: 8px 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  text-align: left;
+}
+
+.license-content th {
+  background: var(--md-sys-color-surface);
+  font-weight: 600;
+}
+
+.license-content hr {
+  border: none;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  margin: 24px 0;
+}
+
+.license-agreement {
+  padding: 20px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 12px;
+  border: 2px solid var(--md-sys-color-outline-variant);
+  transition: all 0.3s;
+}
+
+.license-agreement.error {
+  border-color: var(--md-sys-color-error);
+  background: rgba(211, 47, 47, 0.08);
+  animation: shakeError 0.4s;
+}
+
+.license-agreement.error .checkbox-label {
+  color: var(--md-sys-color-error);
+}
+
+.license-agreement.error input[type="checkbox"] {
+  border-color: var(--md-sys-color-error);
+}
+
+.license-agreement .checkbox-label {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  transition: color 0.3s;
+}
+
+.license-agreement input[type="checkbox"]:checked {
+  animation: checkPulse 0.3s;
+}
+
+@keyframes checkPulse {
+  0%, 100% {transform: scale(1);}
+  50% {transform: scale(1.1);}
+}
+
+@keyframes shakeError {
+  0%, 100% {transform: translateX(0);}
+  25% {transform: translateX(-10px);}
+  75% {transform: translateX(10px);}
+}
+

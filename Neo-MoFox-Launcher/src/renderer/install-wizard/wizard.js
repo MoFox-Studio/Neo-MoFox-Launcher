@@ -1,7 +1,11 @@
 const state = {
   currentStep: 1,
-  totalSteps: 9,
+  totalSteps: 10,
   envCheckPassed: false,
+  licenseLoaded: false,
+  licenseAgreed: false,
+  resumeMode: false, // 是否为续装模式
+  resumeInstanceId: null, // 续装的实例 ID
   inputs: {
     instanceName: '',
     qqNumber: '',
@@ -17,6 +21,58 @@ const state = {
   pythonCmd: null,
 };
 
+// ─── URL 参数解析 ────────────────────────────────────────────────────────────
+
+/**
+ * 解析 URL 参数
+ */
+function parseUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    instanceId: params.get('instanceId'),
+    resume: params.get('resume') === '1',
+  };
+}
+
+/**
+ * 加载待续装的实例数据
+ */
+async function loadResumeInstance(instanceId) {
+  try {
+    const instances = await window.mofoxAPI.getInstances();
+    const instance = instances.find(i => i.id === instanceId);
+    
+    if (!instance) {
+      throw new Error('实例不存在');
+    }
+    
+    if (instance.installCompleted) {
+      throw new Error('实例安装已完成');
+    }
+    
+    // 恢复配置信息到 state.inputs
+    state.inputs = {
+      instanceName: instance.displayName || '',
+      qqNumber: instance.qqNumber || '',
+      qqNickname: instance.qqNickname || '',
+      ownerQQNumber: instance.ownerQQNumber || '',
+      apiKey: instance.apiKey || '',
+      wsPort: instance.wsPort || 8095,
+      channel: instance.channel || 'main',
+      installDir: instance.neomofoxDir ? instance.neomofoxDir.replace(/[\\\/]neo-mofox$/, '').replace(/[\\\/][^\\\/]+$/, '') : '',
+      installNapcat: instance.installSteps ? instance.installSteps.includes('napcat') : true,
+    };
+    
+    state.resumeMode = true;
+    state.resumeInstanceId = instanceId;
+    
+    return instance;
+  } catch (error) {
+    console.error('加载续装实例失败:', error);
+    throw error;
+  }
+}
+
 const el = {
   steps: document.querySelectorAll('.wizard-step'),
   stepItems: document.querySelectorAll('.step-item'),
@@ -31,6 +87,15 @@ const el = {
   checkUv: document.getElementById('check-uv'),
   checkGit: document.getElementById('check-git'),
   envCheckResult: document.getElementById('env-check-result'),
+  
+  // License elements
+  licenseTabs: document.querySelectorAll('.license-tab'),
+  licenseLoading: document.getElementById('license-loading'),
+  licenseError: document.getElementById('license-error'),
+  licenseContentEula: document.getElementById('license-content-eula'),
+  licenseContentPrivacy: document.getElementById('license-content-privacy'),
+  btnReloadLicense: document.getElementById('btn-reload-license'),
+  inputAgreeLicense: document.getElementById('input-agree-license'),
   
   inputInstanceName: document.getElementById('input-instance-name'),
   inputQqNumber: document.getElementById('input-qq-number'),
@@ -68,15 +133,19 @@ function goToStep(step) {
     else if (stepNum === step) item.classList.add('active');
   });
   
-  el.btnBack.classList.toggle('hidden', step === 1 || step === 9);
-  el.btnNext.classList.toggle('hidden', step === 9);
+  el.btnBack.classList.toggle('hidden', step === 1 || step === 10);
+  el.btnNext.classList.toggle('hidden', step === 10);
   el.btnCancel.classList.toggle('hidden', step !== 1);
   
-  if (step === 8) {
-    updateSummary();
+  if (step === 2 && !state.licenseLoaded) {
+    loadLicenseAgreements();
   }
   
   if (step === 9) {
+    updateSummary();
+  }
+  
+  if (step === 10) {
     startCarousel();
     startInstall();
   }
@@ -116,14 +185,44 @@ function clearAllErrors() {
   });
 }
 
+function showLicenseError() {
+  const agreement = document.querySelector('.license-agreement');
+  if (agreement) {
+    agreement.classList.add('error');
+    // 滚动到同意框位置
+    agreement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function clearLicenseError() {
+  const agreement = document.querySelector('.license-agreement');
+  if (agreement) {
+    agreement.classList.remove('error');
+  }
+}
+
 async function goNext() {
   clearAllErrors();
+  clearLicenseError();
   
   // 步骤 1: 环境检测
   if (state.currentStep === 1 && !state.envCheckPassed) return;
   
-  // 步骤 2: 实例名称
+  // 步骤 2: 许可协议
   if (state.currentStep === 2) {
+    if (!state.licenseLoaded) {
+      // 协议还未加载完成，不做处理，让用户等待
+      return;
+    }
+    if (!el.inputAgreeLicense.checked) {
+      showLicenseError();
+      return;
+    }
+    state.licenseAgreed = true;
+  }
+  
+  // 步骤 3: 实例名称
+  if (state.currentStep === 3) {
     const name = el.inputInstanceName.value.trim();
     if (!name) {
       showFieldError(el.inputInstanceName, '❌ 请输入实例名称');
@@ -144,8 +243,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 3: 账号配置
-  if (state.currentStep === 3) {
+  // 步骤 4: 账号配置
+  if (state.currentStep === 4) {
     const qqNumber = el.inputQqNumber.value.trim();
     const qqNickname = el.inputQqNickname.value.trim();
     const ownerQq = el.inputOwnerQq.value.trim();
@@ -164,8 +263,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 4: 模型配置
-  if (state.currentStep === 4) {
+  // 步骤 5: 模型配置
+  if (state.currentStep === 5) {
     const apiKey = el.inputApiKey.value.trim();
     if (!apiKey) {
       showFieldError(el.inputApiKey, '❌ 请输入 API Key');
@@ -173,8 +272,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 5: 网络配置（端口验证）
-  if (state.currentStep === 5) {
+  // 步骤 6: 网络配置（端口验证）
+  if (state.currentStep === 6) {
     const port = parseInt(el.inputWsPort.value, 10);
     if (!port || port < 1024 || port > 65535) {
       showFieldError(el.inputWsPort, '❌ 请输入有效的端口号（1024-65535）');
@@ -182,10 +281,10 @@ async function goNext() {
     }
   }
   
-  // 步骤 6: 组件选择（无需验证）
+  // 步骤 7: 组件选择（无需验证）
   
-  // 步骤 7: 安装位置
-  if (state.currentStep === 7) {
+  // 步骤 8: 安装位置
+  if (state.currentStep === 8) {
     const dir = el.inputInstallDir.value.trim();
     if (!dir) {
       showFieldError(el.inputInstallDir, '❌ 请选择安装目录');
@@ -193,8 +292,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 8: 确认摘要（最终验证）
-  if (state.currentStep === 8) {
+  // 步骤 9: 确认摘要（最终验证）
+  if (state.currentStep === 9) {
     if (!validateInputs()) return;
   }
   
@@ -204,7 +303,7 @@ async function goNext() {
 }
 
 function goBack() {
-  if (state.currentStep > 1 && state.currentStep !== 9) {
+  if (state.currentStep > 1 && state.currentStep !== 10) {
     goToStep(state.currentStep - 1);
   }
 }
@@ -276,6 +375,67 @@ async function runEnvCheck() {
   }
 }
 
+// License agreements loading and rendering
+async function loadLicenseAgreements() {
+  const EULA_URL = 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/eula.md';
+  const PRIVACY_URL = 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/PRIVACY.md';
+  
+  el.licenseLoading.classList.remove('hidden');
+  el.licenseError.classList.add('hidden');
+  el.licenseContentEula.classList.add('hidden');
+  el.licenseContentPrivacy.classList.add('hidden');
+  
+  try {
+    const [eulaResponse, privacyResponse] = await Promise.all([
+      fetch(EULA_URL),
+      fetch(PRIVACY_URL)
+    ]);
+    
+    if (!eulaResponse.ok || !privacyResponse.ok) {
+      throw new Error('加载许可协议失败');
+    }
+    
+    const eulaText = await eulaResponse.text();
+    const privacyText = await privacyResponse.text();
+    
+    // Use marked.js to render markdown
+    if (typeof marked !== 'undefined') {
+      el.licenseContentEula.innerHTML = marked.parse(eulaText);
+      el.licenseContentPrivacy.innerHTML = marked.parse(privacyText);
+    } else {
+      // Fallback to plain text
+      el.licenseContentEula.innerHTML = `<pre>${eulaText}</pre>`;
+      el.licenseContentPrivacy.innerHTML = `<pre>${privacyText}</pre>`;
+    }
+    
+    el.licenseLoading.classList.add('hidden');
+    el.licenseContentEula.classList.remove('hidden');
+    state.licenseLoaded = true;
+    
+  } catch (error) {
+    console.error('加载许可协议失败:', error);
+    el.licenseLoading.classList.add('hidden');
+    el.licenseError.classList.remove('hidden');
+    state.licenseLoaded = false;
+  }
+}
+
+function switchLicenseTab(tabName) {
+  el.licenseTabs.forEach(tab => {
+    const isActive = tab.getAttribute('data-tab') === tabName;
+    tab.classList.toggle('active', isActive);
+  });
+  
+  if (tabName === 'eula') {
+    el.licenseContentEula.classList.remove('hidden');
+    el.licenseContentPrivacy.classList.add('hidden');
+  } else if (tabName === 'privacy') {
+    el.licenseContentEula.classList.add('hidden');
+    el.licenseContentPrivacy.classList.remove('hidden');
+  }
+}
+
+
 function collectInputs() {
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
@@ -294,14 +454,32 @@ function collectInputs() {
 
 function updateSummary() {
   collectInputs();
-  document.getElementById('summary-instance-name').textContent = state.inputs.instanceName;
-  document.getElementById('summary-qq-number').textContent = state.inputs.qqNumber;
-  document.getElementById('summary-qq-nickname').textContent = state.inputs.qqNickname;
-  document.getElementById('summary-owner-qq').textContent = state.inputs.ownerQQNumber;
+  
+  // 实例名称
+  document.getElementById('summary-instance-name').textContent = state.inputs.instanceName || '(未设置)';
+  
+  // 账号配置
+  document.getElementById('summary-qq-number').textContent = state.inputs.qqNumber || '(未设置)';
+  document.getElementById('summary-qq-nickname').textContent = state.inputs.qqNickname || '(未设置)';
+  document.getElementById('summary-owner-qq').textContent = state.inputs.ownerQQNumber || '(未设置)';
+  
+  // 网络配置
   document.getElementById('summary-ws-port').textContent = state.inputs.wsPort;
   document.getElementById('summary-channel').textContent = state.inputs.channel === 'main' ? '稳定版 (main)' : '开发版 (dev)';
+  
+  // 安装选项
   document.getElementById('summary-install-napcat').textContent = state.inputs.installNapcat ? '是' : '否';
-  document.getElementById('summary-install-dir').textContent = state.inputs.installDir;
+  
+  // 安装目录 - 智能截断长路径
+  const installDirEl = document.getElementById('summary-install-dir');
+  const installDir = state.inputs.installDir || '(未设置)';
+  installDirEl.textContent = installDir;
+  installDirEl.title = installDir; // 悬停显示完整路径
+}
+
+// 编辑指定步骤
+function editSection(step) {
+  goToStep(step);
 }
 
 function validateInputs() {
@@ -441,6 +619,26 @@ function bindEvents() {
     }
   });
   
+  // License tab switching
+  el.licenseTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.getAttribute('data-tab');
+      switchLicenseTab(tabName);
+    });
+  });
+  
+  // Reload license button
+  el.btnReloadLicense?.addEventListener('click', () => {
+    loadLicenseAgreements();
+  });
+  
+  // Clear license error when checkbox is checked
+  el.inputAgreeLicense?.addEventListener('change', () => {
+    if (el.inputAgreeLicense.checked) {
+      clearLicenseError();
+    }
+  });
+  
   el.btnToggleApiKey?.addEventListener('click', () => {
     const input = el.inputApiKey;
     const icon = el.btnToggleApiKey.querySelector('.material-symbols-rounded');
@@ -511,13 +709,55 @@ function bindEvents() {
 async function init() {
   bindEvents();
   
-  const settings = await window.mofoxAPI.settingsRead();
-  if (settings?.defaultInstallDir) {
-    el.inputInstallDir.value = settings.defaultInstallDir;
-  }
+  // 检查是否为续装模式
+  const urlParams = parseUrlParams();
   
-  goToStep(1);
-  runEnvCheck();
+  if (urlParams.resume && urlParams.instanceId) {
+    // 续装模式：直接跳到安装页面
+    try {
+      const instance = await loadResumeInstance(urlParams.instanceId);
+      
+      // 更新标题栏显示续装模式
+      const titleBar = document.querySelector('.app-title');
+      if (titleBar) {
+        titleBar.textContent = `继续安装 - ${instance.displayName} - Neo-MoFox Launcher`;
+      }
+      
+      appendLog(`[续装] 实例: ${instance.displayName}`);
+      appendLog(`[续装] QQ: ${instance.qqNumber}`);
+      
+      if (instance.installProgress) {
+        appendLog(`[续装] 上次中断于步骤: ${instance.installProgress.step}`);
+        appendLog(`[续装] 将从该步骤继续执行安装流程...`);
+      }
+      
+      appendLog(''); // 空行分隔
+      
+      // 标记环境检测已通过（续装时跳过）
+      state.envCheckPassed = true;
+      state.licenseAgreed = true;
+      
+      // 直接跳到安装步骤
+      goToStep(10);
+      
+    } catch (error) {
+      console.error('续装初始化失败:', error);
+      await window.customAlert(
+        `无法继续安装: ${error.message}\n\n将返回主界面。`,
+        '错误'
+      );
+      window.location.href = '../index.html';
+    }
+  } else {
+    // 正常模式：从第一步开始
+    const settings = await window.mofoxAPI.settingsRead();
+    if (settings?.defaultInstallDir) {
+      el.inputInstallDir.value = settings.defaultInstallDir;
+    }
+    
+    goToStep(1);
+    runEnvCheck();
+  }
 }
 
 init();
