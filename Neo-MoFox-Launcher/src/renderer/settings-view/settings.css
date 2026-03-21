@@ -388,6 +388,26 @@ body {
   align-items: center;
 }
 
+.number-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 110px;
+}
+
+.number-input-row .settings-input {
+  flex: 1;
+  min-width: 50px;
+  padding: 10px 10px;
+  align-self: stretch;
+}
+
+.number-input-row .input-suffix {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+}
+
 .settings-input {
   flex: 1;
   background: var(--md-sys-color-surface-variant);

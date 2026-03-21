@@ -206,6 +206,73 @@
 
       </section>
 
+      <!-- ══ 日志 ══ -->
+      <section class="settings-section" id="section-logs">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">description</span>
+          <h2>日志</h2>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">folder_open</span>
+            <div>
+              <div class="card-title">日志文件夹</div>
+              <div class="card-desc">打开日志存储目录，查看启动器和实例的日志文件</div>
+            </div>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-open-logs">
+            <span class="material-symbols-rounded">folder_open</span>
+            <span>打开日志文件夹</span>
+          </button>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">archive</span>
+            <div>
+              <div class="card-title">归档保留天数</div>
+              <div class="card-desc">历史日志文件的保留时长，超过此天数的归档将被自动删除</div>
+            </div>
+          </div>
+          <div class="number-input-row">
+            <input type="number" class="settings-input" id="log-archive-days" min="1" max="365" step="1" title="归档保留天数">
+            <span class="input-suffix">天</span>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">compress</span>
+            <div>
+              <div class="card-title">压缩归档文件</div>
+              <div class="card-desc">自动将历史日志压缩为 .gz 格式以节省磁盘空间</div>
+            </div>
+          </div>
+          <div>
+            <label class="switch-row">
+              <input type="checkbox" class="settings-switch" id="log-compress-archive">
+              <span class="switch-label">启用压缩</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">storage</span>
+            <div>
+              <div class="card-title">单文件最大大小</div>
+              <div class="card-desc">单个日志文件的大小上限，超过后将自动轮转创建新文件</div>
+            </div>
+          </div>
+          <div class="number-input-row">
+            <input type="number" class="settings-input" id="log-max-file-size" min="1" max="500" step="1" title="单文件最大大小">
+            <span class="input-suffix">MB</span>
+          </div>
+        </div>
+
+      </section>
+
       <!-- ══ 关于 ══ -->
       <section class="settings-section" id="section-about">
         <div class="section-heading">
@@ -224,10 +291,6 @@
             <button class="action-chip" id="btn-open-github">
               <span class="material-symbols-rounded">open_in_new</span>
               <span>GitHub</span>
-            </button>
-            <button class="action-chip" id="btn-open-logs">
-              <span class="material-symbols-rounded">description</span>
-              <span>查看日志文件夹</span>
             </button>
             <button class="action-chip" id="btn-open-yishan">
               <span class="material-symbols-rounded">play_circle</span>

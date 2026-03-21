@@ -48,10 +48,15 @@ const el = {
   autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
   autoCheckUpdates:   $('auto-check-updates'),
 
+  // 日志
+  logArchiveDays:     $('log-archive-days'),
+  logCompressArchive: $('log-compress-archive'),
+  logMaxFileSize:     $('log-max-file-size'),
+  btnOpenLogs:        $('btn-open-logs'),
+
   // 关于
   aboutVersion:       $('about-version'),
   btnOpenGithub:      $('btn-open-github'),
-  btnOpenLogs:        $('btn-open-logs'),
   btnOpenYishan:      $('btn-open-yishan'),
 };
 
@@ -86,6 +91,12 @@ function populateUI(settings) {
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
   el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
   el.autoCheckUpdates.checked = settings.autoCheckUpdates ?? true;
+
+  // 日志
+  const logging = settings.logging || {};
+  el.logArchiveDays.value = logging.maxArchiveDays || 30;
+  el.logCompressArchive.checked = logging.compressArchive !== false;
+  el.logMaxFileSize.value = Math.round((logging.maxFileSize || 52428800) / (1024 * 1024)); // 转换字节到 MB
 }
 
 // ─── 主题选项 ────────────────────────────────────────────────────────────
@@ -192,6 +203,47 @@ function bindEvents() {
     savePartial({ autoCheckUpdates: el.autoCheckUpdates.checked });
   });
 
+  // 日志 - 归档保留天数
+  el.logArchiveDays.addEventListener('change', () => {
+    const days = parseInt(el.logArchiveDays.value, 10);
+    if (!isNaN(days) && days >= 1 && days <= 365) {
+      savePartial({ 
+        logging: { 
+          ...currentSettings.logging,
+          maxArchiveDays: days 
+        } 
+      });
+    }
+  });
+
+  // 日志 - 压缩归档
+  el.logCompressArchive.addEventListener('change', () => {
+    savePartial({ 
+      logging: { 
+        ...currentSettings.logging,
+        compressArchive: el.logCompressArchive.checked 
+      } 
+    });
+  });
+
+  // 日志 - 单文件最大大小
+  el.logMaxFileSize.addEventListener('change', () => {
+    const sizeMB = parseInt(el.logMaxFileSize.value, 10);
+    if (!isNaN(sizeMB) && sizeMB >= 1 && sizeMB <= 500) {
+      savePartial({ 
+        logging: { 
+          ...currentSettings.logging,
+          maxFileSize: sizeMB * 1024 * 1024 // 转换 MB 到字节
+        } 
+      });
+    }
+  });
+
+  // 打开日志文件夹
+  el.btnOpenLogs?.addEventListener('click', () => {
+    window.mofoxAPI.openLogsDir();
+  });
+
   // 浏览安装目录
   el.btnBrowseInstallDir.addEventListener('click', async () => {
     const selected = await window.mofoxAPI.selectProjectPath();
@@ -220,10 +272,6 @@ function bindEvents() {
   // 关于页按钮
   el.btnOpenGithub?.addEventListener('click', () => {
     window.mofoxAPI.openExternal('https://github.com/MoFox-Studio/Neo-MoFox-Launcher');
-  });
-
-  el.btnOpenLogs?.addEventListener('click', () => {
-    window.mofoxAPI.openLogsDir();
   });
 
   el.btnOpenYishan?.addEventListener('click', () => {

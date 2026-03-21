@@ -224,7 +224,7 @@ class StorageService {
     
     // 删除实例日志文件夹
     try {
-      const logDir = path.join(this.getDataDir(), 'logs', instanceId);
+      const logDir = path.join(this.getDataDir(), 'logs', 'instances', instanceId);
       if (fs.existsSync(logDir)) {
         console.log(`[StorageService] 删除实例日志: ${logDir}`);
         fs.rmSync(logDir, { recursive: true, force: true });
@@ -384,7 +384,16 @@ class StorageService {
    * 获取实例日志目录
    */
   getInstanceLogDir(instanceId) {
-    const logDir = path.join(this.getDataDir(), 'logs', instanceId);
+    const logDir = path.join(this.getDataDir(), 'logs', 'instances', instanceId);
+    fs.mkdirSync(logDir, { recursive: true });
+    return logDir;
+  }
+
+  /**
+   * 获取 Launcher 日志目录
+   */
+  getLauncherLogDir() {
+    const logDir = path.join(this.getDataDir(), 'logs', 'launcher');
     fs.mkdirSync(logDir, { recursive: true });
     return logDir;
   }
@@ -393,7 +402,7 @@ class StorageService {
    * 获取 Launcher 日志文件路径
    */
   getLauncherLogPath() {
-    return path.join(this.getDataDir(), 'logs', 'launcher.log');
+    return path.join(this.getLauncherLogDir(), 'launcher.log');
   }
 }
 

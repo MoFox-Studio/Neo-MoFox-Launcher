@@ -21,8 +21,11 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
 }
 
 const { platformHelper } = require('./services/PlatformHelper');
+const { LauncherLogger, InstanceLogger, LogReader } = require('./services/LoggerService');
+const { storageService } = require('./services/install/StorageService');
 
 let mainWindow;
+let launcherLogger = null; // 启动器日志管理器
 let mofoxProcess = null;
 let mofoxStatus = 'stopped'; // stopped | starting | running | stopping | error
 let projectPath = '';
@@ -31,7 +34,6 @@ const MAX_LOG_LINES = 2000;
 
 // ─── 多实例进程管理 ───────────────────────────────────
 const instanceProcesses = new Map(); // instanceId -> { process, status, logs, stats, startTime, generation }
-const { storageService: instanceStorage } = require('./services/install/StorageService');
 
 // ─── 窗口创建 ───────────────────────────────────────
 function createWindow() {
@@ -80,6 +82,14 @@ function createWindow() {
 
 // ─── 应用生命周期 ───────────────────────────────────
 app.whenReady().then(() => {
+  // 初始化 StorageService（确保数据目录存在）
+  storageService.init();
+  
+  // 初始化启动器日志系统（必须在最前面，在任何 console 输出之前）
+  const logsDir = path.join(storageService.getDataDir(), 'logs');
+  launcherLogger = new LauncherLogger(logsDir);
+  launcherLogger.hijackConsole();
+  
   // 设置全局环境变量，确保所有子进程都使用 UTF-8
   process.env.PYTHONIOENCODING = 'utf-8';
   process.env.PYTHONUNBUFFERED = '1';
@@ -95,11 +105,17 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   killMofoxProcess();
+  if (launcherLogger) {
+    launcherLogger.close();
+  }
   app.quit();
 });
 
 app.on('before-quit', () => {
   killMofoxProcess();
+  if (launcherLogger) {
+    launcherLogger.close();
+  }
 });
 
 // ─── 设置持久化 ─────────────────────────────────────
@@ -561,7 +577,6 @@ ipcMain.handle('window-close', () => {
 });
 
 // ─── 实例管理 & 安装向导 IPC ──────────────────────────────────────────────
-const { storageService } = require('./services/install/StorageService');
 const { installWizardService } = require('./services/install/InstallWizardService');
 const { versionService } = require('./services/version/VersionService');
 
@@ -661,6 +676,179 @@ ipcMain.handle('open-logs-dir', () => {
   shell.openPath(logsDir);
 });
 
+// ─── 日志系统 IPC ────────────────────────────────────────────────────────
+
+// 列出日志文件
+ipcMain.handle('logs-get-files', async (event, logType, instanceId) => {
+  try {
+    let logDir;
+    let baseFilename;
+    
+    if (logType === 'launcher') {
+      logDir = storageService.getLauncherLogDir();
+      baseFilename = 'launcher';
+    } else if (logType === 'mofox' || logType === 'napcat') {
+      logDir = storageService.getInstanceLogDir(instanceId);
+      baseFilename = logType;
+    } else {
+      throw new Error('无效的日志类型: ' + logType);
+    }
+    
+    return LogReader.listLogFiles(logDir, baseFilename);
+  } catch (error) {
+    console.error('[IPC] 列出日志文件失败:', error);
+    return [];
+  }
+});
+
+// 读取日志文件内容
+ipcMain.handle('logs-get-file-content', async (event, filePath) => {
+  try {
+    return await LogReader.readLogFile(filePath);
+  } catch (error) {
+    console.error('[IPC] 读取日志文件失败:', error);
+    throw new Error('读取日志失败: ' + error.message);
+  }
+});
+
+// 获取日志统计信息
+ipcMain.handle('logs-get-stats', async (event) => {
+  try {
+    const launcherDir = storageService.getLauncherLogDir();
+    const launcherFiles = LogReader.listLogFiles(launcherDir, 'launcher');
+    
+    const instancesDir = path.join(storageService.getDataDir(), 'logs', 'instances');
+    let instanceFiles = [];
+    
+    if (fs.existsSync(instancesDir)) {
+      const instanceIds = fs.readdirSync(instancesDir);
+      for (const instanceId of instanceIds) {
+        const instanceLogDir = path.join(instancesDir, instanceId);
+        const mofoxFiles = LogReader.listLogFiles(instanceLogDir, 'mofox');
+        const napcatFiles = LogReader.listLogFiles(instanceLogDir, 'napcat');
+        instanceFiles = instanceFiles.concat(mofoxFiles, napcatFiles);
+      }
+    }
+    
+    const allFiles = [...launcherFiles, ...instanceFiles];
+    const totalSize = allFiles.reduce((sum, file) => sum + file.size, 0);
+    const totalCount = allFiles.length;
+    
+    // 找出最早和最新的日志
+    let earliestDate = null;
+    let latestDate = null;
+    if (allFiles.length > 0) {
+      earliestDate = new Date(Math.min(...allFiles.map(f => f.mtime)));
+      latestDate = new Date(Math.max(...allFiles.map(f => f.mtime)));
+    }
+    
+    return {
+      totalSize,
+      totalCount,
+      launcherCount: launcherFiles.length,
+      instanceCount: instanceFiles.length,
+      earliestDate: earliestDate ? earliestDate.toISOString() : null,
+      latestDate: latestDate ? latestDate.toISOString() : null
+    };
+  } catch (error) {
+    console.error('[IPC] 获取日志统计失败:', error);
+    return {
+      totalSize: 0,
+      totalCount: 0,
+      launcherCount: 0,
+      instanceCount: 0,
+      earliestDate: null,
+      latestDate: null
+    };
+  }
+});
+
+// 获取启动器历史日志
+ipcMain.handle('launcher-get-logs-history', async (event, options = {}) => {
+  try {
+    const logDir = storageService.getLauncherLogDir();
+    const files = LogReader.listLogFiles(logDir, 'launcher');
+    
+    const { limit = 1000, offset = 0 } = options;
+    
+    // 读取所有可用的日志文件（按时间倒序）
+    const allLogs = [];
+    for (const file of files) {
+      try {
+        const content = await LogReader.readLogFile(file.path);
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          const parsed = LogReader.parseLogLine(line);
+          if (parsed) {
+            allLogs.push(parsed);
+          }
+        }
+      } catch (err) {
+        console.error(`[IPC] 读取日志文件失败 ${file.name}:`, err);
+      }
+    }
+    
+    // 按时间戳倒序排序
+    allLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // 分页
+    const paginatedLogs = allLogs.slice(offset, offset + limit);
+    
+    return {
+      logs: paginatedLogs,
+      total: allLogs.length,
+      hasMore: allLogs.length > offset + limit
+    };
+  } catch (error) {
+    console.error('[IPC] 获取启动器历史日志失败:', error);
+    return { logs: [], total: 0, hasMore: false };
+  }
+});
+
+// 获取实例历史日志
+ipcMain.handle('instance-get-logs-history', async (event, instanceId, logType, options = {}) => {
+  try {
+    const logDir = storageService.getInstanceLogDir(instanceId);
+    const files = LogReader.listLogFiles(logDir, logType);
+    
+    const { limit = 1000, offset = 0 } = options;
+    
+    // 读取所有可用的日志文件（按时间倒序）
+    const allLogs = [];
+    for (const file of files) {
+      try {
+        const content = await LogReader.readLogFile(file.path);
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        for (const line of lines) {
+          const parsed = LogReader.parseLogLine(line);
+          if (parsed) {
+            allLogs.push(parsed);
+          }
+        }
+      } catch (err) {
+        console.error(`[IPC] 读取日志文件失败 ${file.name}:`, err);
+      }
+    }
+    
+    // 按时间戳倒序排序
+    allLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // 分页
+    const paginatedLogs = allLogs.slice(offset, offset + limit);
+    
+    return {
+      logs: paginatedLogs,
+      total: allLogs.length,
+      hasMore: allLogs.length > offset + limit
+    };
+  } catch (error) {
+    console.error('[IPC] 获取实例历史日志失败:', error);
+    return { logs: [], total: 0, hasMore: false };
+  }
+});
+
 // 同步读取（用于页面加载时立即应用主题，避免 FOUC）
 ipcMain.on('settings-read-sync', (event) => {
   event.returnValue = settingsService.readSettings();
@@ -674,12 +862,19 @@ function sendInstanceLog(instanceId, type, message, level = 'info') {
   
   const instanceData = instanceProcesses.get(instanceId);
   if (instanceData) {
+    // 写入文件（如果 logger 已初始化）
+    if (instanceData.loggers && instanceData.loggers[type]) {
+      instanceData.loggers[type].log(message);
+    }
+    
+    // 保存到内存缓冲（限制为 200 条，避免内存溢出）
     instanceData.logs.push(log);
-    if (instanceData.logs.length > 1000) {
-      instanceData.logs = instanceData.logs.slice(-1000);
+    if (instanceData.logs.length > 200) {
+      instanceData.logs = instanceData.logs.slice(-200);
     }
   }
   
+  // 发送 IPC 事件到前端
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('instance-log', { instanceId, log });
   }
@@ -772,6 +967,7 @@ async function startMoFoxProcess(instanceId, instance) {
       mofoxStatus: 'stopped',
       napcatStatus: 'stopped',
       logs: [],
+      loggers: {}, // 日志管理器
       stats: {},
       mofoxStartTime: 0,
       napcatStartTime: 0,
@@ -784,6 +980,17 @@ async function startMoFoxProcess(instanceId, instance) {
   const instanceData = instanceProcesses.get(instanceId);
   instanceData.mofoxGeneration = (instanceData.mofoxGeneration || 0) + 1;
   const currentGeneration = instanceData.mofoxGeneration;
+  
+  // 初始化 MoFox 日志管理器
+  if (!instanceData.loggers.mofox) {
+    const logsDir = path.join(storageService.getDataDir(), 'logs');
+    instanceData.loggers.mofox = new InstanceLogger(
+      logsDir,
+      instanceId,
+      'mofox'
+    );
+  }
+  
   instanceData.mofoxStatus = 'starting';
   instanceData.mofoxStartTime = Date.now();
   updateInstanceStatus(instanceId);
@@ -841,6 +1048,13 @@ async function startMoFoxProcess(instanceId, instance) {
       return;
     }
     instanceData.mofoxProcess = null;
+    
+    // 关闭 MoFox 日志管理器
+    if (instanceData.loggers && instanceData.loggers.mofox) {
+      instanceData.loggers.mofox.close();
+      delete instanceData.loggers.mofox;
+    }
+    
     if (instanceData.mofoxStatus === 'stopping') {
       instanceData.mofoxStatus = 'stopped';
     } else if (instanceData.mofoxStatus === 'restarting') {
@@ -892,6 +1106,7 @@ async function startNapcatProcess(instanceId, instance) {
       mofoxStatus: 'stopped',
       napcatStatus: 'stopped',
       logs: [],
+      loggers: {}, // 日志管理器
       stats: {},
       mofoxStartTime: 0,
       napcatStartTime: 0,
@@ -904,6 +1119,17 @@ async function startNapcatProcess(instanceId, instance) {
   const instanceData = instanceProcesses.get(instanceId);
   instanceData.napcatGeneration = (instanceData.napcatGeneration || 0) + 1;
   const currentGeneration = instanceData.napcatGeneration;
+  
+  // 初始化 NapCat 日志管理器
+  if (!instanceData.loggers.napcat) {
+    const logsDir = path.join(storageService.getDataDir(), 'logs');
+    instanceData.loggers.napcat = new InstanceLogger(
+      logsDir,
+      instanceId,
+      'napcat'
+    );
+  }
+  
   instanceData.napcatStatus = 'starting';
   instanceData.napcatStartTime = Date.now();
   updateInstanceStatus(instanceId);
@@ -982,6 +1208,13 @@ async function startNapcatProcess(instanceId, instance) {
       return;
     }
     instanceData.napcatProcess = null;
+    
+    // 关闭 NapCat 日志管理器
+    if (instanceData.loggers && instanceData.loggers.napcat) {
+      instanceData.loggers.napcat.close();
+      delete instanceData.loggers.napcat;
+    }
+    
     if (instanceData.napcatStatus === 'stopping') {
       instanceData.napcatStatus = 'stopped';
     } else if (instanceData.napcatStatus === 'restarting') {
@@ -1525,20 +1758,66 @@ ipcMain.handle('instance-clear-logs', (event, instanceId, type) => {
   return { success: true };
 });
 
-ipcMain.handle('instance-export-logs', async (event, instanceId, type, logs) => {
+ipcMain.handle('instance-export-logs', async (event, instanceId, type) => {
   try {
-    const logsDir = path.join(app.getPath('userData'), 'logs');
-    fs.mkdirSync(logsDir, { recursive: true });
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    // 获取实例日志目录
+    const instanceLogDir = storageService.getInstanceLogDir(instanceId);
+    if (!fs.existsSync(instanceLogDir)) {
+      throw new Error('实例日志目录不存在');
+    }
+
+    // 获取所有历史日志文件（包括归档）
+    const logFiles = LogReader.listLogFiles(instanceLogDir, type);
+    if (logFiles.length === 0) {
+      throw new Error('没有找到任何日志文件');
+    }
+
+    console.log(`[instance-export-logs] 找到 ${logFiles.length} 个日志文件:`, logFiles.map(f => f.name));
+
+    // 读取所有日志文件内容
+    const allLines = [];
+    for (const file of logFiles) {
+      try {
+        const content = await LogReader.readLogFile(file.path);
+        const lines = content.split('\n').filter(line => line.trim().length > 0);
+        allLines.push(...lines);
+        console.log(`[instance-export-logs] 读取 ${file.name}: ${lines.length} 行`);
+      } catch (err) {
+        console.error(`[instance-export-logs] 读取文件失败 ${file.name}: ${err.message}`);
+      }
+    }
+
+    if (allLines.length === 0) {
+      throw new Error('日志文件为空');
+    }
+
+    // 解析并按时间排序
+    const parsedLogs = allLines
+      .map(line => {
+        const parsed = LogReader.parseLogLine(line);
+        return parsed ? { ...parsed, raw: line } : null;
+      })
+      .filter(log => log !== null)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    console.log(`[instance-export-logs] 解析并排序了 ${parsedLogs.length} 行日志`);
+
+    // 生成导出文件
+    const exportsDir = path.join(app.getPath('userData'), 'exports');
+    fs.mkdirSync(exportsDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
     const filename = `${instanceId}_${type}_${timestamp}.log`;
-    const filepath = path.join(logsDir, filename);
-    
-    const content = logs.map(log => `[${log.timestamp}] [${log.level}] ${log.message}`).join('\n');
+    const filepath = path.join(exportsDir, filename);
+
+    // 写入合并后的日志内容（使用原始格式行）
+    const content = parsedLogs.map(log => log.raw).join('\n');
     fs.writeFileSync(filepath, content, 'utf-8');
-    
+
+    console.log(`[instance-export-logs] 导出成功: ${filepath}`);
     return filepath;
   } catch (error) {
+    console.error(`[instance-export-logs] 导出失败:`, error);
     throw new Error('导出失败: ' + error.message);
   }
 });

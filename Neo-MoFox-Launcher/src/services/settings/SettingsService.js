@@ -27,6 +27,13 @@ const DEFAULT_SETTINGS = {
   
   // 更新
   autoCheckUpdates: true,     // 启动时自动检查实例更新
+
+  // 日志
+  logging: {
+    maxArchiveDays: 30,       // 归档保留天数
+    compressArchive: true,    // 是否压缩归档为 .gz
+    maxFileSize: 50 * 1024 * 1024  // 单个日志文件最大大小(字节) - 50MB
+  }
 };
 
 // ─── SettingsService 类 ──────────────────────────────────────────────────

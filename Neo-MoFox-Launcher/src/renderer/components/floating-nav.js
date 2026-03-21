@@ -12,9 +12,10 @@
 
   // 设置页面内部 tab 项
   const SETTINGS_TABS = [
-    { id: 'appearance', icon: 'palette', label: '外观',   section: 'section-appearance' },
-    { id: 'general',    icon: 'tune',    label: '通用',   section: 'section-general' },
-    { id: 'about',      icon: 'info',    label: '关于',   section: 'section-about' },
+    { id: 'appearance', icon: 'palette',     label: '外观',   section: 'section-appearance' },
+    { id: 'general',    icon: 'tune',        label: '通用',   section: 'section-general' },
+    { id: 'logs',       icon: 'description', label: '日志',   section: 'section-logs' },
+    { id: 'about',      icon: 'info',        label: '关于',   section: 'section-about' },
   ];
 
   // 检测当前激活页面
