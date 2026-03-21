@@ -1092,3 +1092,80 @@ body {
   75% {transform: translateX(10px);}
 }
 
+/* ===== 表单分隔符 ===== */
+.form-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 24px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.form-section-divider .material-symbols-rounded {
+  font-size: 20px;
+}
+
+/* ===== 密码强度指示器 ===== */
+.password-strength {
+  margin-top: 8px;
+}
+
+.strength-bar {
+  height: 4px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.strength-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  border-radius: 2px;
+}
+
+.strength-fill.weak { width: 33%; background: var(--md-sys-color-error); }
+.strength-fill.medium { width: 66%; background: #f59e0b; }
+.strength-fill.strong { width: 100%; background: var(--md-sys-color-primary); }
+
+.strength-text {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.strength-text.weak { color: var(--md-sys-color-error); }
+.strength-text.medium { color: #f59e0b; }
+.strength-text.strong { color: var(--md-sys-color-primary); }
+
+/* ===== 信息提示框 ===== */
+.info-box {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.info-box .material-symbols-rounded {
+  color: var(--md-sys-color-secondary);
+  flex-shrink: 0;
+}
+
+.info-box strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-box p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+

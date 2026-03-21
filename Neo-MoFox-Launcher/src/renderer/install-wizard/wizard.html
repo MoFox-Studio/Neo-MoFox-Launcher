@@ -279,8 +279,50 @@
                     <div data-value="dev">开发版 (dev)</div>
                   </div>
                   <input type="hidden" id="input-channel" value="main">
-                </div>
+               </div>
                 <span class="form-hint">选择跟踪的 GitHub 分支</span>
+              </div>
+            </div>
+            
+            <!-- WebUI API 密钥配置 -->
+            <div class="form-section-divider">
+              <span class="material-symbols-rounded">security</span>
+              <span>插件 HTTP 路由 访问控制</span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-webui-api-key">插件 HTTP 路由 / WebUI API 密钥 *</label>
+              <div class="api-key-row">
+                <div class="input-wrapper">
+                  <input type="password" id="input-webui-api-key" 
+                         placeholder="输入自定义密钥或点击骰子随机生成" 
+                         required minlength="8">
+                  <button type="button" class="btn-toggle-password" id="btn-toggle-webui-key">
+                    <span class="material-symbols-rounded">visibility</span>
+                  </button>
+                </div>
+                <button type="button" class="md3-btn md3-btn-tonal" id="btn-generate-api-key" 
+                        title="生成安全的随机密钥">
+                  <span class="material-symbols-rounded">casino</span>
+                  随机生成
+                </button>
+              </div>
+              <span class="form-hint">至少 8 位字符，用于访问 WebUI  控制台/ 插件 HTTP 路由认证</span>
+              
+              <!-- 密码强度指示器 -->
+              <div class="password-strength" id="password-strength">
+                <div class="strength-bar">
+                  <div class="strength-fill" id="strength-fill"></div>
+                </div>
+                <span class="strength-text" id="strength-text">未输入</span>
+              </div>
+            </div>
+            
+            <div class="info-box">
+              <span class="material-symbols-rounded">info</span>
+              <div>
+                <strong>安全提示</strong>
+                <p>此密钥用于访问 WebUI 管理界面和插件 HTTP 路由认证。请妥善保管，不要分享给他人。安装完成后可在配置文件中修改。</p>
               </div>
             </div>
           </form>
@@ -298,7 +340,14 @@
                 <input type="checkbox" id="input-install-napcat" checked>
                 <span class="checkbox-label">安装 NapCat（QQ 连接适配器）</span>
               </label>
-              <span class="form-hint">取消勾选则只安装 Neo-MoFox 核心</span>
+              <span class="form-hint">QQ 平台消息收发所需组件</span>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-group">
+                <input type="checkbox" id="input-install-webui" checked>
+                <span class="checkbox-label">安装 WebUI（Web 管理控制台）</span>
+              </label>
+              <span class="form-hint">可视化配置与管理界面，支持一键更新</span>
             </div>
           </form>
         </section>
@@ -383,6 +432,11 @@
                 <span class="summary-item-label">更新通道</span>
                 <span class="summary-item-value" id="summary-channel"></span>
               </div>
+              <div class="summary-item">
+                <span class="summary-item-icon"><span class="material-symbols-rounded">key</span></span>
+                <span class="summary-item-label">WebUI API 密钥</span>
+                <span class="summary-item-value" id="summary-webui-api-key">********</span>
+              </div>
             </div>
             <div class="summary-section" data-edit-step="7">
               <div class="summary-section-header">
@@ -395,6 +449,11 @@
                 <span class="summary-item-icon"><span class="material-symbols-rounded">extension</span></span>
                 <span class="summary-item-label">安装 NapCat</span>
                 <span class="summary-item-value" id="summary-install-napcat"></span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-item-icon"><span class="material-symbols-rounded">dashboard</span></span>
+                <span class="summary-item-label">安装 WebUI</span>
+                <span class="summary-item-value" id="summary-install-webui"></span>
               </div>
               <div class="summary-item">
                 <span class="summary-item-icon"><span class="material-symbols-rounded">folder</span></span>

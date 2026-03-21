@@ -16,6 +16,8 @@ const state = {
     channel: 'main',
     installDir: '',
     installNapcat: true,
+    installWebui: true,
+    webuiApiKey: '',
   },
   installing: false,
   pythonCmd: null,
@@ -61,7 +63,7 @@ async function loadResumeInstance(instanceId) {
       channel: instance.channel || 'main',
       installDir: instance.neomofoxDir ? instance.neomofoxDir.replace(/[\\\/]neo-mofox$/, '').replace(/[\\\/][^\\\/]+$/, '') : '',
       installNapcat: instance.installSteps ? instance.installSteps.includes('napcat') : true,
-    };
+      installWebui: instance.installSteps ? instance.installSteps.includes('webui') : true,      webuiApiKey: instance.webuiApiKey || '',    };
     
     state.resumeMode = true;
     state.resumeInstanceId = instanceId;
@@ -106,7 +108,13 @@ const el = {
   btnGetApiKey: document.getElementById('btn-get-api-key'),
   inputWsPort: document.getElementById('input-ws-port'),
   inputChannel: document.getElementById('input-channel'),
+  inputWebuiApiKey: document.getElementById('input-webui-api-key'),
+  btnToggleWebuiKey: document.getElementById('btn-toggle-webui-key'),
+  btnGenerateApiKey: document.getElementById('btn-generate-api-key'),
+  strengthFill: document.getElementById('strength-fill'),
+  strengthText: document.getElementById('strength-text'),
   inputInstallNapcat: document.getElementById('input-install-napcat'),
+  inputInstallWebui: document.getElementById('input-install-webui'),
   inputInstallDir: document.getElementById('input-install-dir'),
   btnBrowseDir: document.getElementById('btn-browse-dir'),
   validationErrors: document.getElementById('validation-errors'),
@@ -118,6 +126,57 @@ const el = {
   btnToggleLog: document.getElementById('btn-toggle-log'),
   installResult: document.getElementById('install-result'),
 };
+
+/**
+ * 评估密码强度
+ * @param {string} password 
+ * @returns {{score: number, level: 'weak'|'medium'|'strong'|'none', text: string}}
+ */
+function evaluatePasswordStrength(password) {
+  if (!password) return { score: 0, level: 'none', text: '未输入' };
+  
+  let score = 0;
+  
+  // 长度评分（最高 40 分）
+  if (password.length >= 8) score += 10;
+  if (password.length >= 12) score += 10;
+  if (password.length >= 16) score += 10;
+  if (password.length >= 20) score += 10;
+  
+  // 字符类型评分（每种 15 分）
+  if (/[a-z]/.test(password)) score += 15;  // 小写字母
+  if (/[A-Z]/.test(password)) score += 15;  // 大写字母
+  if (/[0-9]/.test(password)) score += 15;  // 数字
+  if (/[^a-zA-Z0-9]/.test(password)) score += 15; // 特殊字符
+  
+  // 确定强度级别
+  let level, text;
+  if (score < 40) {
+    level = 'weak';
+    text = '弱 - 不推荐使用';
+  } else if (score < 70) {
+    level = 'medium';
+    text = '中等 - 建议使用随机生成';
+  } else {
+    level = 'strong';
+    text = '强';
+  }
+  
+  return { score, level, text };
+}
+
+/**
+ * 生成安全的随机密钥（单密钥）
+ * @param {number} length 密钥长度（默认 32）
+ * @returns {string}
+ */
+function generateSecureApiKey(length = 32) {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  
+  return Array.from(array, byte => charset[byte % charset.length]).join('');
+}
 
 function goToStep(step) {
   state.currentStep = step;
@@ -272,13 +331,38 @@ async function goNext() {
     }
   }
   
-  // 步骤 6: 网络配置（端口验证）
+  // 步骤 6: 网络配置（端口验证 + WebUI API 密钥）
   if (state.currentStep === 6) {
     const port = parseInt(el.inputWsPort.value, 10);
     if (!port || port < 1024 || port > 65535) {
       showFieldError(el.inputWsPort, '❌ 请输入有效的端口号（1024-65535）');
       return;
     }
+    
+    // 验证 WebUI API 密钥
+    const apiKey = el.inputWebuiApiKey.value.trim();
+    
+    if (!apiKey) {
+      showFieldError(el.inputWebuiApiKey, '❌ 请输入 API 密钥或点击随机生成');
+      return;
+    }
+    
+    if (apiKey.length < 8) {
+      showFieldError(el.inputWebuiApiKey, '❌ 密钥长度至少为 8 位');
+      return;
+    }
+    
+    const strength = evaluatePasswordStrength(apiKey);
+    if (strength.level === 'weak') {
+      // 弱密码警告但允许继续
+      const confirmed = await window.customConfirm(
+        '当前密钥强度较弱，建议使用“随机生成”功能。是否继续？',
+        '密钥强度警告'
+      );
+      if (!confirmed) return;
+    }
+    
+    state.inputs.webuiApiKey = apiKey;
   }
   
   // 步骤 7: 组件选择（无需验证）
@@ -447,8 +531,39 @@ function collectInputs() {
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
     installNapcat: el.inputInstallNapcat.checked,
-    pythonCmd: state.pythonCmd,
+    installWebui: el.inputInstallWebui.checked,
+    webuiApiKey: el.inputWebuiApiKey.value.trim(),
   };
+  
+  // 基础安装步骤（始终执行）
+  const baseSteps = [
+    'clone',
+    'venv',
+    'deps',
+    'gen-config',
+    'write-core',
+    'write-model',
+    'write-webui-key',
+    'write-adapter',
+  ];
+  
+  const installSteps = [...baseSteps];
+  
+  // 如果选择安装 NapCat，添加相关步骤
+  if (state.inputs.installNapcat) {
+    installSteps.push('napcat', 'napcat-config');
+  }
+  
+  // 如果选择安装 WebUI，添加相关步骤
+  if (state.inputs.installWebui) {
+    installSteps.push('webui');
+  }
+  
+  // 始终包含 register 步骤
+  installSteps.push('register');
+  
+  state.inputs.installSteps = installSteps;
+  
   return state.inputs;
 }
 
@@ -467,8 +582,14 @@ function updateSummary() {
   document.getElementById('summary-ws-port').textContent = state.inputs.wsPort;
   document.getElementById('summary-channel').textContent = state.inputs.channel === 'main' ? '稳定版 (main)' : '开发版 (dev)';
   
+  // WebUI API 密钥 - 脱敏显示
+  const apiKey = state.inputs.webuiApiKey || '(未设置)';
+  document.getElementById('summary-webui-api-key').textContent = 
+    apiKey === '(未设置)' ? apiKey : '•'.repeat(Math.min(apiKey.length, 16));
+  
   // 安装选项
   document.getElementById('summary-install-napcat').textContent = state.inputs.installNapcat ? '是' : '否';
+  document.getElementById('summary-install-webui').textContent = state.inputs.installWebui ? '是' : '否';
   
   // 安装目录 - 智能截断长路径
   const installDirEl = document.getElementById('summary-install-dir');
@@ -538,9 +659,11 @@ async function startInstall() {
     'gen-config': {name: '生成配置', progress: 60},
     'write-core': {name: '写入 core.toml', progress: 70},
     'write-model': {name: '写入 model.toml', progress: 75},
-    'write-adapter': {name: '写入适配器配置', progress: 80},
-    'napcat': {name: '配置 NapCat', progress: 90},
-    'register': {name: '注册实例', progress: 95},
+    'write-webui-key': {name: '写入 WebUI 密钥', progress: 78},
+    'write-adapter': {name: '写入适配器配置', progress: 82},
+    'napcat': {name: '配置 NapCat', progress: 87},
+    'webui': {name: '安装 WebUI', progress: 92},
+    'register': {name: '注册实例', progress: 96},
   };
   
   window.mofoxAPI.onInstallProgress((progress) => {
@@ -639,6 +762,7 @@ function bindEvents() {
     }
   });
   
+  // LLM API Key 可见性切换
   el.btnToggleApiKey?.addEventListener('click', () => {
     const input = el.inputApiKey;
     const icon = el.btnToggleApiKey.querySelector('.material-symbols-rounded');
@@ -653,6 +777,60 @@ function bindEvents() {
   
   el.btnGetApiKey?.addEventListener('click', () => {
     window.mofoxAPI.openExternal('https://cloud.siliconflow.cn/i/0ww8zcOn');
+  });
+  
+  // WebUI API Key 实时强度更新
+  el.inputWebuiApiKey?.addEventListener('input', () => {
+    const password = el.inputWebuiApiKey.value;
+    const result = evaluatePasswordStrength(password);
+    
+    // 更新进度条
+    el.strengthFill.className = 'strength-fill';
+    if (result.level !== 'none') {
+      el.strengthFill.classList.add(result.level);
+    }
+    
+    // 更新文本
+    el.strengthText.textContent = result.text;
+    el.strengthText.className = 'strength-text';
+    if (result.level !== 'none') {
+      el.strengthText.classList.add(result.level);
+    }
+    
+    // 清除错误状态
+    clearFieldError(el.inputWebuiApiKey);
+  });
+  
+  // 随机生成 API Key
+  el.btnGenerateApiKey?.addEventListener('click', () => {
+    const newKey = generateSecureApiKey(32);
+    el.inputWebuiApiKey.value = newKey;
+    
+    // 手动触发 input 事件以更新强度显示
+    el.inputWebuiApiKey.dispatchEvent(new Event('input'));
+    
+    // 短暂显示明文以便用户确认
+    if (el.inputWebuiApiKey.type === 'password') {
+      const originalType = el.inputWebuiApiKey.type;
+      el.inputWebuiApiKey.type = 'text';
+      setTimeout(() => {
+        el.inputWebuiApiKey.type = originalType;
+      }, 2000);
+    }
+  });
+  
+  // WebUI API Key 密码可见性切换
+  el.btnToggleWebuiKey?.addEventListener('click', () => {
+    const input = el.inputWebuiApiKey;
+    const icon = el.btnToggleWebuiKey.querySelector('.material-symbols-rounded');
+    
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.textContent = 'visibility_off';
+    } else {
+      input.type = 'password';
+      icon.textContent = 'visibility';
+    }
   });
   
   el.btnBrowseDir?.addEventListener('click', async () => {

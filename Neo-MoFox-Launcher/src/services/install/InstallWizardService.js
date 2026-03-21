@@ -38,9 +38,11 @@ const AVAILABLE_STEPS = [
   'gen-config',    // 生成配置文件
   'write-core',    // 写入 core.toml
   'write-model',   // 写入 model.toml
+  'write-webui-key', // 写入 WebUI API 密钥
   'write-adapter', // 写入 napcat_adapter 配置
   'napcat',        // 安装 NapCat
   'napcat-config', // 写入 NapCat 配置
+  'webui',         // 安装 WebUI
   'register',      // 注册实例
 ];
 
@@ -915,7 +917,37 @@ class InstallWizardService {
   }
 
   /**
-   * 3.6.1 写入 napcat_adapter 配置
+   * 3.6.1 写入 WebUI API 密钥
+   * 将用户生成的 API 密钥写入 config/core.toml 的 [http_router].api_keys 数组
+   */
+  async writeWebuiApiKey(neoMofoxDir, apiKey) {
+    this._emitProgress('write-webui-key', 0, '正在写入 WebUI API 密钥...');
+
+    const coreTomlPath = path.join(neoMofoxDir, 'config', 'core.toml');
+
+    try {
+      // 读取现有的 core.toml
+      const data = storageService.readToml(coreTomlPath);
+
+      // 确保 http_router 对象存在
+      if (!data.http_router) {
+        data.http_router = {};
+      }
+
+      // 写入 api_keys 数组（替换为用户生成的密钥）
+      data.http_router.api_keys = [apiKey];
+
+      storageService.writeToml(coreTomlPath, data);
+      
+      this._emitProgress('write-webui-key', 100, 'WebUI API 密钥写入完成');
+      return { success: true };
+    } catch (e) {
+      throw new Error(`写入 WebUI API 密钥失败: ${e.message}`);
+    }
+  }
+
+  /**
+   * 3.6.2 写入 napcat_adapter 配置
    * 将 bot.qq_id 和 bot.qq_nickname 写入 config/plugins/napcat_adapter/config.toml
    * 如果文件或目录不存在则自动创建
    */
@@ -1123,6 +1155,57 @@ class InstallWizardService {
   }
 
   /**
+   * 3.9 安装 WebUI
+   * 克隆 MoFox-Core-Webui 仓库的 webui-dist 分支到 plugins/webui_backend 目录
+   * @param {string} neoMofoxDir Neo-MoFox 安装目录
+   */
+  async installWebUI(neoMofoxDir) {
+    this._emitProgress('webui', 0, '正在安装 WebUI...');
+
+    const pluginsDir = path.join(neoMofoxDir, 'plugins');
+    const webuiDir = path.join(pluginsDir, 'webui_backend');
+
+    // 确保 plugins 目录存在
+    fs.mkdirSync(pluginsDir, { recursive: true });
+
+    // 检查是否已经存在 webui_backend 目录
+    if (fs.existsSync(webuiDir)) {
+      this._emitOutput('[webui] 检测到已存在的 webui_backend 目录，跳过安装');
+      this._emitProgress('webui', 100, 'WebUI 已存在，跳过安装');
+      return { success: true, path: webuiDir, skipped: true };
+    }
+
+    // WebUI 仓库地址和分支
+    const WEBUI_REPO = 'https://github.com/MoFox-Studio/MoFox-Core-Webui.git';
+    const WEBUI_BRANCH = 'webui-dist';
+
+    this._emitProgress('webui', 10, '正在克隆 WebUI 仓库（webui-dist 分支）...');
+    this._emitOutput(`[webui] 仓库地址: ${WEBUI_REPO}`);
+    this._emitOutput(`[webui] 分支: ${WEBUI_BRANCH}`);
+    this._emitOutput(`[webui] 目标目录: ${webuiDir}`);
+
+    try {
+      // 克隆 webui-dist 分支（预编译版本）
+      await this._execCommand(
+        'git',
+        ['clone', '-b', WEBUI_BRANCH, '--depth', '1', WEBUI_REPO, webuiDir],
+        {
+          onStdout: (d) => this._emitOutput(d),
+          onStderr: (d) => this._emitOutput(d),
+        }
+      );
+
+      this._emitOutput('[webui] WebUI 克隆完成');
+      this._emitProgress('webui', 100, 'WebUI 安装完成');
+
+      return { success: true, path: webuiDir };
+    } catch (error) {
+      this._emitOutput(`[webui] 错误: ${error.message}`);
+      throw new Error(`WebUI 安装失败: ${error.message}`);
+    }
+  }
+
+  /**
    * 3.9 & 3.10 注册实例并标记完成
    */
   async registerInstance(inputs, neoMofoxDir, napcatDir, installSteps, napcatVersion = null) {
@@ -1147,6 +1230,7 @@ class InstallWizardService {
       qqNickname: inputs.qqNickname || '',
       ownerQQNumber: inputs.ownerQQNumber,
       apiKey: inputs.apiKey,
+      webuiApiKey: inputs.webuiApiKey, // 保存 WebUI API 密钥
       channel: inputs.channel || 'main',
       enabled: true,
       neomofoxDir: neoMofoxDir,
@@ -1277,7 +1361,13 @@ class InstallWizardService {
         await this.writeModelToml(neoMofoxDir, inputs.apiKey);
       }
 
-      // 3.6.1 写入适配器配置 (napcat_adapter/config.toml)
+      // 3.6.1 写入 WebUI API 密钥
+      if (shouldRun('write-webui-key')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'write-webui-key', substep: 0 } });
+        await this.writeWebuiApiKey(neoMofoxDir, inputs.webuiApiKey);
+      }
+
+      // 3.6.2 写入适配器配置 (napcat_adapter/config.toml)
       if (shouldRun('write-adapter')) {
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-adapter', substep: 0 } });
         await this.writeAdapterConfig(neoMofoxDir, inputs.qqNumber, inputs.qqNickname || '', inputs.wsPort);
@@ -1312,7 +1402,13 @@ class InstallWizardService {
         await this.writeNapCatConfig(configTarget, inputs.qqNumber, inputs.wsPort);
       }
 
-      // 3.9 & 3.10 注册实例
+      // 3.9 安装 WebUI
+      if (shouldRun('webui')) {
+        storageService.updateInstance(instanceId, { installProgress: { step: 'webui', substep: 0 } });
+        await this.installWebUI(neoMofoxDir);
+      }
+
+      // 3.10 注册实例
       storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
       const result = await this.registerInstance(inputs, neoMofoxDir, napcatDir, configuredSteps, napcatVersion);
 
