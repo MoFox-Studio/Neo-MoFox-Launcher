@@ -17,11 +17,13 @@ const { platformHelper } = require('../PlatformHelper');
 const REPO_URLS = {
   main: [
     'https://github.com/MoFox-Studio/Neo-MoFox.git',
+    'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://ghproxy.com/https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://gitclone.com/github.com/MoFox-Studio/Neo-MoFox.git',
   ],
   dev: [
     'https://github.com/MoFox-Studio/Neo-MoFox.git',
+    'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://ghproxy.com/https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://gitclone.com/github.com/MoFox-Studio/Neo-MoFox.git',
   ],
@@ -550,6 +552,7 @@ class InstallWizardService {
   async _fetchLatestNapCatRelease() {
     const apiUrls = [
       'https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
+      'https://github.ikun114.top/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
       'https://ghproxy.com/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
     ];
 

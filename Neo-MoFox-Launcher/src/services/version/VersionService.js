@@ -16,10 +16,12 @@ const { platformHelper } = require('../PlatformHelper');
 const GITHUB_API_URLS = {
   napcat: [
     'https://api.github.com/repos/NapNeko/NapCatQQ/releases',
+    'https://github.ikun114.top/https://api.github.com/repos/NapNeko/NapCatQQ/releases',
     'https://ghproxy.com/https://api.github.com/repos/NapNeko/NapCatQQ/releases',
   ],
   mofox: [
     'https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
+    'https://github.ikun114.top/https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
     'https://ghproxy.com/https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
   ],
 };
