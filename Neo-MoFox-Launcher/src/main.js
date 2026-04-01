@@ -122,11 +122,6 @@ function createEditorWindow(filePath, fileName) {
   
   editorWindow.loadFile(path.join(__dirname, 'windows', 'editor', 'editor.html'));
 
-  // 自动打开开发者工具以便调试
-  editorWindow.webContents.once('did-finish-load', () => {
-    editorWindow.webContents.openDevTools();
-  });
-
   // F12 快捷键切换开发者工具
   editorWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
