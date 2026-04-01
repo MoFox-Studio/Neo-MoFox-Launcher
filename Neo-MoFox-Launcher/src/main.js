@@ -35,6 +35,9 @@ const MAX_LOG_LINES = 2000;
 // ─── 多实例进程管理 ───────────────────────────────────
 const instanceProcesses = new Map(); // instanceId -> { process, status, logs, stats, startTime, generation }
 
+// ─── 配置编辑器窗口管理 ─────────────────────────────────
+const editorWindows = new Map(); // filePath -> BrowserWindow
+
 // ─── 窗口创建 ───────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -78,6 +81,69 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+// ─── 配置编辑器窗口创建 ──────────────────────────────────
+/**
+ * 创建配置编辑器窗口
+ * @param {string} filePath - 要编辑的文件路径
+ * @param {string} fileName - 文件名（用于窗口标题）
+ */
+function createEditorWindow(filePath, fileName) {
+  // 检查同一文件是否已打开，如果是则聚焦
+  if (editorWindows.has(filePath)) {
+    const existingWindow = editorWindows.get(filePath);
+    if (!existingWindow.isDestroyed()) {
+      existingWindow.focus();
+      return existingWindow;
+    }
+    editorWindows.delete(filePath);
+  }
+
+  const editorWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    minWidth: 600,
+    minHeight: 400,
+    title: `编辑配置 - ${fileName}`,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: false,
+      nodeIntegration: true,
+      additionalArguments: [`--file-path=${filePath}`] // 传递文件路径
+    },
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    parent: mainWindow, // 设置父窗口关联
+    modal: false
+  });
+
+  Menu.setApplicationMenu(null);
+  editorWindow.setMenuBarVisibility(false);
+  
+  editorWindow.loadFile(path.join(__dirname, 'windows', 'editor', 'editor.html'));
+
+  // 自动打开开发者工具以便调试
+  editorWindow.webContents.once('did-finish-load', () => {
+    editorWindow.webContents.openDevTools();
+  });
+
+  // F12 快捷键切换开发者工具
+  editorWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      if (editorWindow.webContents.isDevToolsOpened()) {
+        editorWindow.webContents.closeDevTools();
+      } else {
+        editorWindow.webContents.openDevTools();
+      }
+    }
+  });
+
+  editorWindow.on('closed', () => {
+    editorWindows.delete(filePath);
+  });
+
+  editorWindows.set(filePath, editorWindow);
+  return editorWindow;
 }
 
 // ─── 应用生命周期 ───────────────────────────────────
@@ -1920,6 +1986,128 @@ ipcMain.handle('instance-open-file', async (event, instanceId, fileType) => {
     return { success: true, path: filePath };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+// ─── 配置编辑器 IPC Handlers ─────────────────────────────────
+
+ipcMain.handle('config-editor:open', async (event, instanceId, fileType) => {
+  try {
+    const { settingsService } = require('./services/settings/SettingsService');
+    const settings = settingsService.readSettings();
+    const useBuiltIn = settings.configEditor?.useBuiltIn ?? true;
+
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    let filePath = null;
+    let fileName = '';
+    const mofoxDir = instance.neomofoxDir;
+    
+    switch (fileType) {
+      case 'core-config':
+        filePath = path.join(mofoxDir, 'config', 'core.toml');
+        fileName = 'core.toml';
+        break;
+      case 'model-config':
+        filePath = path.join(mofoxDir, 'config', 'model.toml');
+        fileName = 'model.toml';
+        break;
+      default:
+        throw new Error(`未知的文件类型: ${fileType}`);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`文件不存在: ${filePath}`);
+    }
+
+    if (useBuiltIn) {
+      // 使用内置编辑器
+      createEditorWindow(filePath, fileName);
+      return { success: true, path: filePath, mode: 'builtin' };
+    } else {
+      // 使用系统默认编辑器
+      await shell.openPath(filePath);
+      return { success: true, path: filePath, mode: 'external' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('config-editor:read', async (event, filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: '文件不存在' };
+    }
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, content, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('config-editor:write', async (event, filePath, content) => {
+  try {
+    // 创建备份
+    if (fs.existsSync(filePath)) {
+      const backupPath = `${filePath}.backup`;
+      fs.copyFileSync(filePath, backupPath);
+    }
+    
+    fs.writeFileSync(filePath, content, 'utf-8');
+    return { success: true, path: filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('config-editor:get-theme', () => {
+  try {
+    const { settingsService } = require('./services/settings/SettingsService');
+    const settings = settingsService.readSettings();
+    
+    return {
+      success: true,
+      theme: settings.theme || 'dark',
+      accentColor: settings.accentColor || '#367BF0'
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ─── TOML 验证（使用 @iarna/toml 完整解析）─────────────────────────────
+ipcMain.handle('validate-toml', async (event, content) => {
+  try {
+    const TOML = require('@iarna/toml');
+    
+    // 尝试解析 TOML
+    TOML.parse(content);
+    
+    // 解析成功
+    return { 
+      valid: true 
+    };
+  } catch (error) {
+    // 解析失败，提取错误信息
+    const errorMessage = error.message || '未知错误';
+    
+    // 尝试从错误消息中提取行号
+    // @iarna/toml 的错误格式通常是: "error at line X..."
+    let line = undefined;
+    const lineMatch = errorMessage.match(/line\s+(\d+)/i);
+    if (lineMatch) {
+      line = parseInt(lineMatch[1], 10);
+    }
+    
+    return { 
+      valid: false, 
+      error: errorMessage,
+      line: line
+    };
   }
 });
 

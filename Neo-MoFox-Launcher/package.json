@@ -29,7 +29,15 @@
     "electron-builder": "^26.0.0"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/legacy-modes": "^6.5.2",
+    "@codemirror/lint": "^6.9.5",
+    "@codemirror/search": "^6.6.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.0",
     "@iarna/toml": "^2.2.5",
+    "@lezer/highlight": "^1.2.3",
     "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
   }

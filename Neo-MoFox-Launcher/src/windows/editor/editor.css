@@ -1,0 +1,165 @@
+/**
+ * 配置编辑器样式
+ * 复用系统的 MD3 CSS 变量和主题系统
+ */
+
+/* ═══ 布局 ═══ */
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--font-sans);
+  background-color: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-background);
+}
+
+/* ═══ 工具栏 ═══ */
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--md-sys-color-surface-container);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  flex-shrink: 0;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.file-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.file-status {
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.file-status.modified::before {
+  content: "● ";
+  color: var(--md-sys-color-primary);
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.toolbar-btn:hover {
+  background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.toolbar-btn:active {
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+.toolbar-btn .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.toolbar-btn.primary {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.toolbar-btn.primary:hover {
+  background-color: var(--md-sys-color-primary);
+  opacity: 0.9;
+}
+
+/* ═══ 编辑器容器 ═══ */
+.editor-container {
+  flex: 1;
+  overflow: auto;
+  background-color: var(--md-sys-color-surface);
+}
+
+/* CodeMirror 将在这里渲染 */
+
+/* ═══ 状态栏 ═══ */
+.editor-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 16px;
+  background-color: var(--md-sys-color-surface-container-low);
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  flex-shrink: 0;
+}
+
+.statusbar-left,
+.statusbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-errors {
+  color: var(--md-sys-color-error);
+}
+
+.status-errors .material-symbols-rounded {
+  font-size: 16px;
+}
+
+/* ═══ 工具类 ═══ */
+.hidden {
+  display: none !important;
+}
+
+/* ═══ 滚动条样式 ═══ */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--md-sys-color-surface-container);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--md-sys-color-on-surface-variant);
+}

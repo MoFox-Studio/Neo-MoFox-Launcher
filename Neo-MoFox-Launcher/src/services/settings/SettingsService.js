@@ -28,6 +28,11 @@ const DEFAULT_SETTINGS = {
   // 更新
   autoCheckUpdates: true,     // 启动时自动检查实例更新
 
+  // 配置编辑器
+  configEditor: {
+    useBuiltIn: true          // true: 使用内置编辑器 | false: 使用系统默认编辑器
+  },
+
   // 日志
   logging: {
     maxArchiveDays: 30,       // 归档保留天数

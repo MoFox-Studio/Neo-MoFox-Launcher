@@ -47,6 +47,7 @@ const el = {
   btnResetAll:        $('btn-reset-all'),
   autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
   autoCheckUpdates:   $('auto-check-updates'),
+  configEditorBuiltin:$('config-editor-builtin'),
 
   // 日志
   logArchiveDays:     $('log-archive-days'),
@@ -91,6 +92,7 @@ function populateUI(settings) {
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
   el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
   el.autoCheckUpdates.checked = settings.autoCheckUpdates ?? true;
+  el.configEditorBuiltin.checked = settings.configEditor?.useBuiltIn ?? true;
 
   // 日志
   const logging = settings.logging || {};
@@ -201,6 +203,11 @@ function bindEvents() {
   // 自动检查更新
   el.autoCheckUpdates.addEventListener('change', () => {
     savePartial({ autoCheckUpdates: el.autoCheckUpdates.checked });
+  });
+
+  // 配置编辑器
+  el.configEditorBuiltin.addEventListener('change', () => {
+    savePartial({ configEditor: { useBuiltIn: el.configEditorBuiltin.checked } });
   });
 
   // 日志 - 归档保留天数

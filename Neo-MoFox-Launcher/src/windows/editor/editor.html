@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>配置编辑器 - Neo-MoFox Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+  
+  <!-- 同步主题注入 -->
+  <script src="../../renderer/theme-init.js"></script>
+  <link rel="stylesheet" href="../../renderer/styles.css">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+  <!-- ═══ 工具栏 ═══ -->
+  <header class="editor-toolbar">
+    <div class="toolbar-left">
+      <span class="material-symbols-rounded file-icon">description</span>
+      <span id="file-name" class="file-name">配置文件</span>
+      <span id="file-status" class="file-status"></span>
+    </div>
+    <div class="toolbar-right">
+      <button id="btn-save" class="toolbar-btn" title="保存 (Ctrl+S)">
+        <span class="material-symbols-rounded">save</span>
+        <span>保存</span>
+      </button>
+      <button id="btn-close" class="toolbar-btn" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ 编辑器容器 ═══ -->
+  <div id="editor-container" class="editor-container"></div>
+
+  <!-- ═══ 状态栏 ═══ -->
+  <footer class="editor-statusbar">
+    <div class="statusbar-left">
+      <span id="cursor-position" class="status-item">行 1, 列 1</span>
+      <span id="error-count" class="status-item status-errors hidden">
+        <span class="material-symbols-rounded">error</span>
+        <span id="error-number">0</span>
+      </span>
+    </div>
+    <div class="statusbar-right">
+      <span class="status-item">UTF-8</span>
+      <span class="status-item">TOML</span>
+    </div>
+  </footer>
+
+  <script src="editor.js"></script>
+</body>
+</html>

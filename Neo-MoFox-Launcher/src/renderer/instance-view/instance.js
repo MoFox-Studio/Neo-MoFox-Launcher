@@ -663,10 +663,12 @@ async function openFolder(folderType) {
 }
 
 async function openFile(fileType) {
-  const result = await window.mofoxAPI.openInstanceFile(state.instanceId, fileType);
+  // 使用配置编辑器 API（根据用户设置自动选择内置或系统编辑器）
+  const result = await window.mofoxAPI.configEditorOpen(state.instanceId, fileType);
   
   if (result.success) {
-    showSuccess('已打开文件');
+    const mode = result.mode === 'builtin' ? '内置编辑器' : '系统编辑器';
+    showSuccess(`已使用${mode}打开文件`);
   } else {
     showError(result.error || '打开文件失败');
   }

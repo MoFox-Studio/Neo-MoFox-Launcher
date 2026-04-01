@@ -29,7 +29,7 @@ window.addEventListener('keydown', (e) => {
   }
 }, true);
 
-contextBridge.exposeInMainWorld('mofoxAPI', {
+const api = {
   // 进程控制
   startMofox: () => ipcRenderer.invoke('start-mofox'),
   stopMofox: () => ipcRenderer.invoke('stop-mofox'),
@@ -156,6 +156,15 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
 
+  // ─── 配置编辑器 ──────────────────────────────────────────────────────────
+  configEditorOpen: (instanceId, fileType) => ipcRenderer.invoke('config-editor:open', instanceId, fileType),
+  configEditorRead: (filePath) => ipcRenderer.invoke('config-editor:read', filePath),
+  configEditorWrite: (filePath, content) => ipcRenderer.invoke('config-editor:write', filePath, content),
+  configEditorGetTheme: () => ipcRenderer.invoke('config-editor:get-theme'),
+  
+  // TOML 验证（通过主进程 @iarna/toml 完整解析）
+  validateTOML: (content) => ipcRenderer.invoke('validate-toml', content),
+
   // ─── 环境管理 ───────────────────────────────────────────────────────────
   envGetRecommendedTools: () => ipcRenderer.invoke('env-get-recommended-tools'),
   envGetRecommendedExtensions: () => ipcRenderer.invoke('env-get-recommended-extensions'),
@@ -187,4 +196,10 @@ contextBridge.exposeInMainWorld('mofoxAPI', {
   onVersionProgress: (callback) => {
     ipcRenderer.on('version-progress', (_event, data) => callback(data));
   },
-});
+};
+
+if (process.contextIsolated) {
+  contextBridge.exposeInMainWorld('mofoxAPI', api);
+} else {
+  window.mofoxAPI = api;
+}
