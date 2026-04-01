@@ -1,6 +1,36 @@
 // april-fools.js
 (function() {
   const isAprilFools = new Date().getMonth() === 3 && new Date().getDate() === 1;
+
+  // 始终注册快捷键 (连按3次 q)
+  let qCount = 0;
+  let qTimeout;
+  window.addEventListener('keydown', (e) => {
+    // 忽略输入框内的按键，避免打字时误触
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    
+    if (e.key.toLowerCase() === 'q') {
+      qCount++;
+      if (qCount >= 3) {
+        // 切换状态
+        const isCurrentlyDisabled = localStorage.getItem('disable-april-fools') === 'true';
+        if (isCurrentlyDisabled) {
+          localStorage.removeItem('disable-april-fools');
+          localStorage.setItem('force-april-fools', 'true'); // 如果不是愚人节，强制开启
+          alert("🤪 愚人节彩蛋再次开启！");
+        } else {
+          localStorage.setItem('disable-april-fools', 'true');
+          alert("🎉 愚人节快乐！彩蛋已解除，这就为你恢复正常！");
+        }
+        location.reload();
+      }
+      clearTimeout(qTimeout);
+      qTimeout = setTimeout(() => { qCount = 0; }, 500); // 500ms 内连按才有效
+    } else {
+      qCount = 0; // 按了别的键就重置
+    }
+  });
+
   // 方便测试，强制开启或者匹配到4月1日
   if (!isAprilFools && localStorage.getItem('force-april-fools') !== 'true') return;
   // 如果用户按下了快捷键，则禁用
@@ -79,24 +109,6 @@
   };
 
   setInterval(makeButtonsEscape, 1000);
-
-  // 5. 快捷键关闭 (连按3次 q)
-  let qCount = 0;
-  let qTimeout;
-  window.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 'q') {
-      qCount++;
-      if (qCount >= 3) {
-        localStorage.setItem('disable-april-fools', 'true');
-        alert("🎉 愚人节快乐！彩蛋已解除，这就为你恢复正常！");
-        location.reload();
-      }
-      clearTimeout(qTimeout);
-      qTimeout = setTimeout(() => { qCount = 0; }, 500); // 500ms 内连按才有效
-    } else {
-      qCount = 0; // 按了别的键就重置
-    }
-  });
 
   // 提示用户如何关闭
   setTimeout(() => {
