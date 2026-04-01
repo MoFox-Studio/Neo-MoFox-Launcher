@@ -4,6 +4,8 @@
  */
 
 const { EditorView } = require('@codemirror/view');
+const { tags: t } = require('@lezer/highlight');
+const { HighlightStyle, syntaxHighlighting } = require('@codemirror/language');
 
 /**
  * 创建编辑器主题
@@ -47,7 +49,7 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
         comment: getColor('--md-sys-color-outline-variant', '#c4c7c5'),
       };
 
-  return EditorView.theme(
+  const editorTheme = EditorView.theme(
     {
       '&': {
         color: colors.foreground,
@@ -188,6 +190,25 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
     },
     { dark: isDark }
   );
+
+  // 创建动态语法高亮样式，并使其使用主题色
+  const highlightStyle = HighlightStyle.define([
+    { tag: t.comment, color: colors.comment, fontStyle: 'italic' },
+    { tag: t.keyword, color: accentColor, fontWeight: 'bold' },
+    { tag: t.typeName, color: accentColor, fontWeight: 'bold' },
+    { tag: t.string, color: isDark ? '#f29e74' : '#c77a00' },
+    { tag: t.number, color: isDark ? '#d4a373' : '#a05900' },
+    { tag: t.bool, color: accentColor, fontWeight: 'bold' }, // 使用主题色
+    { tag: t.operator, color: colors.foreground },
+    { tag: t.punctuation, color: colors.foreground },
+    { tag: t.heading, color: accentColor, fontWeight: 'bold' }, // 方括号等高亮
+    { tag: t.variableName, color: isDark ? '#cba6f7' : '#8839ef' },
+    { tag: t.propertyName, color: isDark ? '#89b4fa' : '#367BF0' },
+    { tag: t.atom, color: isDark ? '#94e2d5' : '#40a02b' },
+    { tag: t.meta, color: accentColor, fontWeight: 'bold' }, // TOML Section 使用主题色
+  ]);
+
+  return [editorTheme, syntaxHighlighting(highlightStyle, { fallback: true })];
 }
 
 /**
