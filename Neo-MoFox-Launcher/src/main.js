@@ -2115,18 +2115,36 @@ ipcMain.handle('validate-toml', async (event, content) => {
     // 解析失败，提取错误信息
     const errorMessage = error.message || '未知错误';
     
-    // 尝试从错误消息中提取行号
-    // @iarna/toml 的错误格式通常是: "error at line X..."
+    // 提取行号和列号
+    // @iarna/toml 的错误格式: "Unexpected character, expected only whitespace or comments till end of line at row 7, col 21, pos 124:"
     let line = undefined;
-    const lineMatch = errorMessage.match(/line\s+(\d+)/i);
-    if (lineMatch) {
-      line = parseInt(lineMatch[1], 10);
+    let column = undefined;
+    let position = undefined;
+    
+    // 尝试匹配 "row X, col Y, pos Z" 格式
+    const detailedMatch = errorMessage.match(/row\s+(\d+)(?:,\s*col\s+(\d+))?(?:,\s*pos\s+(\d+))?/i);
+    if (detailedMatch) {
+      line = parseInt(detailedMatch[1], 10);
+      if (detailedMatch[2]) {
+        column = parseInt(detailedMatch[2], 10);
+      }
+      if (detailedMatch[3]) {
+        position = parseInt(detailedMatch[3], 10);
+      }
+    } else {
+      // 尝试简单的行号匹配
+      const lineMatch = errorMessage.match(/(?:at\s+)?line\s+(\d+)/i);
+      if (lineMatch) {
+        line = parseInt(lineMatch[1], 10);
+      }
     }
     
     return { 
       valid: false, 
       error: errorMessage,
-      line: line
+      line: line,
+      column: column,
+      position: position
     };
   }
 });

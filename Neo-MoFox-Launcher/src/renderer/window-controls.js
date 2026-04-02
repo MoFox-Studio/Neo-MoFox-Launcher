@@ -30,8 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      window.mofoxAPI.windowClose();
+    closeBtn.addEventListener('click', async () => {
+      // 如果窗口定义了自定义的 closeWindow 函数，优先调用它（例如编辑器窗口）
+      if (typeof window.closeWindow === 'function') {
+        await window.closeWindow();
+      } else {
+        window.mofoxAPI.windowClose();
+      }
     });
   }
 });

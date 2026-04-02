@@ -1,0 +1,213 @@
+[
+  {
+    "testName": "未闭合的双引号",
+    "content": "key = \"value",
+    "errorMessage": "Unterminated string at row 1, col 15, pos 14:\n1> key = \"value\n                 ^\n\n",
+    "line": 0,
+    "position": 14
+  },
+  {
+    "testName": "未闭合的单引号",
+    "content": "key = 'value",
+    "errorMessage": "Unterminated string at row 1, col 15, pos 14:\n1> key = 'value\n                 ^\n\n",
+    "line": 0,
+    "position": 14
+  },
+  {
+    "testName": "未闭合的三引号字符串",
+    "content": "key = \"\"\"value",
+    "errorMessage": "Unterminated multi-line string at row 1, col 17, pos 16:\n1> key = \"\"\"value\n                   ^\n\n",
+    "line": 0,
+    "position": 16
+  },
+  {
+    "testName": "重复的键",
+    "content": "key = \"value1\"\nkey = \"value2\"",
+    "errorMessage": "Can't redefine existing key at row 2, col 15, pos 30:\n1: key = \"value1\"\n2> key = \"value2\"\n                 ^\n\n",
+    "line": 1,
+    "position": 30
+  },
+  {
+    "testName": "表中重复的键",
+    "content": "[table]\nkey = 1\nkey = 2",
+    "errorMessage": "Can't redefine existing key at row 3, col 8, pos 24:\n2: key = 1\n3> key = 2\n          ^\n\n",
+    "line": 2,
+    "position": 24
+  },
+  {
+    "testName": "无效的转义序列",
+    "content": "key = \"\\x41\"",
+    "errorMessage": "Unknown escape character: 120 at row 1, col 10, pos 9:\n1> key = \"\\x41\"\n            ^\n\n",
+    "line": 0,
+    "position": 9
+  },
+  {
+    "testName": "无效的数字格式",
+    "content": "key = 12.34.56",
+    "errorMessage": "Unexpected character, expected only whitespace or comments till end of line at row 1, col 13, pos 12:\n1> key = 12.34.56\n               ^\n\n",
+    "line": 0,
+    "position": 12
+  },
+  {
+    "testName": "前导零",
+    "content": "key = 012",
+    "errorMessage": "Expected digit while parsing year part of a date at row 1, col 11, pos 10:\n1> key = 012\n             ^\n\n",
+    "line": 0,
+    "position": 10
+  },
+  {
+    "testName": "无效的十六进制",
+    "content": "key = 0xGHI",
+    "errorMessage": "Invalid number at row 1, col 10, pos 9:\n1> key = 0xGHI\n            ^\n\n",
+    "line": 0,
+    "position": 9
+  },
+  {
+    "testName": "无效的布尔值",
+    "content": "key = True",
+    "errorMessage": "Unexpected character, expecting string, number, datetime, boolean, inline array or inline table at row 1, col 8, pos 7:\n1> key = True\n          ^\n\n",
+    "line": 0,
+    "position": 7
+  },
+  {
+    "testName": "大写布尔值",
+    "content": "key = TRUE",
+    "errorMessage": "Unexpected character, expecting string, number, datetime, boolean, inline array or inline table at row 1, col 8, pos 7:\n1> key = TRUE\n          ^\n\n",
+    "line": 0,
+    "position": 7
+  },
+  {
+    "testName": "无效的日期格式",
+    "content": "key = 2023-13-45",
+    "errorMessage": "Invalid Datetime"
+  },
+  {
+    "testName": "无效的时间格式",
+    "content": "key = 25:99:99",
+    "errorMessage": "Invalid Datetime"
+  },
+  {
+    "testName": "无效的日期时间偏移",
+    "content": "key = 2023-01-01T12:00:00+99:00",
+    "errorMessage": "Invalid Datetime"
+  },
+  {
+    "testName": "数组类型混合",
+    "content": "key = [1, \"string\", true]",
+    "errorMessage": "Inline lists must be a single type, not a mix of integer and string at row 1, col 20, pos 19:\n1> key = [1, \"string\", true]\n                      ^\n\n",
+    "line": 0,
+    "position": 19
+  },
+  {
+    "testName": "数组未闭合",
+    "content": "key = [1, 2, 3",
+    "errorMessage": "Invalid character, expected whitespace, comma (,) or close bracket (]) at row 1, col 16, pos 15:\n1> key = [1, 2, 3\n                  ^\n\n",
+    "line": 0,
+    "position": 15
+  },
+  {
+    "testName": "内联表未闭合",
+    "content": "key = { a = 1, b = 2",
+    "errorMessage": "Unterminated inline array at row 1, col 22, pos 21:\n1> key = { a = 1, b = 2\n                        ^\n\n",
+    "line": 0,
+    "position": 21
+  },
+  {
+    "testName": "内联表中换行",
+    "content": "key = { a = 1,\nb = 2 }",
+    "errorMessage": "Unterminated inline array at row 1, col 16, pos 15:\n1> key = { a = 1,\n                  ^\n2: b = 2 }\n\n",
+    "line": 0,
+    "position": 15
+  },
+  {
+    "testName": "重复定义表",
+    "content": "[table]\nkey = 1\n[table]\nkey = 2",
+    "errorMessage": "Can't redefine existing key at row 3, col 7, pos 23:\n2: key = 1\n3> [table]\n         ^\n4: key = 2\n\n",
+    "line": 2,
+    "position": 23
+  },
+  {
+    "testName": "重新定义为表数组",
+    "content": "[table]\nkey = 1\n[[table]]\nkey = 2",
+    "errorMessage": "Can't redefine an existing key at row 3, col 8, pos 24:\n2: key = 1\n3> [[table]]\n          ^\n4: key = 2\n\n",
+    "line": 2,
+    "position": 24
+  },
+  {
+    "testName": "未闭合的表名",
+    "content": "[table",
+    "errorMessage": "Key ended without value at row 1, col 9, pos 8:\n1> [table\n           ^\n\n",
+    "line": 0,
+    "position": 8
+  },
+  {
+    "testName": "缺少等号",
+    "content": "key \"value\"",
+    "errorMessage": "Invalid character, expected \"=\" at row 1, col 6, pos 5:\n1> key \"value\"\n        ^\n\n",
+    "line": 0,
+    "position": 5
+  },
+  {
+    "testName": "缺少值",
+    "content": "key =",
+    "errorMessage": "Key without value at row 1, col 7, pos 6:\n1> key =\n         ^\n\n",
+    "line": 0,
+    "position": 6
+  },
+  {
+    "testName": "多余的等号",
+    "content": "key = = value",
+    "errorMessage": "Unexpected character, expecting string, number, datetime, boolean, inline array or inline table at row 1, col 8, pos 7:\n1> key = = value\n          ^\n\n",
+    "line": 0,
+    "position": 7
+  },
+  {
+    "testName": "点键未引用空格",
+    "content": "my key = \"value\"",
+    "errorMessage": "Invalid character, expected \"=\" at row 1, col 5, pos 4:\n1> my key = \"value\"\n       ^\n\n",
+    "line": 0,
+    "position": 4
+  },
+  {
+    "testName": "行首意外字符",
+    "content": "@ invalid",
+    "errorMessage": "Unknown character \"64\" at row 1, col 2, pos 1:\n1> @ invalid\n    ^\n\n",
+    "line": 0,
+    "position": 1
+  },
+  {
+    "testName": "键后意外字符",
+    "content": "key @ = \"value\"",
+    "errorMessage": "Invalid character, expected \"=\" at row 1, col 6, pos 5:\n1> key @ = \"value\"\n        ^\n\n",
+    "line": 0,
+    "position": 5
+  },
+  {
+    "testName": "等号后意外字符",
+    "content": "key = @ \"value\"",
+    "errorMessage": "Unexpected character, expecting string, number, datetime, boolean, inline array or inline table at row 1, col 8, pos 7:\n1> key = @ \"value\"\n          ^\n\n",
+    "line": 0,
+    "position": 7
+  },
+  {
+    "testName": "表数组与普通表冲突",
+    "content": "[[array]]\nkey = 1\n[array]\nkey = 2",
+    "errorMessage": "Can't redefine existing key at row 3, col 7, pos 25:\n2: key = 1\n3> [array]\n         ^\n4: key = 2\n\n",
+    "line": 2,
+    "position": 25
+  },
+  {
+    "testName": "无效的 Unicode 转义",
+    "content": "key = \"\\uDEAD\"",
+    "errorMessage": "Invalid unicode, character in range 0xD800 - 0xDFFF is reserved at row 1, col 15, pos 14:\n1> key = \"\\uDEAD\"\n                 ^\n\n",
+    "line": 0,
+    "position": 14
+  },
+  {
+    "testName": "深层嵌套表重复",
+    "content": "[a.b.c]\nkey = 1\n[a.b.c]\nkey = 2",
+    "errorMessage": "Can't redefine existing key at row 3, col 7, pos 23:\n2: key = 1\n3> [a.b.c]\n         ^\n4: key = 2\n\n",
+    "line": 2,
+    "position": 23
+  }
+]

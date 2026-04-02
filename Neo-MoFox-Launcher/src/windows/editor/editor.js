@@ -3,11 +3,11 @@
  * 基于 CodeMirror 6 的 TOML 配置文件编辑器
  */
 
-const { EditorState, Compartment } = require('@codemirror/state');
-const { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } = require('@codemirror/view');
+const { EditorState, Compartment, StateField } = require('@codemirror/state');
+const { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, Decoration, WidgetType } = require('@codemirror/view');
 const { defaultKeymap, history, historyKeymap, indentWithTab } = require('@codemirror/commands');
 const { search, searchKeymap } = require('@codemirror/search');
-const { lintGutter, linter } = require('@codemirror/lint');
+const { lintGutter, linter, forEachDiagnostic } = require('@codemirror/lint');
 const { StreamLanguage } = require('@codemirror/language');
 const { toml } = require('@codemirror/legacy-modes/mode/toml');
 const { createEditorTheme, getThemeFromSettings, watchSystemTheme } = require('./theme.js');
@@ -26,6 +26,145 @@ let lastChangeTime = null;
 
 // 主题 Compartment（用于动态切换）
 const themeCompartment = new Compartment();
+
+// ═══ 行尾诊断信息显示（类似 Error Lens）═══
+/**
+ * 创建诊断信息小部件
+ */
+class DiagnosticWidget extends WidgetType {
+  constructor(message, severity) {
+    super();
+    this.message = message;
+    this.severity = severity;
+  }
+
+  toDOM() {
+    const span = document.createElement('span');
+    span.className = `cm-inline-diagnostic cm-inline-diagnostic-${this.severity}`;
+    
+    // 移动端使用更短的消息（30字符），桌面端稍长（50字符）
+    const isMobile = window.innerWidth < 768;
+    const maxLength = isMobile ? 30 : 50;
+    const shortMessage = this.message.length > maxLength 
+      ? this.message.substring(0, maxLength - 3) + '...' 
+      : this.message;
+    
+    // 移动端只显示图标+简短消息，去掉多余信息
+    const displayMessage = isMobile 
+      ? `⚠ ${shortMessage.split('(')[0].trim()}` // 移除括号内的详细位置信息
+      : `⚠ ${shortMessage}`;
+    
+    span.textContent = ` ${displayMessage}`;
+    span.title = this.message; // 完整消息作为 tooltip
+    return span;
+  }
+
+  eq(other) {
+    return other.message === this.message && other.severity === this.severity;
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+/**
+ * 构建诊断装饰器
+ */
+function buildDiagnosticDecorations(state) {
+  const diagnostics = [];
+  
+  // 收集所有诊断信息
+  forEachDiagnostic(state, (diagnostic, from, to) => {
+    diagnostics.push({
+      from,
+      to,
+      message: diagnostic.message,
+      severity: diagnostic.severity,
+    });
+  });
+  
+  // 按行分组诊断信息（每行只显示第一个错误）
+  const lineMap = new Map();
+  diagnostics.forEach(({ from, message, severity }) => {
+    const line = state.doc.lineAt(from).number;
+    if (!lineMap.has(line)) {
+      // 只保留每行的第一个错误
+      lineMap.set(line, { message, severity });
+    }
+  });
+
+  // 创建装饰器
+  const decorationArray = [];
+  lineMap.forEach((diag, lineNumber) => {
+    const line = state.doc.line(lineNumber);
+    const lineEnd = line.to;
+    
+    // 在行尾添加 widget
+    const widget = Decoration.widget({
+      widget: new DiagnosticWidget(diag.message, diag.severity),
+      side: 1,
+    });
+    
+    decorationArray.push(widget.range(lineEnd));
+  });
+
+  return Decoration.set(decorationArray, true);
+}
+
+/**
+ * 行尾诊断信息扩展
+ */
+function inlineDiagnostics() {
+  const inlineDiagnosticField = StateField.define({
+    create(state) {
+      return buildDiagnosticDecorations(state);
+    },
+    
+    update(decorations, tr) {
+      // 强制每次都重新构建，确保 lint 状态变化时能刷新
+      return buildDiagnosticDecorations(tr.state);
+    },
+    
+    provide: f => EditorView.decorations.from(f),
+  });
+
+  return [
+    inlineDiagnosticField,
+    EditorView.theme({
+      '.cm-inline-diagnostic': {
+        display: 'inline',
+        whiteSpace: 'nowrap',
+        marginLeft: '0.5em',
+        fontSize: '0.75em',
+        opacity: '0.7',
+        fontStyle: 'italic',
+        pointerEvents: 'none',
+        userSelect: 'none',
+        maxWidth: '40vw',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      },
+      '.cm-inline-diagnostic-error': {
+        color: '#ef4444',
+      },
+      '.cm-inline-diagnostic-warning': {
+        color: '#ff9800',
+      },
+      '.cm-inline-diagnostic-info': {
+        color: '#3b82f6',
+      },
+      // 移动端特殊样式
+      '@media (max-width: 768px)': {
+        '.cm-inline-diagnostic': {
+          fontSize: '0.7em',
+          marginLeft: '0.3em',
+          maxWidth: '30vw',
+        },
+      },
+    }),
+  ];
+}
 
 // ═══ DOM 元素 ═══
 const elements = {
@@ -110,6 +249,9 @@ async function initializeEditor() {
         // 语法检查
         lintGutter(),
         linter(lintTOML),
+        
+        // 行尾诊断信息显示（Error Lens 效果）
+        inlineDiagnostics(),
         
         // 搜索
         search(),
@@ -317,13 +459,13 @@ async function saveFile() {
 }
 
 // ═══ 关闭窗口 ═══
-function closeWindow() {
+async function closeWindow() {
   // 清除自动保存定时器
   clearAutoSaveTimer();
   
+  // 如果有未保存的修改，自动保存
   if (isModified) {
-    const confirmed = confirm('文件未保存，确定要关闭吗？');
-    if (!confirmed) return;
+    await saveFile();
   }
   window.close();
 }
@@ -334,18 +476,18 @@ function bindEvents() {
   elements.btnSave.addEventListener('click', saveFile);
 
   // 快捷键（已在 keymap 中处理，这里作为后备）
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', async (e) => {
     // Esc 关闭
     if (e.key === 'Escape') {
-      closeWindow();
+      await closeWindow();
     }
   });
 
-  // 窗口关闭前提示
-  window.addEventListener('beforeunload', (e) => {
+  // 窗口关闭前自动保存（由于自动保存机制，此处不再需要提示）
+  window.addEventListener('beforeunload', async (e) => {
     if (isModified) {
-      e.preventDefault();
-      e.returnValue = '';
+      // 尝试快速保存，虽然不能保证完成，但总比不保存好
+      saveFile();
     }
   });
 }
