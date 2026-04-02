@@ -26,6 +26,11 @@ const state = {
   }
 };
 
+// ─── 性能配置 ─────────────────────────────────────────────────────────
+const MAX_LOG_BUFFER = 2000;  // 内存中保存的最大日志数
+const MAX_LOG_DISPLAY = 1000; // 页面上显示的最大日志数
+let renderTimeout = null;     // 防抖渲染定时器
+
 // ─── DOM 元素引用 ─────────────────────────────────────────────────────
 
 const el = {
@@ -842,6 +847,11 @@ function addLog(type, logData) {
 
   state.logs[type].push(log);
   
+  // 限制内存中的日志数量，避免内存溢出
+  if (state.logs[type].length > MAX_LOG_BUFFER) {
+    state.logs[type] = state.logs[type].slice(-MAX_LOG_BUFFER);
+  }
+  
   // 更新日志计数
   if (type === 'mofox') {
     el.mofoxLogCount.textContent = state.logs.mofox.length;
@@ -849,10 +859,21 @@ function addLog(type, logData) {
     el.napcatLogCount.textContent = state.logs.napcat.length;
   }
 
-  // 如果当前标签是这个类型，重新渲染
+  // 如果当前标签是这个类型，使用防抖渲染
   if (state.currentTab === type) {
-    renderLogs();
+    scheduleRender();
   }
+}
+
+// 防抖渲染，避免频繁渲染导致卡顿
+function scheduleRender() {
+  if (renderTimeout) {
+    clearTimeout(renderTimeout);
+  }
+  renderTimeout = setTimeout(() => {
+    renderLogs();
+    renderTimeout = null;
+  }, 100); // 100ms 防抖延迟
 }
 
 function renderLogs() {
@@ -881,8 +902,23 @@ function renderLogs() {
     return;
   }
 
+  // 只渲染最近的日志，避免 DOM 过多导致卡顿
+  const displayLogs = filteredLogs.slice(-MAX_LOG_DISPLAY);
+  const hiddenCount = filteredLogs.length - displayLogs.length;
+  
   // 渲染日志 - 终端风格
-  container.innerHTML = filteredLogs.map(log => {
+  let html = '';
+  
+  // 如果有隐藏的日志，显示提示
+  if (hiddenCount > 0) {
+    html += `
+      <div class="log-entry" style="opacity: 0.6; font-style: italic;">
+        ── 已隐藏前 ${hiddenCount} 条日志，仅显示最近 ${MAX_LOG_DISPLAY} 条 ──
+      </div>
+    `;
+  }
+  
+  html += displayLogs.map(log => {
     // 先 escape HTML，然后解析 ANSI 代码
     let message = escapeHtml(log.message);
     message = parseAnsi(message);
@@ -896,6 +932,8 @@ function renderLogs() {
     // 纯文本输出，移除级别颜色
     return `<div class="log-entry">${message}</div>`;
   }).join('');
+  
+  container.innerHTML = html;
 
   // 自动滚动到底部
   if (state.autoScroll) {
