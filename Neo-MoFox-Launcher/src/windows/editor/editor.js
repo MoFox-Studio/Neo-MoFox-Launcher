@@ -19,6 +19,11 @@ let filePath = null;
 let fileContent = null;
 let isModified = false;
 
+// 自动保存配置
+const AUTO_SAVE_DELAY = 3000; // 30秒
+let autoSaveTimer = null;
+let lastChangeTime = null;
+
 // 主题 Compartment（用于动态切换）
 const themeCompartment = new Compartment();
 
@@ -133,6 +138,8 @@ async function initializeEditor() {
           if (update.docChanged) {
             setModified(true);
             updateCursorPosition(update.view);
+            // 触发自动保存倒计时
+            scheduleAutoSave();
           }
           if (update.selectionSet) {
             updateCursorPosition(update.view);
@@ -221,6 +228,62 @@ function setModified(modified) {
   }
 }
 
+// ═══ 自动保存调度 ═══
+function scheduleAutoSave() {
+  // 清除现有定时器
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+  }
+  
+  // 记录最后修改时间
+  lastChangeTime = Date.now();
+  
+  // 设置新的自动保存定时器
+  autoSaveTimer = setTimeout(() => {
+    if (isModified) {
+      autoSave();
+    }
+  }, AUTO_SAVE_DELAY);
+}
+
+// ═══ 自动保存 ═══
+async function autoSave() {
+  try {
+    if (!isModified) {
+      return;
+    }
+    
+    // 执行保存
+    const content = editor.state.doc.toString();
+    const result = await window.mofoxAPI.configEditorWrite(filePath, content);
+    
+    if (!result.success) {
+      showError(`自动保存失败: ${result.error}`);
+      return;
+    }
+    
+    setModified(false);
+    
+    // 显示成功提示
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    showInfo(`已在 ${timeStr} 自动保存`, 2000);
+    
+    console.log('[Editor] 自动保存成功', timeStr);
+  } catch (error) {
+    console.error('[Editor] 自动保存失败', error);
+    showError(`自动保存失败: ${error.message}`);
+  }
+}
+
+// ═══ 清除自动保存定时器 ═══
+function clearAutoSaveTimer() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
 // ═══ 保存文件 ═══
 async function saveFile() {
   try {
@@ -244,6 +307,7 @@ async function saveFile() {
     }
 
     setModified(false);
+    clearAutoSaveTimer(); // 清除自动保存定时器
     showSuccess('保存成功');
     console.log('[Editor] 文件已保存', filePath);
   } catch (error) {
@@ -254,6 +318,9 @@ async function saveFile() {
 
 // ═══ 关闭窗口 ═══
 function closeWindow() {
+  // 清除自动保存定时器
+  clearAutoSaveTimer();
+  
   if (isModified) {
     const confirmed = confirm('文件未保存，确定要关闭吗？');
     if (!confirmed) return;
@@ -284,21 +351,8 @@ function bindEvents() {
 }
 
 // ═══ 工具函数 ═══
-function showError(message) {
-  elements.fileStatus.textContent = `⚠️ ${message}`;
-  elements.fileStatus.style.color = 'var(--md-sys-color-error)';
-}
-
-function showSuccess(message) {
-  elements.fileStatus.textContent = `✓ ${message}`;
-  elements.fileStatus.style.color = 'var(--md-sys-color-primary)';
-  setTimeout(() => {
-    if (elements.fileStatus.textContent === `✓ ${message}`) {
-      elements.fileStatus.textContent = '';
-      elements.fileStatus.style.color = '';
-    }
-  }, 3000);
-}
+// 使用系统 Toast 组件（在 toast.js 中定义）
+// showError, showSuccess, showInfo, showWarning 等函数已由 toast.js 提供
 
 // ═══ 启动 ═══
 document.addEventListener('DOMContentLoaded', initialize);
