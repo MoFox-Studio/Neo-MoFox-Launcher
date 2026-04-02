@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚠ System Locked — MoFox-Neo 7877</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display:wght@700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 背景粒子层 -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- WannaCry 式左右分栏 -->
+  <div class="wc-window">
+
+    <!-- ══ 左栏 ══ -->
+    <div class="wc-left">
+
+      <!-- 锁图标块 -->
+      <div class="wc-lock-box">
+        <div class="lock-icon-wrap">
+          <span class="material-symbols-rounded lock-icon">lock</span>
+          <div class="pulse-ring"></div>
+          <div class="pulse-ring delay-1"></div>
+        </div>
+      </div>
+
+      <!-- 倒计时块 1：照片上传截止 -->
+      <div class="wc-timer-box wc-timer-warn">
+        <div class="wc-timer-title">照片上传截止时间</div>
+        <div class="wc-timer-date" id="deadline-date">--</div>
+        <div class="wc-timer-left-label">Time Left</div>
+        <div class="countdown-wrap">
+          <div class="countdown-block">
+            <span id="cd-h" class="cd-num">01</span>
+            <span class="cd-label">时</span>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="countdown-block">
+            <span id="cd-m" class="cd-num">00</span>
+            <span class="cd-label">分</span>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="countdown-block">
+            <span id="cd-s" class="cd-num">00</span>
+            <span class="cd-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 倒计时块 2：脑前叶切除 -->
+      <div class="wc-timer-box wc-timer-danger">
+        <div class="wc-timer-title">脑前叶切除手术时间</div>
+        <div class="wc-timer-date" id="op-date">--</div>
+        <div class="wc-timer-left-label">Time Left</div>
+        <div class="countdown-wrap">
+          <div class="countdown-block">
+            <span id="cd2-h" class="cd-num">03</span>
+            <span class="cd-label">时</span>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="countdown-block">
+            <span id="cd2-m" class="cd-num">00</span>
+            <span class="cd-label">分</span>
+          </div>
+          <span class="cd-sep">:</span>
+          <div class="countdown-block">
+            <span id="cd2-s" class="cd-num">00</span>
+            <span class="cd-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部链接 -->
+      <div class="wc-left-links">
+        <a href="#" class="wc-link" data-chaos="0">关于女装</a>
+        <a href="#" class="wc-link" data-chaos="1">如何提交照片？</a>
+        <a href="#" class="wc-link" data-chaos="2">联系我们</a>
+      </div>
+
+    </div><!-- /wc-left -->
+
+    <!-- ══ 右栏 ══ -->
+    <div class="wc-right">
+
+      <!-- 标题栏 -->
+      <div class="wc-right-header">
+        <h1 class="wc-headline">! Oops, Your System Is Locked !</h1>
+        <select class="wc-lang-select" title="语言（没用）">
+          <option>Chinese (simp)</option>
+          <option>日本語</option>
+          <option>English</option>
+          <option>混乱模式</option>
+        </select>
+      </div>
+
+      <!-- 滚动内容区 -->
+      <div class="wc-content">
+
+        <h2 class="wc-section-title">我的电脑出了什么问题？</h2>
+        <p>鉴于您长期<em>不看控制台</em>、不关心 WatchDog 的心情，MoFox-Neo 7877.26.41 已经接管了您的 WebUI。所有的菜单、日志、配置图标已被我们（在您的浏览器里）<strong>「高阶加密锁定」</strong>了，因此不能正常打开。</p>
+        <p>这和一般程序损坏有本质上的区别。您大可在网上搜索恢复 WebUI 的方法，我敢保证，没有我们的解密服务，就算整个开源社区来了也不能恢复这些配置。</p>
+
+        <h2 class="wc-section-title">有没有恢复这些配置的方法？</h2>
+        <p>当然有可恢复的方法。只能通过我们的解密服务才能恢复。我以狐狐担保，能够提供安全有效的恢复服务。</p>
+        <p>但这是有条件的，也不能无限期地推迟。</p>
+        <p>请点击 <strong>「解锁」</strong> 按钮，就可以免费恢复一些配置。请您放心，我是绝不会骗你的。</p>
+        <p>但想要恢复全部配置，需要提交一份有效的女装照片。</p>
+        <p>照片审核通过后，您将立即收到解密密钥。审核越早，恢复越快。</p>
+        <p>还有，一个小时之内未提交，将会永远也无法恢复了。</p>
+        <p>对了，忘了告诉你，对半年以上没有提交的穷人（懒人），会有活动——<strong>免费执行脑前叶切除手术</strong>，能否负起责任，就看您的了。</p>
+
+        <h2 class="wc-section-title">我该如何提交？</h2>
+        <p>您不需要支付比特币，我们需要更稀缺的资源。</p>
+        <p>请在 <strong>1 小时内</strong>，将您个人的<strong>「女装照片（精修/未精修均可）」</strong>上传至我们的审核端口。审核通过后，我们将远程为您发送解密密钥。</p>
+
+      </div><!-- /wc-content -->
+
+      <!-- 底部操作栏（仿比特币区） -->
+      <div class="wc-action-bar">
+
+        <!-- 上半部：女装上传区 -->
+        <div class="wc-action-top">
+          <div class="wc-dress-icon">
+            <span class="material-symbols-rounded">checkroom</span>
+          </div>
+          <div class="wc-action-addr-wrap">
+            <div class="wc-action-addr-label">将您的女装照片上传至此审核端口：</div>
+            <div class="wc-action-addr-row">
+              <input type="file" id="photo-input" accept="image/*" hidden>
+              <div class="wc-fake-addr" id="file-name">点击右侧按钮选择文件...</div>
+              <button class="wc-btn-secondary" onclick="document.getElementById('photo-input').click()">
+                浏览...
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 下半部：密钥 + 按钮 -->
+        <div class="wc-action-bottom">
+          <input type="text" id="key-input" class="wc-key-input" placeholder="输入解密密钥 XXXX-XXXX-XXXX-XXXX">
+          <button class="wc-btn-primary" id="upload-btn">上传女装</button>
+          <button class="wc-btn-primary" id="unlock-btn">解锁</button>
+        </div>
+
+      </div><!-- /wc-action-bar -->
+
+    </div><!-- /wc-right -->
+
+  </div><!-- /wc-window -->
+
+  <!-- 解锁成功弹窗 -->
+  <div id="success-dialog" class="dialog-overlay hidden">
+    <div class="dialog-card">
+      <span class="material-symbols-rounded dialog-icon">sentiment_very_satisfied</span>
+      <h2>愚人节快乐！🎉</h2>
+      <p>哈哈，被骗到了吗？<br>这只是个玩笑，WatchDog 没事的。</p>
+      <button class="btn-filled" onclick="document.getElementById('success-dialog').classList.add('hidden')">
+        <span class="material-symbols-rounded">close</span>
+        关闭
+      </button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
