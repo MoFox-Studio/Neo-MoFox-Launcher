@@ -54,7 +54,7 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
       '&': {
         color: colors.foreground,
         backgroundColor: colors.background,
-        fontSize: '14px',
+        fontSize: '16px',
         fontFamily: getColor('--font-mono', 'JetBrains Mono, Fira Code, Consolas, monospace'),
       },
 
@@ -84,7 +84,7 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
 
       '.cm-lineNumbers .cm-gutterElement': {
         color: colors.lineNumber,
-        fontSize: '13px',
+        fontSize: '15px',
         padding: '0 8px 0 8px',
         minWidth: '32px',
       },
@@ -110,7 +110,6 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
       // 语法高亮
       '.cm-comment': {
         color: colors.comment,
-        fontStyle: 'italic',
       },
 
       '.cm-keyword': {
@@ -193,7 +192,7 @@ function createEditorTheme(isDark, accentColor = '#367BF0') {
 
   // 创建动态语法高亮样式，并使其使用主题色
   const highlightStyle = HighlightStyle.define([
-    { tag: t.comment, color: colors.comment, fontStyle: 'italic' },
+    { tag: t.comment, color: colors.comment },
     { tag: t.keyword, color: accentColor, fontWeight: 'bold' },
     { tag: t.typeName, color: accentColor, fontWeight: 'bold' },
     { tag: t.string, color: isDark ? '#f29e74' : '#c77a00' },

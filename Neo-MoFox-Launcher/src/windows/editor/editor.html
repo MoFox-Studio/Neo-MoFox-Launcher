@@ -14,8 +14,27 @@
   <script src="../../renderer/theme-init.js"></script>
   <link rel="stylesheet" href="../../renderer/styles.css">
   <link rel="stylesheet" href="editor.css">
+  <script src="../../renderer/window-controls.js" defer></script>
 </head>
 <body>
+
+  <!-- ═══ 自定义标题栏 ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title" id="editor-title">配置编辑器</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
 
   <!-- ═══ 工具栏 ═══ -->
   <header class="editor-toolbar">
@@ -29,9 +48,7 @@
         <span class="material-symbols-rounded">save</span>
         <span>保存</span>
       </button>
-      <button id="btn-close" class="toolbar-btn" title="关闭">
-        <span class="material-symbols-rounded">close</span>
-      </button>
+
     </div>
   </header>
 

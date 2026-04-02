@@ -47,7 +47,8 @@ const el = {
   btnResetAll:        $('btn-reset-all'),
   autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
   autoCheckUpdates:   $('auto-check-updates'),
-  configEditorBuiltin:$('config-editor-builtin'),
+  editorBuiltin:      $('editor-builtin'),
+  editorSystem:       $('editor-system'),
 
   // 日志
   logArchiveDays:     $('log-archive-days'),
@@ -92,7 +93,7 @@ function populateUI(settings) {
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
   el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
   el.autoCheckUpdates.checked = settings.autoCheckUpdates ?? true;
-  el.configEditorBuiltin.checked = settings.configEditor?.useBuiltIn ?? true;
+  selectEditorOption(settings.configEditor?.useBuiltIn !== false ? 'builtin' : 'system');
 
   // 日志
   const logging = settings.logging || {};
@@ -105,6 +106,13 @@ function populateUI(settings) {
 function selectThemeOption(theme) {
   [el.themeDark, el.themeLight, el.themeAuto].forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.theme === theme);
+  });
+}
+
+// ─── 编辑器选项 ────────────────────────────────────────────────────────────
+function selectEditorOption(editor) {
+  [el.editorBuiltin, el.editorSystem].forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.editor === editor);
   });
 }
 
@@ -206,8 +214,11 @@ function bindEvents() {
   });
 
   // 配置编辑器
-  el.configEditorBuiltin.addEventListener('change', () => {
-    savePartial({ configEditor: { useBuiltIn: el.configEditorBuiltin.checked } });
+  [el.editorBuiltin, el.editorSystem].forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectEditorOption(btn.dataset.editor);
+      savePartial({ configEditor: { useBuiltIn: btn.dataset.editor === 'builtin' } });
+    });
   });
 
   // 日志 - 归档保留天数

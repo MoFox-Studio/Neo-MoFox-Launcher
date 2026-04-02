@@ -198,11 +198,23 @@
               <div class="card-desc">选择编辑配置文件（core.toml、model.toml）时使用的编辑器</div>
             </div>
           </div>
-          <div>
-            <label class="switch-row">
-              <input type="checkbox" class="settings-switch" id="config-editor-builtin">
-              <span class="switch-label">使用内置编辑器</span>
-            </label>
+          <div class="editor-options">
+            <button class="editor-option" data-editor="builtin" id="editor-builtin">
+              <span class="material-symbols-rounded editor-icon">code</span>
+              <div class="editor-info">
+                <span class="editor-label">内置编辑器</span>
+                <span class="editor-desc">Launcher内置的轻量级编辑器</span>
+              </div>
+              <span class="material-symbols-rounded editor-check">check_circle</span>
+            </button>
+            <button class="editor-option" data-editor="system" id="editor-system">
+              <span class="material-symbols-rounded editor-icon">open_in_new</span>
+              <div class="editor-info">
+                <span class="editor-label">系统编辑器</span>
+                <span class="editor-desc">使用系统默认的文本编辑器</span>
+              </div>
+              <span class="material-symbols-rounded editor-check">check_circle</span>
+            </button>
           </div>
         </div>
 

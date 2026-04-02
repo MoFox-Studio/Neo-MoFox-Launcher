@@ -200,6 +200,12 @@ function updateFileName() {
   if (filePath) {
     const fileName = filePath.split(/[/\\]/).pop();
     elements.fileName.textContent = fileName;
+    
+    // 同时更新自定义标题栏
+    const titleElement = document.getElementById('editor-title');
+    if (titleElement) {
+      titleElement.textContent = `编辑配置 - ${fileName}`;
+    }
   }
 }
 
@@ -259,9 +265,6 @@ function closeWindow() {
 function bindEvents() {
   // 保存按钮
   elements.btnSave.addEventListener('click', saveFile);
-
-  // 关闭按钮
-  elements.btnClose.addEventListener('click', closeWindow);
 
   // 快捷键（已在 keymap 中处理，这里作为后备）
   document.addEventListener('keydown', (e) => {

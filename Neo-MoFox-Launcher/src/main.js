@@ -78,6 +78,13 @@ function createWindow() {
     }
   });
 
+  // 监听窗口最大化/还原状态变化
+  const sendMaximizeState = () => {
+    mainWindow.webContents.send('window-maximize-changed', mainWindow.isMaximized());
+  };
+  mainWindow.on('maximize', sendMaximizeState);
+  mainWindow.on('unmaximize', sendMaximizeState);
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -106,6 +113,7 @@ function createEditorWindow(filePath, fileName) {
     minWidth: 600,
     minHeight: 400,
     title: `编辑配置 - ${fileName}`,
+    titleBarStyle: 'hidden', // 隐藏默认标题栏
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: false,
@@ -132,6 +140,13 @@ function createEditorWindow(filePath, fileName) {
       }
     }
   });
+
+  // 监听窗口最大化/还原状态变化
+  const sendMaximizeState = () => {
+    editorWindow.webContents.send('window-maximize-changed', editorWindow.isMaximized());
+  };
+  editorWindow.on('maximize', sendMaximizeState);
+  editorWindow.on('unmaximize', sendMaximizeState);
 
   editorWindow.on('closed', () => {
     editorWindows.delete(filePath);
@@ -623,18 +638,28 @@ ipcMain.handle('env-install-all-missing', async (_event, checks) => {
   });
 });
 
-// 窗口控制
-ipcMain.handle('window-minimize', () => mainWindow.minimize());
-ipcMain.handle('window-maximize', () => {
-  if (mainWindow.isMaximized()) {
-    mainWindow.unmaximize();
-  } else {
-    mainWindow.maximize();
+// 窗口控制 - 使用 event.sender 获取当前窗口
+ipcMain.handle('window-minimize', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) window.minimize();
+});
+ipcMain.handle('window-maximize', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) {
+    if (window.isMaximized()) {
+      window.unmaximize();
+    } else {
+      window.maximize();
+    }
   }
 });
-ipcMain.handle('window-close', () => {
-  killMofoxProcess();
-  mainWindow.close();
+ipcMain.handle('window-close', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  // 仅主窗口关闭时杀死 MoFox 进程
+  if (window === mainWindow) {
+    killMofoxProcess();
+  }
+  if (window) window.close();
 });
 
 // ─── 实例管理 & 安装向导 IPC ──────────────────────────────────────────────
