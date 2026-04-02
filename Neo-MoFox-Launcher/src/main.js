@@ -288,6 +288,7 @@ function startMofox() {
       env: platformHelper.buildSpawnEnv(),
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
+      maxBuffer: 10 * 1024 * 1024, // 10MB 缓冲区，防止日志过多导致阻塞
     });
 
     sendLog('info', `  PID: ${mofoxProcess.pid}`);
@@ -1103,6 +1104,7 @@ async function startMoFoxProcess(instanceId, instance) {
     env: platformHelper.buildSpawnEnv(),
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
+    maxBuffer: 10 * 1024 * 1024, // 10MB 缓冲区，防止日志过多导致阻塞
   });
   
   instanceData.mofoxProcess = mofoxProc;
@@ -1247,6 +1249,7 @@ async function startNapcatProcess(instanceId, instance) {
     env: process.env,
     shell: true,
     stdio: ['pipe', 'pipe', 'pipe'],
+    maxBuffer: 10 * 1024 * 1024, // 10MB 缓冲区，防止日志过多导致阻塞
   });
   
   instanceData.napcatProcess = napcatProc;
