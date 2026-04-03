@@ -852,11 +852,21 @@ body {
 .install-result h2 {
   font-size: 24px;
   margin-bottom: 8px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .install-result p {
   font-size: 14px;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+.result-error,
+.result-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .install-steps {

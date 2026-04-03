@@ -18,16 +18,17 @@ const REPO_URLS = {
   main: [
     'https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://ghproxy.com/https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://gitclone.com/github.com/MoFox-Studio/Neo-MoFox.git',
   ],
   dev: [
     'https://github.com/MoFox-Studio/Neo-MoFox.git',
     'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://ghproxy.com/https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://gitclone.com/github.com/MoFox-Studio/Neo-MoFox.git',
   ],
 };
+
+const WEBUI_REPOS = [
+  'https://github.com/MoFox-Studio/MoFox-Core-Webui.git',
+  'https://github.ikun114.top/https://github.com/MoFox-Studio/MoFox-Core-Webui.git',
+];
 
 const MAX_RETRY = 3;
 const CONFIG_DETECT_TIMEOUT = 60000; // 60 秒
@@ -553,22 +554,23 @@ class InstallWizardService {
     const apiUrls = [
       'https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
       'https://github.ikun114.top/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
-      'https://ghproxy.com/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
     ];
 
     let lastError = null;
     for (const apiUrl of apiUrls) {
       try {
+        this._emitOutput(`[napcat] 正在尝试访问: ${apiUrl}`);
         const data = await this._httpsGet(apiUrl, {
           'User-Agent': 'Neo-MoFox-Launcher',
           'Accept': 'application/vnd.github.v3+json',
         });
         const release = JSON.parse(data);
         if (!release.assets) throw new Error('Release 数据无效');
+        this._emitOutput(`[napcat] 成功获取 Release 信息`);
         return release;
       } catch (e) {
         lastError = e;
-        this._emitOutput(`[napcat] 尝试 ${apiUrl} 失败: ${e.message}`);
+        this._emitOutput(`[napcat] 访问失败: ${e.message}`);
       }
     }
     throw new Error(`获取 NapCat Release 信息失败: ${lastError?.message}`);
@@ -678,6 +680,9 @@ class InstallWizardService {
     for (let retry = 0; retry < MAX_RETRY; retry++) {
       const url = urls[retry % urls.length];
       this._emitProgress('clone', Math.floor((retry / MAX_RETRY) * 100), `尝试克隆 (${retry + 1}/${MAX_RETRY}): ${url}`);
+      this._emitOutput(`[clone] 正在尝试克隆仓库: ${url}`);
+      this._emitOutput(`[clone] 分支: ${branch}`);
+      this._emitOutput(`[clone] 目标目录: ${targetDir}`);
 
       try {
         const args = ['clone', url, targetDir];
@@ -690,9 +695,11 @@ class InstallWizardService {
           onStderr: (data) => this._emitOutput(data),
         });
 
+        this._emitOutput(`[clone] 克隆成功`);
         this._emitProgress('clone', 100, '仓库克隆完成');
         return { success: true, path: targetDir };
       } catch (e) {
+        this._emitOutput(`[clone] 克隆失败: ${e.message}`);
         console.error(`[InstallWizard] 克隆失败 (${retry + 1}/${MAX_RETRY}):`, e.message);
         if (retry === MAX_RETRY - 1) {
           throw new Error(`克隆仓库失败: ${e.message}`);
@@ -1178,33 +1185,44 @@ class InstallWizardService {
       return { success: true, path: webuiDir, skipped: true };
     }
 
-    // WebUI 仓库地址和分支
-    const WEBUI_REPO = 'https://github.com/MoFox-Studio/MoFox-Core-Webui.git';
     const WEBUI_BRANCH = 'webui-dist';
 
-    this._emitProgress('webui', 10, '正在克隆 WebUI 仓库（webui-dist 分支）...');
-    this._emitOutput(`[webui] 仓库地址: ${WEBUI_REPO}`);
-    this._emitOutput(`[webui] 分支: ${WEBUI_BRANCH}`);
-    this._emitOutput(`[webui] 目标目录: ${webuiDir}`);
+    // 尝试多个镜像源
+    for (let retry = 0; retry < MAX_RETRY; retry++) {
+      const url = WEBUI_REPOS[retry % WEBUI_REPOS.length];
+      this._emitProgress('webui', Math.floor(10 + (retry / MAX_RETRY) * 80), `尝试克隆 WebUI (${retry + 1}/${MAX_RETRY})`);
+      this._emitOutput(`[webui] 正在尝试克隆仓库: ${url}`);
+      this._emitOutput(`[webui] 分支: ${WEBUI_BRANCH}`);
+      this._emitOutput(`[webui] 目标目录: ${webuiDir}`);
 
-    try {
-      // 克隆 webui-dist 分支（预编译版本）
-      await this._execCommand(
-        'git',
-        ['clone', '-b', WEBUI_BRANCH, '--depth', '1', WEBUI_REPO, webuiDir],
-        {
-          onStdout: (d) => this._emitOutput(d),
-          onStderr: (d) => this._emitOutput(d),
+      try {
+        // 克隆 webui-dist 分支（预编译版本）
+        await this._execCommand(
+          'git',
+          ['clone', '-b', WEBUI_BRANCH, '--depth', '1', url, webuiDir],
+          {
+            onStdout: (d) => this._emitOutput(d),
+            onStderr: (d) => this._emitOutput(d),
+          }
+        );
+
+        this._emitOutput('[webui] WebUI 克隆成功');
+        this._emitProgress('webui', 100, 'WebUI 安装完成');
+        return { success: true, path: webuiDir };
+      } catch (error) {
+        this._emitOutput(`[webui] 克隆失败: ${error.message}`);
+        
+        // 清理可能部分创建的目录
+        if (fs.existsSync(webuiDir)) {
+          try {
+            fs.rmSync(webuiDir, { recursive: true, force: true });
+          } catch (_) {}
         }
-      );
-
-      this._emitOutput('[webui] WebUI 克隆完成');
-      this._emitProgress('webui', 100, 'WebUI 安装完成');
-
-      return { success: true, path: webuiDir };
-    } catch (error) {
-      this._emitOutput(`[webui] 错误: ${error.message}`);
-      throw new Error(`WebUI 安装失败: ${error.message}`);
+        
+        if (retry === MAX_RETRY - 1) {
+          throw new Error(`WebUI 安装失败，已尝试 ${MAX_RETRY} 次。最后错误: ${error.message}`);
+        }
+      }
     }
   }
 
