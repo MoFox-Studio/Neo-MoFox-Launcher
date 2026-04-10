@@ -5,12 +5,28 @@
 // ─── 全局状态 ───────────────────────────────────────────────────────────
 let instanceId = null;
 let instanceName = '';
-let currentVersionInfo = null;let hasUpdateAvailable = false;
+let currentVersionInfo = null;
+let hasUpdateAvailable = false;
 // 自定义下拉框状态
 let branchSelectValue = '';
+// 侧边栏状态
+let sidebarCollapsed = false;
+let activeTab = 'mofox'; //  'mofox' | 'napcat'
+let napcatInstalled = false;
 
 // ─── DOM 元素 ───────────────────────────────────────────────────────────
 const el = {
+  // Sidebar
+  sidebar: document.querySelector('.sidebar'),
+  toggleSidebar: document.getElementById('toggleSidebar'),
+  tabMofox: document.getElementById('tab-mofox'),
+  tabNapcat: document.getElementById('tab-napcat'),
+  
+  // Panels
+  panelMofox: document.getElementById('panel-mofox'),
+  panelNapcat: document.getElementById('panel-napcat'),
+  panelNapcatEmpty: document.getElementById('panel-napcat-empty'),
+  
   // Header
   btnBack: document.getElementById('btnBack'),
   btnRefresh: document.getElementById('btnRefresh'),
@@ -31,7 +47,6 @@ const el = {
   napcatVersion: document.getElementById('napcatVersion'),
   napcatPath: document.getElementById('napcatPath'),
   napcatVersionList: document.getElementById('napcatVersionList'),
-  napcatCard: document.getElementById('napcatCard'),
   
   // Progress
   progressOverlay: document.getElementById('progressOverlay'),
@@ -58,11 +73,19 @@ class CustomSelect {
     // 点击触发器打开/关闭下拉
     this.trigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      // 检查是否禁用
+      if (this.container.classList.contains('disabled')) {
+        return;
+      }
       this.toggle();
     });
     
     // 键盘支持
     this.trigger.addEventListener('keydown', (e) => {
+      // 检查是否禁用
+      if (this.container.classList.contains('disabled')) {
+        return;
+      }
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         this.toggle();
@@ -183,8 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载 MoFox 提交历史
   await loadMofoxCommitHistory();
   
-  // 加载 NapCat 版本列表
-  await loadNapCatVersions();
+  // 不在初始化时加载 NapCat 版本列表，等用户切换到 NapCat 标签时再加载
   
   // 监听进度事件
   window.mofoxAPI.onVersionProgress((data) => {
@@ -194,6 +216,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ─── 事件绑定 ───────────────────────────────────────────────────────────
 function setupEventListeners() {
+  // 侧边栏折叠按钮
+  if (el.toggleSidebar) {
+    el.toggleSidebar.addEventListener('click', handleToggleSidebar);
+  }
+  
+  // 标签切换
+  if (el.tabMofox) {
+    el.tabMofox.addEventListener('click', () => switchTab('mofox'));
+    el.tabMofox.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchTab('mofox');
+      }
+    });
+  }
+  
+  if (el.tabNapcat) {
+    el.tabNapcat.addEventListener('click', () => switchTab('napcat'));
+    el.tabNapcat.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchTab('napcat');
+      }
+    });
+  }
+  
   // 返回按钮
   el.btnBack.addEventListener('click', () => {
     window.history.back();
@@ -206,7 +254,9 @@ function setupEventListeners() {
     await loadVersionInfo();
     await loadBranches();
     await loadMofoxCommitHistory();
-    await loadNapCatVersions();
+    if (activeTab === 'napcat') {
+      await loadNapCatVersions();
+    }
     if (icon) icon.classList.remove('spinning');
   });
   
@@ -222,6 +272,88 @@ function setupEventListeners() {
   
   // 更新 MoFox 按钮
   el.btnUpdateMofox.addEventListener('click', handleUpdateMofox);
+  
+  // 响应式监听
+  setupResponsiveListener();
+}
+
+// ─── 侧边栏折叠切换 ───────────────────────────────────────────────────────
+function handleToggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  if (el.sidebar) {
+    el.sidebar.classList.toggle('collapsed', sidebarCollapsed);
+  }
+  if (el.toggleSidebar) {
+    el.toggleSidebar.setAttribute(
+      'aria-label',
+      sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'
+    );
+  }
+}
+
+// ─── 标签切换 ───────────────────────────────────────────────────────────
+async function switchTab(target) {
+  if (activeTab === target) return; // 已经是当前标签
+  
+  activeTab = target;
+  
+  // 更新标签按钮状态
+  [el.tabMofox, el.tabNapcat].forEach(tab => {
+    if (!tab) return;
+    const isActive = tab.dataset.target === target;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive.toString());
+  });
+  
+  // 切换面板
+  if (target === 'mofox') {
+    showPanel(el.panelMofox);
+  } else if (target === 'napcat') {
+    // 检查 NapCat 是否安装
+    if (napcatInstalled) {
+      showPanel(el.panelNapcat);
+      // 首次切换到 NapCat 时加载数据
+      if (!el.napcatVersionList.querySelector('.version-item')) {
+        await loadNapCatVersions();
+      }
+    } else {
+      showPanel(el.panelNapcatEmpty);
+    }
+  }
+}
+
+// ─── 显示指定面板 ───────────────────────────────────────────────────────
+function showPanel(targetPanel) {
+  const allPanels = [el.panelMofox, el.panelNapcat, el.panelNapcatEmpty];
+  
+  allPanels.forEach(panel => {
+    if (!panel) return;
+    if (panel === targetPanel) {
+      panel.classList.add('active');
+      panel.removeAttribute('hidden');
+    } else {
+      panel.classList.remove('active');
+      panel.setAttribute('hidden', '');
+    }
+  });
+}
+
+// ─── 响应式监听 ───────────────────────────────────────────────────────
+function setupResponsiveListener() {
+  const mediaQuery = window.matchMedia('(max-width: 800px)');
+  
+  function handleResponsive(e) {
+    if (e.matches) {
+      // 移动端：始终展开（变成横向标签栏）
+      sidebarCollapsed = false;
+      if (el.sidebar) {
+        el.sidebar.classList.remove('collapsed');
+      }
+    }
+  }
+  
+  handleResponsive(mediaQuery);
+  mediaQuery.addEventListener('change', handleResponsive);
 }
 
 // ─── 加载版本信息 ───────────────────────────────────────────────────────
@@ -250,9 +382,12 @@ async function loadVersionInfo() {
       }
     }
     
-    // 更新 NapCat 显示
+    // 更新 NapCat 显示和安装状态
     if (currentVersionInfo.napcat) {
       const { version, dir } = currentVersionInfo.napcat;
+      
+      // 更新安装状态
+      napcatInstalled = !!(version && dir);
       
       const versionEl = el.napcatVersion?.querySelector('span:last-child');
       if (versionEl) {
@@ -263,11 +398,8 @@ async function loadVersionInfo() {
         el.napcatPath.textContent = dir || '--';
         el.napcatPath.title = dir || '';
       }
-      
-      // 如果有 napcat 路径，显示 NapCat 卡片；否则保持隐藏
-      if (el.napcatCard) {
-        el.napcatCard.style.display = dir ? '' : 'none';
-      }
+    } else {
+      napcatInstalled = false;
     }
     
     // 检查 MoFox 更新
@@ -282,6 +414,9 @@ async function loadVersionInfo() {
 // ─── 加载分支列表 ───────────────────────────────────────────────────────
 async function loadBranches() {
   try {
+    // 加载时禁用下拉框
+    el.branchSelectContainer.classList.add('disabled');
+    
     const branches = await window.mofoxAPI.versionGetBranches();
     const currentBranch = currentVersionInfo?.mofox?.branch;
     
@@ -306,6 +441,9 @@ async function loadBranches() {
     
   } catch (error) {
     console.error('加载分支列表失败:', error);
+  } finally {
+    // 加载完成后启用下拉框
+    el.branchSelectContainer.classList.remove('disabled');
   }
 }
 

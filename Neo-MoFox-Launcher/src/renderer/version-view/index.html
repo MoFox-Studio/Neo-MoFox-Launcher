@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
   <title>版本管理 - Neo-MoFox Launcher</title>
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -47,193 +49,373 @@
     </div>
   </header>
 
-  <!-- ═══ 主内容区域 ═══ -->
-  <!--  Main Content Wrapper  -->
-  <div class="app-content-wrapper">
+  <!-- ═══ Main Layout Container ═══ -->
+  <div class="app-layout">
     
-    <!--  Page Header  -->
-    <header class="page-header">
-      <div class="header-left">
-        <button class="icon-btn back-btn" id="btnBack" title="返回">
-          <span class="material-symbols-rounded">arrow_back</span>
-        </button>
-        <div class="header-info">
-          <h1 class="page-title">版本管理</h1>
-          <div class="instance-name-badge" id="instanceName">加载中...</div>
-        </div>
-      </div>
-      <div class="header-right">
-        <button class="md3-btn md3-btn-text icon-only" id="btnRefresh" title="刷新版本信息">
-          <span class="material-symbols-rounded">refresh</span>
-        </button>
-      </div>
-    </header>
-
-    <!--  Content Grid (Landscape Layout)  -->
-    <div class="version-content-grid">
+    <!-- ═══ Sidebar Navigation ═══ -->
+    <nav class="sidebar" role="navigation" aria-label="版本管理导航">
       
-      <!-- Neo-MoFox Card -->
-      <section class="version-card">
-        <div class="card-header">
-          <div class="card-icon mofox-icon">
-            <span class="material-symbols-rounded">smart_toy</span>
-          </div>
-          <div class="card-title-group">
-            <h2 class="card-title">Neo-MoFox</h2>
-            <p class="card-subtitle">核心框架管理</p>
+      <!-- Collapse Toggle Button (Top) -->
+      <div class="sidebar-header">
+        <button class="sidebar-toggle-btn" id="toggleSidebar" aria-label="折叠侧边栏" title="折叠">
+          <span class="material-symbols-rounded">menu</span>
+        </button>
+      </div>
+
+      <!-- Navigation List -->
+      <ul class="sidebar-nav" role="tablist">
+        
+        <!-- Neo-MoFox Tab -->
+        <li role="presentation">
+          <button 
+            class="sidebar-nav-item active" 
+            role="tab" 
+            aria-selected="true" 
+            aria-controls="panel-mofox"
+            data-target="mofox"
+            id="tab-mofox">
+            <span class="nav-icon material-symbols-rounded">smart_toy</span>
+            <span class="nav-text">Neo-MoFox</span>
+            <span class="nav-indicator"></span>
+          </button>
+        </li>
+
+        <!-- NapCat Tab -->
+        <li role="presentation">
+          <button 
+            class="sidebar-nav-item" 
+            role="tab" 
+            aria-selected="false" 
+            aria-controls="panel-napcat"
+            data-target="napcat"
+            id="tab-napcat">
+            <span class="nav-icon material-symbols-rounded">terminal</span>
+            <span class="nav-text">NapCat</span>
+            <span class="nav-indicator"></span>
+          </button>
+        </li>
+
+      </ul>
+
+      <!-- Spacer (pushes footer to bottom) -->
+      <div class="sidebar-spacer"></div>
+
+      <!-- Sidebar Footer (Optional - for version info, etc.) -->
+      <div class="sidebar-footer">
+        <!-- 可以放置版本号、帮助链接等 -->
+      </div>
+
+    </nav>
+
+    <!-- ═══ Main Content Area ═══ -->
+    <main class="content-area">
+      
+      <!-- Page Header (返回、刷新、实例名) -->
+      <header class="content-header">
+        <div class="header-left">
+          <button class="icon-btn back-btn" id="btnBack" title="返回">
+            <span class="material-symbols-rounded">arrow_back</span>
+          </button>
+          <div class="header-info">
+            <h1 class="page-title">版本管理</h1>
+            <div class="instance-name-badge" id="instanceName">加载中...</div>
           </div>
         </div>
+        <div class="header-right">
+          <button class="md3-btn md3-btn-text icon-only" id="btnRefresh" title="刷新版本信息">
+            <span class="material-symbols-rounded">refresh</span>
+          </button>
+        </div>
+      </header>
 
-        <div class="card-body">
-          <!-- Info Grid -->
-          <div class="version-info-grid">
-            <div class="info-item">
-              <span class="info-label">当前分支</span>
-              <div class="info-value-badge primary" id="mofoxBranch">
-                <span class="material-symbols-rounded" style="font-size: 14px;">commit</span>
-                <span class="branch-name">--</span>
-              </div>
-            </div>
-            <div class="info-item">
-              <span class="info-label">当前版本</span>
-              <span class="info-value text-mono" id="mofoxVersion">--</span>
-            </div>
-            <div class="info-item full-width">
-              <span class="info-label">最新提交</span>
-              <div class="commit-box" id="mofoxCommit">
-                <code class="commit-hash">--</code>
-                <span class="commit-msg">--</span>
-              </div>
-            </div>
-            <div class="info-item full-width">
-              <span class="info-label">提交时间</span>
-              <span class="info-value" id="mofoxCommitDate">--</span>
-            </div>
-          </div>
+      <!-- Content Panels Container -->
+      <div class="content-panels">
 
-          <div class="divider"></div>
-
-          <!-- Actions -->
-          <!-- 检查更新 (放在最前面) -->
-          <div class="action-section">
-            <h3 class="action-header">
-              <span class="material-symbols-rounded">system_update</span>
-              检查更新
-            </h3>
-            <div class="update-status-row" id="mofoxUpdateStatus">
-              <span class="material-symbols-rounded">check_circle</span>
-              <span class="status-text">正在检查更新...</span>
-            </div>
-            <button class="md3-btn md3-btn-tonal full-width-btn" id="btnUpdateMofox">
-              <span class="material-symbols-rounded">download</span>
-              <span>检查并更新</span>
-            </button>
-          </div>
-
-          <!-- 分支切换 -->
-          <div class="action-section">
-            <h3 class="action-header">
-              <span class="material-symbols-rounded">account_tree</span>
-              在分支之间切换
-            </h3>
-            <div class="control-row">
-              <!-- Custom Branch Select -->
-              <div class="custom-select-container" id="branchSelectContainer">
-                <div class="custom-select-trigger" tabindex="0">
-                  <span class="selected-value">选择分支...</span>
-                  <span class="material-symbols-rounded arrow">expand_more</span>
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Panel 1: Neo-MoFox 版本管理 -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section 
+          class="content-panel active" 
+          id="panel-mofox" 
+          role="tabpanel" 
+          aria-labelledby="tab-mofox">
+          
+          <!-- 左右布局容器 -->
+          <div class="two-column-layout">
+            
+            <!-- 左侧面板 -->
+            <div class="left-panel">
+              
+              <!-- Version Info Card - Two Column Layout -->
+              <div class="info-card-split">
+                <!-- Left Column: Branch Info -->
+                <div class="info-column">
+                  <h2 class="card-title">
+                    <span class="material-symbols-rounded">info</span>
+                    当前版本信息
+                  </h2>
+                  
+                  <div class="info-items">
+                    <div class="info-item">
+                      <span class="info-label">当前分支</span>
+                      <div class="info-value-badge primary" id="mofoxBranch">
+                        <span class="material-symbols-rounded">commit</span>
+                        <span class="branch-name">--</span>
+                      </div>
+                    </div>
+                    
+                    <div class="info-item">
+                      <span class="info-label">当前版本</span>
+                      <span class="info-value text-mono" id="mofoxVersion">--</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="custom-select-options hidden">
-                  <!-- Options injected via JS -->
+                
+                <!-- Right Column: Commit Info -->
+                <div class="info-column">
+                  <h2 class="card-title">
+                    <span class="material-symbols-rounded">update</span>
+                    提交信息
+                  </h2>
+                  
+                  <div class="info-items">
+                    <div class="info-item">
+                      <span class="info-label">最新提交</span>
+                      <div class="commit-box" id="mofoxCommit">
+                        <code class="commit-hash">--</code>
+                        <span class="commit-msg">--</span>
+                      </div>
+                    </div>
+                    
+                    <div class="info-item">
+                      <span class="info-label">提交时间</span>
+                      <span class="info-value" id="mofoxCommitDate">--</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Branch Switching Section -->
+              <div class="action-card">
+                <h2 class="card-title">
+                  <span class="material-symbols-rounded">account_tree</span>
+                  分支切换
+                </h2>
+                
+                <div class="control-row">
+                  <div class="custom-select-container" id="branchSelectContainer">
+                    <div class="custom-select-trigger" tabindex="0">
+                      <span class="selected-value">选择分支...</span>
+                      <span class="material-symbols-rounded arrow">expand_more</span>
+                    </div>
+                    <div class="custom-select-options hidden">
+                      <!-- Options injected via JS -->
+                    </div>
+                  </div>
+                  
+                  <button class="md3-btn md3-btn-filled" id="btnSwitchBranch" disabled>
+                    <span class="material-symbols-rounded">swap_horiz</span>
+                    <span>切换</span>
+                  </button>
+                </div>
+                
+                <p class="action-hint">注意：切换分支将会暂存本地更改并拉取最新代码</p>
+              </div>
+
+              <!-- Quick Guide Card -->
+              <div class="info-card guide-card">
+                <h2 class="card-title">
+                  <span class="material-symbols-rounded">help</span>
+                  操作指南
+                </h2>
+                
+                <div class="guide-items">
+                  <div class="guide-item">
+                    <div class="guide-icon">
+                      <span class="material-symbols-rounded">update</span>
+                    </div>
+                    <div class="guide-content">
+                      <h3 class="guide-title">更新版本</h3>
+                      <p class="guide-description">定期检查并更新到最新版本，获取新功能和bug修复</p>
+                    </div>
+                  </div>
+                  
+                  <div class="guide-item">
+                    <div class="guide-icon">
+                      <span class="material-symbols-rounded">account_tree</span>
+                    </div>
+                    <div class="guide-content">
+                      <h3 class="guide-title">切换分支</h3>
+                      <p class="guide-description">main分支为稳定版，dev分支为开发版，包含最新特性</p>
+                    </div>
+                  </div>
+                  
+                  <div class="guide-item">
+                    <div class="guide-icon">
+                      <span class="material-symbols-rounded">history</span>
+                    </div>
+                    <div class="guide-content">
+                      <h3 class="guide-title">版本回退</h3>
+                      <p class="guide-description">如遇问题可在提交历史中回退到之前的稳定版本</p>
+                    </div>
+                  </div>
+                  
+                  <div class="guide-item">
+                    <div class="guide-icon warning">
+                      <span class="material-symbols-rounded">warning</span>
+                    </div>
+                    <div class="guide-content">
+                      <h3 class="guide-title">注意事项</h3>
+                      <p class="guide-description">更新前请先停止实例，避免文件占用导致更新失败</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <button class="md3-btn md3-btn-filled" id="btnSwitchBranch" disabled>
-                <span class="material-symbols-rounded">swap_horiz</span>
-                <span>切换</span>
-              </button>
             </div>
-            <p class="action-hint">注意：切换分支将会暂存本地更改并拉取最新代码</p>
-          </div>
 
-          <!-- 提交历史 -->
-          <div class="action-section flex-grow">
-            <h3 class="action-header">
-              <span class="material-symbols-rounded">history</span>
-              提交历史
-            </h3>
-            <div class="version-list-scroll" id="mofoxCommitList">
-              <div class="loading-placeholder">
-                <span class="material-symbols-rounded spinning">progress_activity</span>
-                <span>加载提交历史...</span>
+            <!-- 右侧面板 -->
+            <div class="right-panel">
+              
+              <!-- Update Section -->
+              <div class="action-card">
+                <h2 class="card-title">
+                  <span class="material-symbols-rounded">system_update</span>
+                  检查更新
+                </h2>
+                
+                <div class="update-status-row" id="mofoxUpdateStatus">
+                  <span class="material-symbols-rounded">check_circle</span>
+                  <span class="status-text">正在检查更新...</span>
+                </div>
+                
+                <button class="md3-btn md3-btn-tonal full-width-btn" id="btnUpdateMofox">
+                  <span class="material-symbols-rounded">download</span>
+                  <span>检查并更新</span>
+                </button>
+              </div>
+
+              <!-- Commit History Section -->
+              <div class="action-card flex-grow" style="display: flex; flex-direction: column; overflow: hidden;">
+                <h2 class="card-title">
+                  <span class="material-symbols-rounded">history</span>
+                  提交历史
+                </h2>
+                
+                <div class="version-list-scroll" id="mofoxCommitList">
+                  <div class="loading-placeholder">
+                    <span class="material-symbols-rounded spinning">progress_activity</span>
+                    <span>加载提交历史...</span>
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Panel 2: NapCat 版本管理（已安装） -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section 
+          class="content-panel" 
+          id="panel-napcat" 
+          role="tabpanel" 
+          aria-labelledby="tab-napcat"
+          hidden>
+          
+          <div class="panel-inner">
+            
+            <!-- Version Info Card -->
+            <div class="info-card">
+              <h2 class="card-title">
+                <span class="material-symbols-rounded">info</span>
+                当前版本信息
+              </h2>
+              
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">当前版本</span>
+                  <div class="info-value-badge success" id="napcatVersion">
+                    <span class="material-symbols-rounded">sell</span>
+                    <span>--</span>
+                  </div>
+                </div>
+                
+                <div class="info-item full-width">
+                  <span class="info-label">安装路径</span>
+                  <div class="path-box" id="napcatPath" title="">--</div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <!-- NapCat Card -->
-      <section class="version-card" id="napcatCard" style="display: none;">
-        <div class="card-header">
-          <div class="card-icon napcat-icon">
-            <span class="material-symbols-rounded">terminal</span>
-          </div>
-          <div class="card-title-group">
-            <h2 class="card-title">NapCat</h2>
-            <p class="card-subtitle">QQ 协议框架版本</p>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <!-- Info Grid -->
-          <div class="version-info-grid">
-            <div class="info-item">
-              <span class="info-label">当前版本</span>
-              <div class="info-value-badge success" id="napcatVersion">
-                <span class="material-symbols-rounded" style="font-size: 14px;">sell</span>
-                <span>--</span>
+            <!-- Version List Section -->
+            <div class="action-card flex-grow">
+              <h2 class="card-title">
+                <span class="material-symbols-rounded">history</span>
+                可用版本列表
+              </h2>
+              
+              <div class="version-list-scroll" id="napcatVersionList">
+                <div class="loading-placeholder">
+                  <span class="material-symbols-rounded spinning">progress_activity</span>
+                  <span>加载版本列表...</span>
+                </div>
               </div>
             </div>
-            <div class="info-item full-width">
-              <span class="info-label">安装路径</span>
-              <div class="path-box" id="napcatPath" title="">--</div>
-            </div>
+
           </div>
+        </section>
 
-          <div class="divider"></div>
-
-          <!-- Version List -->
-          <div class="action-section flex-grow">
-            <h3 class="action-header">
-              <span class="material-symbols-rounded">history</span>
-              可用版本列表
-            </h3>
-            <div class="version-list-scroll" id="napcatVersionList">
-              <div class="loading-placeholder">
-                <span class="material-symbols-rounded spinning">progress_activity</span>
-                <span>加载版本列表...</span>
-              </div>
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- Panel 3: NapCat 空状态（未安装） -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section 
+          class="content-panel" 
+          id="panel-napcat-empty" 
+          role="tabpanel" 
+          aria-labelledby="tab-napcat"
+          hidden>
+          
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <span class="material-symbols-rounded">warning</span>
             </div>
+            <h2 class="empty-state-title">NapCat 未安装</h2>
+            <p class="empty-state-description">
+              当前实例尚未安装 NapCat。NapCat 是用于连接 QQ 的协议框架，
+              是运行 Neo-MoFox 所必需的组件。
+            </p>
+            <p class="empty-state-hint">
+              您可以在实例配置中安装 NapCat，或手动下载安装后重新检测。
+            </p>
+            <!-- 可选：添加快速操作按钮 -->
+            <!-- <button class="md3-btn md3-btn-filled">
+              <span class="material-symbols-rounded">download</span>
+              <span>前往安装 NapCat</span>
+            </button> -->
           </div>
-        </div>
-      </section>
+        </section>
 
-    </div>
-
-    <!--  Progress Overlay  -->
-    <div class="progress-overlay hidden" id="progressOverlay">
-      <div class="progress-modal">
-        <div class="progress-icon-wrapper">
-          <span class="material-symbols-rounded spinning">sync</span>
-        </div>
-        <h3 id="progressTitle">处理中...</h3>
-        <div class="md3-progress-track">
-          <div class="md3-progress-indicator" id="progressBar"></div>
-        </div>
-        <p class="md3-text-body-small" id="progressMessage" style="color: var(--md-sys-color-on-surface-variant);">请稍候...</p>
       </div>
-    </div>
 
+    </main>
+
+  </div>
+
+  <!-- ═══ Progress Overlay ═══ -->
+  <div class="progress-overlay hidden" id="progressOverlay">
+    <div class="progress-modal">
+      <div class="progress-icon-wrapper">
+        <span class="material-symbols-rounded spinning">sync</span>
+      </div>
+      <h3 id="progressTitle">处理中...</h3>
+      <div class="md3-progress-track">
+        <div class="md3-progress-indicator" id="progressBar"></div>
+      </div>
+      <p class="md3-text-body-small" id="progressMessage" style="color: var(--md-sys-color-on-surface-variant);">请稍候...</p>
+    </div>
   </div>
 
   <script src="version.js" type="module"></script>

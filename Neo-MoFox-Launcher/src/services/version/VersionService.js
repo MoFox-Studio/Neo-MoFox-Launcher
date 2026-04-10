@@ -470,17 +470,17 @@ class VersionService {
       }
 
       // 拉取更新
-      this._emitProgress('update-mofox', 30, '拉取更新...');
+      this._emitProgress('update-mofox', 30, '正在拉取最新代码...');
       await this._execCommand('git', ['pull', 'origin', currentBranch], {
         cwd: neoMofoxDir,
-        onStdout: (data) => this._emitProgress('update-mofox', 50, data.trim()),
-        onStderr: (data) => this._emitProgress('update-mofox', 50, data.trim()),
       });
 
       // 更新依赖（如果有变化）
-      this._emitProgress('update-mofox', 70, '检查并更新依赖...');
+      this._emitProgress('update-mofox', 70, '正在同步依赖包...');
       try {
-        await this._execCommand('uv', ['sync'], { cwd: neoMofoxDir });
+        await this._execCommand('uv', ['sync'], {
+          cwd: neoMofoxDir,
+        });
       } catch (e) {
         console.warn('[VersionService] 依赖同步跳过:', e.message);
       }
@@ -614,9 +614,8 @@ class VersionService {
         this._emitProgress('update-napcat', percent, `下载中: ${Math.floor(downloaded / 1024 / 1024)}MB / ${Math.floor(total / 1024 / 1024)}MB`);
       });
 
-      this._emitProgress('update-napcat', 60, '解压中...');
-
       // 备份旧的 NapCat 配置
+      this._emitProgress('update-napcat', 60, '备份配置...');
       const oldShellPath = this._getNapCatShellPath(napcatDir);
       let configBackup = null;
       if (oldShellPath) {
@@ -626,20 +625,9 @@ class VersionService {
         }
       }
 
-      // 清理旧版本
-      this._emitProgress('update-napcat', 70, '清理旧版本...');
-      if (fs.existsSync(napcatDir)) {
-        const entries = fs.readdirSync(napcatDir);
-        for (const entry of entries) {
-          if (/^NapCat\..+\.Shell$/i.test(entry)) {
-            const oldPath = path.join(napcatDir, entry);
-            fs.rmSync(oldPath, { recursive: true, force: true });
-          }
-        }
-      }
-
-      // 解压新版本
-      this._emitProgress('update-napcat', 80, '解压新版本...');
+      // 直接解压覆盖（不删除旧版本）
+      this._emitProgress('update-napcat', 70, '安装新版本...');
+      fs.mkdirSync(napcatDir, { recursive: true });
       await this._extractZip(zipPath, napcatDir);
 
       // 恢复配置
@@ -653,9 +641,15 @@ class VersionService {
 
       // 清理临时文件
       try {
-        fs.unlinkSync(zipPath);
-        fs.rmdirSync(tempDir);
-      } catch (_) {}
+        if (fs.existsSync(zipPath)) {
+          fs.unlinkSync(zipPath);
+        }
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (error) {
+        console.warn(`[VersionService] 清理临时文件失败: ${error.message}`);
+      }
 
       // 更新实例记录
       storageService.updateInstance(instanceId, { 
