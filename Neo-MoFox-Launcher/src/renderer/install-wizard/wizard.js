@@ -727,7 +727,86 @@ async function cleanupAndRestart() {
   }
 }
 
+/**
+ * 智能处理回车键事件
+ * - 单个输入框：直接进入下一步
+ * - 多个输入框：切换到下一个输入框，最后一个时进入下一步
+ */
+function handleEnterKey(currentInput, event) {
+  // 阻止默认表单提交行为
+  event.preventDefault();
+  
+  // 获取当前步骤的表单
+  const currentStep = document.getElementById(`step-${state.currentStep}`);
+  if (!currentStep) return;
+  
+  // 查找当前步骤中所有可聚焦的输入框（排除checkbox和hidden）
+  const focusableInputs = Array.from(
+    currentStep.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"]), select')
+  ).filter(input => {
+    // 确保元素可见且未禁用
+    return !input.disabled && 
+           input.offsetParent !== null && 
+           input.type !== 'checkbox' &&
+           input.type !== 'hidden';
+  });
+  
+  // 如果只有一个输入框，直接进入下一步
+  if (focusableInputs.length <= 1) {
+    goNext();
+    return;
+  }
+  
+  // 找到当前输入框的索引
+  const currentIndex = focusableInputs.indexOf(currentInput);
+  
+  // 如果是最后一个输入框，进入下一步
+  if (currentIndex === focusableInputs.length - 1) {
+    goNext();
+  } else if (currentIndex >= 0 && currentIndex < focusableInputs.length - 1) {
+    // 否则，聚焦到下一个输入框
+    focusableInputs[currentIndex + 1].focus();
+  }
+}
+
 function bindEvents() {
+  // 阻止所有表单的默认提交行为
+  document.querySelectorAll('.config-form').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      return false;
+    });
+  });
+  
+  // 为所有输入框添加智能回车键处理
+  document.querySelectorAll('.config-form input:not([type="checkbox"]):not([type="hidden"]), .config-form select').forEach(input => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        handleEnterKey(input, e);
+      }
+    });
+  });
+  
+  // 全局回车键监听：当焦点不在输入框上时也能按回车进入下一步
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'SELECT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'BUTTON' ||
+        activeElement.classList.contains('md3-btn')
+      );
+      
+      // 如果焦点不在输入控件上，且不在步骤1（环境检测）和步骤10（安装中），则触发下一步
+      if (!isInputFocused && state.currentStep !== 1 && state.currentStep !== 10) {
+        e.preventDefault();
+        goNext();
+      }
+    }
+  });
+  
   // 清除输入框错误状态
   document.querySelectorAll('.form-group input, .form-group select').forEach(input => {
     input.addEventListener('input', () => clearFieldError(input));

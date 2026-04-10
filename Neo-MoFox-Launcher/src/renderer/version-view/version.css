@@ -6,7 +6,7 @@
 :root {
   /* ─── Sidebar Dimensions ─── */
   --sidebar-width-expanded: 240px;
-  --sidebar-width-collapsed: 64px;
+  --sidebar-width-collapsed: 72px;
   --sidebar-transition-duration: 250ms;
   
   /* ─── Responsive Breakpoints ─── */
@@ -148,11 +148,13 @@
   flex: 1;
   white-space: nowrap;
   opacity: 1;
-  transition: opacity var(--transition-fast);
+  overflow: hidden;
+  transition: opacity var(--transition-fast), width var(--transition-normal);
 }
 
 .sidebar.collapsed .sidebar-nav-item .nav-text {
   opacity: 0;
+  width: 0;
   pointer-events: none;
 }
 
@@ -199,7 +201,8 @@
 /* Collapsed - Center Icons */
 .sidebar.collapsed .sidebar-nav-item {
   justify-content: center;
-  padding: var(--spacing-md) var(--spacing-sm);
+  padding: var(--spacing-md);
+  gap: 0;
 }
 
 /* ─── Sidebar Spacer & Footer ─── */
@@ -312,14 +315,15 @@
 
 .two-column-layout {
   display: flex;
-  flex: 1;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl);
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-  min-height: 0; /* 允许 flexbox 正确收缩 */
-  overflow: hidden; /* 防止整体溢出 */
+  height: calc(100vh - var(--title-bar-height, 32px) - 140px); /* 减去标题栏和header高度 */
+  min-height: 600px; /* 最小高度 */
+  max-height: 900px; /* 最大高度，适配不同分辨率 */
+  overflow: hidden;
 }
 
 .left-panel {
@@ -327,9 +331,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  overflow-y: auto; /* 左侧如果内容过多允许整体滚动 */
-  padding-right: var(--spacing-sm);
+  height: 100%; /* 与父容器同高 */
+  overflow-y: auto;
+  padding: var(--spacing-lg);
   min-width: 0;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .right-panel {
@@ -337,9 +346,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  overflow-y: hidden; /* 防止右侧整体滚动，把滚动交给内部的 flex-grow 面板 */
-  padding-right: var(--spacing-sm);
+  height: 100%; /* 与父容器同高 */
+  overflow-y: hidden;
+  padding: var(--spacing-lg);
   min-width: 0;
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 /* 响应式：在小屏幕上改为上下布局 */
@@ -501,6 +515,19 @@
    Version List & Commit History
    ═══════════════════════════════════════════════════════════ */
 
+/* Commit History Card - 固定高度 */
+.commit-history-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* 允许flex收缩 */
+}
+
+.commit-history-card .version-list-scroll {
+  height: 480px; /* 固定高度 */
+  max-height: 480px;
+}
+
 .version-list-scroll {
   flex: 1;
   overflow-y: auto;
@@ -508,7 +535,6 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   padding-right: var(--spacing-sm);
-  /* 允许滚动容器占满剩余空间 */
   min-height: 200px;
 }
 
@@ -1363,95 +1389,4 @@
 .branch-name {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Guide Card (操作指南)
-   ═══════════════════════════════════════════════════════════ */
-
-.guide-card {
-  background: linear-gradient(135deg, 
-    var(--md-sys-color-surface) 0%, 
-    var(--md-sys-color-surface-container) 100%);
-}
-
-.guide-items {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.guide-item {
-  display: flex;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--md-sys-color-surface-container-high);
-  border-radius: var(--radius-md);
-  border-left: 3px solid var(--md-sys-color-primary);
-  transition: all var(--transition-fast);
-}
-
-.guide-item:hover {
-  transform: translateX(4px);
-  box-shadow: var(--shadow-sm);
-}
-
-.guide-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: var(--radius-full);
-  background: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
-}
-
-.guide-icon .material-symbols-rounded {
-  font-size: 24px;
-}
-
-.guide-icon.warning {
-  background: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error-container);
-}
-
-.guide-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.guide-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-  line-height: 1.4;
-}
-
-.guide-description {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-/* 响应式调整 */
-@media (max-width: 1000px) {
-  .guide-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .guide-icon {
-    width: 36px;
-    height: 36px;
-  }
-  
-  .guide-icon .material-symbols-rounded {
-    font-size: 20px;
-  }
 }
