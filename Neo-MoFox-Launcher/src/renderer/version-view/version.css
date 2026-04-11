@@ -324,6 +324,9 @@ body {
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
+  height: calc(120vh - var(--title-bar-height, 32px) - 88px - var(--spacing-xl) * 2);
+  max-height: calc(100vh - var(--title-bar-height, 32px) - 88px);
+  overflow-y: auto;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -789,6 +792,8 @@ body {
 
 .flex-grow {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .text-mono {
