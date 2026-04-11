@@ -58,6 +58,35 @@
   <!-- ═══ 主区域 ═══ -->
   <div class="settings-layout">
 
+    <!-- ─── 左侧导航栏 ─── -->
+    <aside class="settings-sidebar">
+      <!-- Collapse Toggle Button -->
+      <div class="sidebar-header">
+        <button class="sidebar-toggle-btn" id="toggleSidebar" aria-label="折叠侧边栏" title="折叠">
+          <span class="material-symbols-rounded">menu</span>
+        </button>
+      </div>
+      
+      <nav class="sidebar-nav" aria-label="设置分类">
+        <button class="sidebar-item active" data-section="section-appearance">
+          <span class="material-symbols-rounded">palette</span>
+          <span class="sidebar-label">外观</span>
+        </button>
+        <button class="sidebar-item" data-section="section-general">
+          <span class="material-symbols-rounded">tune</span>
+          <span class="sidebar-label">通用</span>
+        </button>
+        <button class="sidebar-item" data-section="section-logs">
+          <span class="material-symbols-rounded">description</span>
+          <span class="sidebar-label">日志</span>
+        </button>
+        <button class="sidebar-item" data-section="section-about">
+          <span class="material-symbols-rounded">info</span>
+          <span class="sidebar-label">关于</span>
+        </button>
+      </nav>
+    </aside>
+
     <!-- ─── 内容区域 ─── -->
     <main class="settings-content">
 

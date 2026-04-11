@@ -49,19 +49,30 @@
     </div>
   </header>
 
+  <!-- Page Header (返回、刷新、实例名) - 移到最外层 -->
+  <header class="content-header">
+    <div class="header-left">
+      <button class="icon-btn back-btn" id="btnBack" title="返回">
+        <span class="material-symbols-rounded">arrow_back</span>
+      </button>
+      <div class="header-info">
+        <h1 class="page-title">版本管理</h1>
+        <div class="instance-name-badge" id="instanceName">加载中...</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="md3-btn md3-btn-text icon-only" id="btnRefresh" title="刷新版本信息">
+        <span class="material-symbols-rounded">refresh</span>
+      </button>
+    </div>
+  </header>
+
   <!-- ═══ Main Layout Container ═══ -->
   <div class="app-layout">
     
     <!-- ═══ Sidebar Navigation ═══ -->
     <nav class="sidebar" role="navigation" aria-label="版本管理导航">
       
-      <!-- Collapse Toggle Button (Top) -->
-      <div class="sidebar-header">
-        <button class="sidebar-toggle-btn" id="toggleSidebar" aria-label="折叠侧边栏" title="折叠">
-          <span class="material-symbols-rounded">menu</span>
-        </button>
-      </div>
-
       <!-- Navigation List -->
       <ul class="sidebar-nav" role="tablist">
         
@@ -100,33 +111,17 @@
       <!-- Spacer (pushes footer to bottom) -->
       <div class="sidebar-spacer"></div>
 
-      <!-- Sidebar Footer (Optional - for version info, etc.) -->
+      <!-- Sidebar Footer - Collapse Toggle Button -->
       <div class="sidebar-footer">
-        <!-- 可以放置版本号、帮助链接等 -->
+        <button class="sidebar-toggle-btn" id="toggleSidebar" aria-label="折叠侧边栏" title="折叠">
+          <span class="material-symbols-rounded">menu</span>
+        </button>
       </div>
 
     </nav>
 
     <!-- ═══ Main Content Area ═══ -->
     <main class="content-area">
-      
-      <!-- Page Header (返回、刷新、实例名) -->
-      <header class="content-header">
-        <div class="header-left">
-          <button class="icon-btn back-btn" id="btnBack" title="返回">
-            <span class="material-symbols-rounded">arrow_back</span>
-          </button>
-          <div class="header-info">
-            <h1 class="page-title">版本管理</h1>
-            <div class="instance-name-badge" id="instanceName">加载中...</div>
-          </div>
-        </div>
-        <div class="header-right">
-          <button class="md3-btn md3-btn-text icon-only" id="btnRefresh" title="刷新版本信息">
-            <span class="material-symbols-rounded">refresh</span>
-          </button>
-        </div>
-      </header>
 
       <!-- Content Panels Container -->
       <div class="content-panels">

@@ -42,13 +42,26 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Body Layout
+   ═══════════════════════════════════════════════════════════ */
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Main Layout Container (Split Layout)
    ═══════════════════════════════════════════════════════════ */
 
 .app-layout {
   display: flex;
+  flex-direction: row;
   width: 100%;
-  height: calc(100vh - var(--title-bar-height, 32px));
+  flex: 1;
   overflow: hidden;
 }
 
@@ -75,12 +88,7 @@
 
 /* ─── Sidebar Header (Toggle Button) ─── */
 .sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: var(--spacing-md);
-  min-height: 56px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  display: none;
 }
 
 .sidebar-toggle-btn {
@@ -211,7 +219,11 @@
 }
 
 .sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   padding: var(--spacing-md);
+  min-height: 56px;
   border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
@@ -220,9 +232,10 @@
    ═══════════════════════════════════════════════════════════ */
 
 .content-area {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   overflow: hidden;
   background: var(--md-sys-color-background);
@@ -233,8 +246,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg) var(--spacing-xl);
-  background: var(--md-sys-color-surface);
+  padding: var(--spacing-md) var(--spacing-xl);
+  min-height: 56px;
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--md-sys-color-surface-container-high);
   border-bottom: 1px solid var(--md-sys-color-outline-variant);
   z-index: var(--z-header);
 }
@@ -247,13 +263,14 @@
 
 .header-info {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .page-title {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
 }
@@ -320,7 +337,7 @@
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-  height: calc(100vh - var(--title-bar-height, 32px) - 140px); /* 减去标题栏和header高度 */
+  height: calc(100vh - var(--title-bar-height, 32px) - 88px); /* 减去标题栏和缩小后的header高度 */
   min-height: 600px; /* 最小高度 */
   max-height: 900px; /* 最大高度，适配不同分辨率 */
   overflow: hidden;
@@ -338,7 +355,8 @@
   background: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
 
 .right-panel {
@@ -353,7 +371,8 @@
   background: var(--md-sys-color-surface);
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
 
 /* 响应式：在小屏幕上改为上下布局 */
@@ -373,10 +392,17 @@
   flex-direction: column;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: var(--md-sys-color-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid rgba(var(--md-sys-color-on-surface-rgb), 0.05);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.info-card:hover,
+.action-card:hover {
+  border-color: rgba(var(--md-sys-color-on-surface-rgb), 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Info Card Split Layout (Two Columns) */
@@ -385,10 +411,16 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-xl);
   padding: var(--spacing-lg);
-  background: var(--md-sys-color-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container-low);
+  border: 1px solid rgba(var(--md-sys-color-on-surface-rgb), 0.05);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.info-card-split:hover {
+  border-color: rgba(var(--md-sys-color-on-surface-rgb), 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .info-column {

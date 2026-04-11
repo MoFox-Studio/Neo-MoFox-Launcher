@@ -37,7 +37,7 @@ const DEFAULT_SETTINGS = {
   logging: {
     maxArchiveDays: 30,       // 归档保留天数
     compressArchive: true,    // 是否压缩归档为 .gz
-    maxFileSize: 50 * 1024 * 1024  // 单个日志文件最大大小(字节) - 50MB
+    maxFileSize: 5 * 1024 * 1024  // 单个日志文件最大大小(字节) - 5MB
   }
 };
 

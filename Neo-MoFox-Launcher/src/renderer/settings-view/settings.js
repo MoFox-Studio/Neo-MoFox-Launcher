@@ -19,6 +19,7 @@ const ACCENT_PRESETS = [
 // ─── 状态 ────────────────────────────────────────────────────────────────
 let currentSettings = null;
 let saveHintTimer = null;
+let sidebarCollapsed = false;
 
 // 🦊 版本号连点彩蛋状态
 let versionClickCount = 0;
@@ -185,7 +186,43 @@ function bindEvents() {
     window.location.href = '../main-view/index.html';
   });
 
-  // 侧边导航已移至悬浮底栏组件 (floating-nav.js)，无需在此绑定
+  // 侧边栏折叠
+  const toggleBtn = $('toggleSidebar');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      sidebarCollapsed = !sidebarCollapsed;
+      const sidebar = document.querySelector('.settings-sidebar');
+      
+      if (sidebar) {
+        sidebar.classList.toggle('collapsed', sidebarCollapsed);
+      }
+      
+      toggleBtn.setAttribute(
+        'aria-label',
+        sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'
+      );
+      toggleBtn.setAttribute(
+        'title',
+        sidebarCollapsed ? '展开' : '折叠'
+      );
+    });
+  }
+
+  // 侧边栏导航切换
+  document.querySelectorAll('.sidebar-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sectionId = btn.dataset.section;
+      
+      // 更新侧边栏激活状态
+      document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // 切换内容区域
+      document.querySelectorAll('.settings-section').forEach(section => {
+        section.classList.toggle('active', section.id === sectionId);
+      });
+    });
+  });
 
   // 主题切换
   [el.themeDark, el.themeLight, el.themeAuto].forEach(btn => {
