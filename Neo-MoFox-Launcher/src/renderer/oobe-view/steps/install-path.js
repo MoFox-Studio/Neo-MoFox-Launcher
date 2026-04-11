@@ -2,7 +2,7 @@
  * OOBE 步骤 3: 安装路径配置
  */
 
-let currentPath = 'D:\\Neo-MoFox_Bots'; // 默认路径
+let currentPath = ''; // 默认路径
 
 export async function renderInstallPathStep(container, stepManager) {
   // 尝试从现有配置读取
