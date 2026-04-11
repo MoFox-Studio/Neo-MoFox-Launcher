@@ -106,15 +106,27 @@ const DOWNLOAD_META = {
 class OobeService {
   /**
    * @param {import('electron').App} electronApp
+   * @param {import('electron').Dialog} electronDialog
    */
-  constructor(electronApp) {
+  constructor(electronApp, electronDialog = null) {
     this._app = electronApp;
+    this._dialog = electronDialog;
+    /** @type {import('electron').BrowserWindow | null} */
+    this._mainWindow = null;
     /** @type {Map<string, AbortController>} 正在进行的下载任务 */
     this._downloads = new Map();
 
     // 启动时检测系统环境
     this._sysEnv = platformHelper.detectSystemEnv();
     console.log(`[OobeService] 系统环境: ${this._sysEnv.platformLabel}${this._sysEnv.distro ? ' (' + this._sysEnv.distroName + ')' : ''}`);
+  }
+
+  /**
+   * 设置主窗口引用（用于对话框）
+   * @param {import('electron').BrowserWindow} mainWindow
+   */
+  setMainWindow(mainWindow) {
+    this._mainWindow = mainWindow;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -255,6 +267,88 @@ class OobeService {
       return { success: true };
     } catch (e) {
       return { success: false, error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // OOBE 路径选择与验证
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * 打开文件夹选择对话框
+   * @returns {Promise<string | null>} 选中的路径，如果取消则返回 null
+   */
+  async selectPath() {
+    if (!this._dialog || !this._mainWindow) {
+      console.error('[OobeService] dialog 或 mainWindow 未初始化');
+      return null;
+    }
+
+    const result = await this._dialog.showOpenDialog(this._mainWindow, {
+      title: '选择安装目录',
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: this._app.getPath('home'),
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0];
+    }
+    return null;
+  }
+
+  /**
+   * 验证安装路径是否有效
+   * @param {string} targetPath - 要验证的路径
+   * @returns {Promise<{valid: boolean, error?: string}>}
+   */
+  async validatePath(targetPath) {
+    if (!targetPath || targetPath.trim() === '') {
+      return { valid: false, error: '路径不能为空' };
+    }
+
+    try {
+      // Windows 平台检查盘符和路径格式
+      if (process.platform === 'win32') {
+        if (!/^[a-zA-Z]:\\/.test(targetPath)) {
+          return { valid: false, error: '路径格式无效' };
+        }
+      }
+
+      // 检查路径长度（Windows 限制）
+      if (process.platform === 'win32' && targetPath.length > 240) {
+        return { valid: false, error: '路径过长（Windows 限制为 240 字符）' };
+      }
+
+      // 检查路径是否存在
+      let pathExists = false;
+      try {
+        await fs.promises.access(targetPath, fs.constants.F_OK);
+        pathExists = true;
+      } catch {
+        pathExists = false;
+      }
+
+      if (!pathExists) {
+        return { valid: false, error: '路径不存在，请选择已存在的目录' };
+      }
+
+      // 路径存在，检查是否可写
+      try {
+        await fs.promises.access(targetPath, fs.constants.W_OK);
+      } catch {
+        return { valid: false, error: '路径不可写' };
+      }
+
+      // 检查目录是否为空
+      const files = await fs.promises.readdir(targetPath);
+      if (files.length > 0) {
+        return { valid: false, error: '目录不为空，请选择空目录' };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      console.error('[OobeService] 验证路径失败:', error);
+      return { valid: false, error: error.message || '验证失败' };
     }
   }
 
@@ -600,11 +694,12 @@ let _instance = null;
 /**
  * 获取 OobeService 单例
  * @param {import('electron').App} [electronApp]
+ * @param {import('electron').Dialog} [electronDialog]
  */
-function getOobeService(electronApp) {
+function getOobeService(electronApp, electronDialog = null) {
   if (!_instance) {
     if (!electronApp) throw new Error('首次调用 getOobeService() 必须传入 electronApp');
-    _instance = new OobeService(electronApp);
+    _instance = new OobeService(electronApp, electronDialog);
   }
   return _instance;
 }

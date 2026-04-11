@@ -23,6 +23,10 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
 const { platformHelper } = require('./services/PlatformHelper');
 const { LauncherLogger, InstanceLogger, LogReader } = require('./services/LoggerService');
 const { storageService } = require('./services/install/StorageService');
+const { getOobeService } = require('./services/oobe/OobeService');
+
+// 初始化 OobeService（传入 app 和 dialog）
+const oobeService = getOobeService(app, dialog);
 
 let mainWindow;
 let launcherLogger = null; // 启动器日志管理器
@@ -94,6 +98,9 @@ function createWindow(isOobe = false) {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  
+  // 设置 OobeService 的主窗口引用（用于对话框）
+  oobeService.setMainWindow(mainWindow);
 }
 
 // ─── 配置编辑器窗口创建 ──────────────────────────────────
@@ -639,8 +646,7 @@ ipcMain.handle('get-project-info', () => {
 
 
 // ─── 环境检测 & 自动安装 IPC（委托 OobeService）──────────────────────
-const { getOobeService } = require('./services/oobe/OobeService');
-const oobeService = getOobeService(app);
+// OobeService 已在文件顶部初始化
 
 ipcMain.handle('env-check-python', () => oobeService.checkPython());
 ipcMain.handle('env-check-uv',     () => oobeService.checkUv());
@@ -667,71 +673,11 @@ ipcMain.handle('env-install-all-missing', async (_event, checks) => {
 
 // ─── OOBE 向导 IPC ────────────────────────────────────────────────────────
 
-// 选择安装路径
-ipcMain.handle('oobe-select-path', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择安装目录',
-    properties: ['openDirectory', 'createDirectory'],
-    defaultPath: app.getPath('home'),
-  });
+// 选择安装路径（委托给 OobeService）
+ipcMain.handle('oobe-select-path', () => oobeService.selectPath());
 
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
-  }
-  return null;
-});
-
-// 验证路径
-ipcMain.handle('oobe-validate-path', async (_event, targetPath) => {
-  if (!targetPath || targetPath.trim() === '') {
-    return { valid: false, error: '路径不能为空' };
-  }
-
-  try {
-    // Windows 平台检查盘符和路径格式
-    if (process.platform === 'win32') {
-      if (!/^[a-zA-Z]:\\/.test(targetPath)) {
-        return { valid: false, error: '路径格式无效' };
-      }
-    }
-
-    // 检查路径长度（Windows 限制）
-    if (process.platform === 'win32' && targetPath.length > 240) {
-      return { valid: false, error: '路径过长（Windows 限制为 240 字符）' };
-    }
-
-    // 检查路径是否存在
-    let pathExists = false;
-    try {
-      await fs.promises.access(targetPath, fs.constants.F_OK);
-      pathExists = true;
-    } catch {
-      pathExists = false;
-    }
-
-    if (!pathExists) {
-      return { valid: false, error: '路径不存在，请选择已存在的目录' };
-    }
-
-    // 路径存在，检查是否可写
-    try {
-      await fs.promises.access(targetPath, fs.constants.W_OK);
-    } catch {
-      return { valid: false, error: '路径不可写' };
-    }
-
-    // 检查目录是否为空
-    const files = await fs.promises.readdir(targetPath);
-    if (files.length > 0) {
-      return { valid: false, error: '目录不为空，请选择空目录' };
-    }
-
-    return { valid: true };
-  } catch (error) {
-    console.error('[OOBE] 验证路径失败:', error);
-    return { valid: false, error: error.message || '验证失败' };
-  }
-});
+// 验证路径（委托给 OobeService）
+ipcMain.handle('oobe-validate-path', (_event, targetPath) => oobeService.validatePath(targetPath));
 
 // OOBE 相关 handlers 已移除（未被使用）
 // 实际使用 settingsWrite 来保存 OOBE 完成状态
@@ -865,14 +811,7 @@ ipcMain.handle('oobe-complete', async () => {
     // 重新读取设置并更新主题
     const { settingsService } = require('./services/settings/SettingsService');
     const settings = settingsService.readSettings();
-    
-    try {
-      await themeService.updateThemeFromSettings(settings);
-      console.log('[Main] 主题已根据 OOBE 设置更新');
-    } catch (error) {
-      console.error('[Main] 更新主题失败:', error);
-    }
-    
+
     // 直接加载主视图，避免通过 index.html 的重定向导致导航冲突
     await mainWindow.loadFile(path.join(__dirname, 'renderer', 'main-view', 'index.html'));
     
