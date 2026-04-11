@@ -14,8 +14,11 @@ const SETTINGS_FILE = 'settings.json';
 // ─── 默认设置 ────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS = {
+  // OOBE
+  oobeCompleted: false,       // 首次启动向导是否已完成
+
   // 通用
-  defaultInstallDir: 'D:\\Neo-MoFox_Bots',
+  defaultInstallDir: '',
   language: 'zh-CN',
 
   // 外观

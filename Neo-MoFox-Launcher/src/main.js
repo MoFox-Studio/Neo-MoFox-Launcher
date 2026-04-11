@@ -39,7 +39,7 @@ const instanceProcesses = new Map(); // instanceId -> { process, status, logs, s
 const editorWindows = new Map(); // filePath -> BrowserWindow
 
 // ─── 窗口创建 ───────────────────────────────────────
-function createWindow() {
+function createWindow(isOobe = false) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -56,7 +56,13 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  
+  // 根据 OOBE 状态加载不同的页面
+  if (isOobe) {
+    mainWindow.loadFile(path.join(__dirname, 'renderer', 'oobe-view', 'index.html'));
+  } else {
+    mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  }
 
 
 
@@ -175,12 +181,23 @@ app.whenReady().then(async () => {
   console.log(`[Main] 系统平台: ${sysEnv.platformLabel} (${sysEnv.osType} ${sysEnv.osRelease})${sysEnv.distro ? ' - ' + sysEnv.distroName : ''}`);
   console.log(`[Main] 架构: ${sysEnv.arch}, Shell: ${sysEnv.shell}`);
   
-  createWindow();
-  loadSettings();
+  // 检查 OOBE 是否已完成
+  const { settingsService } = require('./services/settings/SettingsService');
+  const settings = settingsService.readSettings();
+  
+  if (!settings.oobeCompleted) {
+    // 首次运行，在主窗口中显示 OOBE
+    console.log('[Main] 检测到首次运行，启动 OOBE 向导');
+    createWindow(true); // 传入 true 表示加载 OOBE 页面
+  } else {
+    // 已完成 OOBE，正常启动主窗口
+    console.log('[Main] OOBE 已完成，启动主窗口');
+    createWindow(false);
+    loadSettings();
+  }
   
   // 初始化主题（根据用户设置生成并保存主题）
   try {
-    const settings = settingsService.readSettings();
     await themeService.updateThemeFromSettings(settings);
     console.log('[Main] 主题服务已初始化');
   } catch (error) {
@@ -648,6 +665,77 @@ ipcMain.handle('env-install-all-missing', async (_event, checks) => {
   });
 });
 
+// ─── OOBE 向导 IPC ────────────────────────────────────────────────────────
+
+// 选择安装路径
+ipcMain.handle('oobe-select-path', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择安装目录',
+    properties: ['openDirectory', 'createDirectory'],
+    defaultPath: app.getPath('home'),
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
+// 验证路径
+ipcMain.handle('oobe-validate-path', async (_event, targetPath) => {
+  if (!targetPath || targetPath.trim() === '') {
+    return { valid: false, error: '路径不能为空' };
+  }
+
+  try {
+    // Windows 平台检查盘符和路径格式
+    if (process.platform === 'win32') {
+      if (!/^[a-zA-Z]:\\/.test(targetPath)) {
+        return { valid: false, error: '路径格式无效' };
+      }
+    }
+
+    // 检查路径长度（Windows 限制）
+    if (process.platform === 'win32' && targetPath.length > 240) {
+      return { valid: false, error: '路径过长（Windows 限制为 240 字符）' };
+    }
+
+    // 检查路径是否存在
+    let pathExists = false;
+    try {
+      await fs.promises.access(targetPath, fs.constants.F_OK);
+      pathExists = true;
+    } catch {
+      pathExists = false;
+    }
+
+    if (!pathExists) {
+      return { valid: false, error: '路径不存在，请选择已存在的目录' };
+    }
+
+    // 路径存在，检查是否可写
+    try {
+      await fs.promises.access(targetPath, fs.constants.W_OK);
+    } catch {
+      return { valid: false, error: '路径不可写' };
+    }
+
+    // 检查目录是否为空
+    const files = await fs.promises.readdir(targetPath);
+    if (files.length > 0) {
+      return { valid: false, error: '目录不为空，请选择空目录' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.error('[OOBE] 验证路径失败:', error);
+    return { valid: false, error: error.message || '验证失败' };
+  }
+});
+
+// OOBE 相关 handlers 已移除（未被使用）
+// 实际使用 settingsWrite 来保存 OOBE 完成状态
+
 // 窗口控制 - 使用 event.sender 获取当前窗口
 ipcMain.handle('window-minimize', (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
@@ -763,6 +851,36 @@ ipcMain.handle('settings-write', (event, patch) => {
 
 ipcMain.handle('settings-reset', (event, key) => {
   return settingsService.reset(key ?? null);
+});
+
+// ─── OOBE 完成处理 ───────────────────────────────────────────────────────
+
+/**
+ * OOBE 完成后重新加载主窗口
+ */
+ipcMain.handle('oobe-complete', async () => {
+  console.log('[Main] OOBE 已完成，重新加载主窗口');
+  
+  if (mainWindow) {
+    // 重新读取设置并更新主题
+    const { settingsService } = require('./services/settings/SettingsService');
+    const settings = settingsService.readSettings();
+    
+    try {
+      await themeService.updateThemeFromSettings(settings);
+      console.log('[Main] 主题已根据 OOBE 设置更新');
+    } catch (error) {
+      console.error('[Main] 更新主题失败:', error);
+    }
+    
+    // 直接加载主视图，避免通过 index.html 的重定向导致导航冲突
+    await mainWindow.loadFile(path.join(__dirname, 'renderer', 'main-view', 'index.html'));
+    
+    // 加载设置
+    loadSettings();
+  }
+  
+  return { success: true };
 });
 
 // ─── 主题系统 IPC ──────────────────────────────────────────────────────────

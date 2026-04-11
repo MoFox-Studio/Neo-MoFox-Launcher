@@ -57,11 +57,7 @@ const api = {
   // OOBE 向导
   oobeSelectPath: () => ipcRenderer.invoke('oobe-select-path'),
   oobeValidatePath: (targetPath) => ipcRenderer.invoke('oobe-validate-path', targetPath),
-  oobeGetBranches: () => ipcRenderer.invoke('oobe-get-branches'),
-  oobeClone: (targetPath, branch) => ipcRenderer.invoke('oobe-clone', targetPath, branch),
-  oobeGetConfigFiles: (targetPath) => ipcRenderer.invoke('oobe-get-config-files', targetPath),
-  oobeSaveConfig: (filePath, content) => ipcRenderer.invoke('oobe-save-config', filePath, content),
-  oobeFinish: (instanceData) => ipcRenderer.invoke('oobe-finish', instanceData),
+  // 注意：oobeGetConfigFiles, oobeSaveConfig, oobeFinish 已删除（未被使用）
 
   // 环境检测
   envCheckPython: () => ipcRenderer.invoke('env-check-python'),
@@ -155,6 +151,9 @@ const api = {
   /** 同步读取设置，仅在 <head> 中应用主题时使用，避免 FOUC */
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
+  
+  // ─── OOBE 完成处理 ──────────────────────────────────────────────────────
+  oobeComplete: () => ipcRenderer.invoke('oobe-complete'),
 
   // ─── 主题系统 ───────────────────────────────────────────────────────────
   /** 更新主题（根据设置重新计算并保存） */
