@@ -88,14 +88,15 @@ body {
   width: 72px;
 }
 
-/* Sidebar Header (Toggle Button) */
-.sidebar-header {
+/* Sidebar Footer (Toggle Button) */
+.sidebar-footer {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 16px;
   min-height: 56px;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  margin-top: auto;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .sidebar-toggle-btn {
