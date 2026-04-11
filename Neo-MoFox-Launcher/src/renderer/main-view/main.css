@@ -8,6 +8,10 @@
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-blur: 24px;
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --inset-highlight: rgba(255, 255, 255, 0.12);
+  --inset-highlight-hover: rgba(255, 255, 255, 0.18);
+  --quote-border: rgba(255, 255, 255, 0.2);
   --glow-primary: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.35);
   --glow-primary-soft: rgba(var(--md-sys-color-primary-rgb, 208, 188, 255), 0.12);
 }
@@ -15,6 +19,10 @@
 [data-theme="light"] {
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-bg-hover: rgba(0, 0, 0, 0.05);
+  --inset-highlight: rgba(0, 0, 0, 0.08);
+  --inset-highlight-hover: rgba(0, 0, 0, 0.12);
+  --quote-border: rgba(0, 0, 0, 0.15);
   --glow-primary: rgba(var(--md-sys-color-primary-rgb, 103, 80, 164), 0.2);
   --glow-primary-soft: rgba(var(--md-sys-color-primary-rgb, 103, 80, 164), 0.08);
 }
@@ -84,7 +92,7 @@
 .hero-card {
   width: 100%;
   background:
-    linear-gradient(135deg, rgba(var(--md-sys-color-primary-container-rgb, 79, 55, 139), 0.35), rgba(var(--md-sys-color-secondary-container-rgb, 74, 68, 88), 0.25));
+    linear-gradient(135deg, rgba(var(--md-sys-color-primary-container-rgb), 0.35), rgba(var(--md-sys-color-secondary-container-rgb), 0.25));
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-radius: 28px;
@@ -98,7 +106,7 @@
   box-shadow:
     0 16px 48px rgba(0, 0, 0, 0.2),
     0 4px 16px rgba(0, 0, 0, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.12);
+    inset 0 1px 1px var(--inset-highlight);
   color: var(--md-sys-color-on-primary-container);
   transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.4s cubic-bezier(0.2, 0, 0, 1);
 }
@@ -108,7 +116,7 @@
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.25),
     0 8px 24px rgba(0, 0, 0, 0.15),
-    inset 0 1px 1px rgba(255, 255, 255, 0.18),
+    inset 0 1px 1px var(--inset-highlight-hover),
     0 0 40px var(--glow-primary-soft);
 }
 
@@ -253,7 +261,7 @@
   flex-direction: column;
   justify-content: center;
   padding-left: 40px;
-  border-left: 2px solid rgba(128, 128, 128, 0.2);
+  border-left: 2px solid var(--quote-border);
   z-index: 2;
 }
 
@@ -473,7 +481,7 @@
 }
 
 .instance-card:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-hover);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.18),
     0 6px 16px rgba(0, 0, 0, 0.1),

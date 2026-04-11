@@ -156,6 +156,17 @@ const api = {
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
 
+  // ─── 主题系统 ───────────────────────────────────────────────────────────
+  /** 更新主题（根据设置重新计算并保存） */
+  themeUpdate: (settings) => ipcRenderer.invoke('theme-update', settings),
+  /** 获取当前主题 */
+  themeGet: () => ipcRenderer.invoke('theme-get'),
+  /** 同步获取主题（用于页面加载时避免 FOUC） */
+  themeGetSync: () => ipcRenderer.sendSync('theme-get-sync'),
+  /** 重新生成主题（清除缓存并强制重新计算） */
+  themeRegenerate: (accentColor, themeMode, options) => ipcRenderer.invoke('theme-regenerate', accentColor, themeMode, options),
+
+
   // ─── 配置编辑器 ──────────────────────────────────────────────────────────
   configEditorOpen: (instanceId, fileType) => ipcRenderer.invoke('config-editor:open', instanceId, fileType),
   configEditorRead: (filePath) => ipcRenderer.invoke('config-editor:read', filePath),

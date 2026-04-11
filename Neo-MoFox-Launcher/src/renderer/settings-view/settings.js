@@ -149,11 +149,16 @@ function setAccentColor(hex, save = true) {
 // ─── 保存逻辑 ────────────────────────────────────────────────────────────
 async function savePartial(patch) {
   Object.assign(currentSettings, patch);
-  // 立即同步应用（无需等待 IPC 回调）
-  applyTheme(currentSettings);
 
   try {
     await window.mofoxAPI.settingsWrite(patch);
+    // 如果保存的是主题相关设置，通知后端更新主题
+    if ('theme' in patch || 'accentColor' in patch) {
+      await window.mofoxAPI.themeUpdate(currentSettings);
+        // 只在主题相关设置修改时才立即应用主题
+        applyTheme(currentSettings);
+    }
+    
     showSaveHint();
   } catch (e) {
     console.error('[settings] 保存失败', e);

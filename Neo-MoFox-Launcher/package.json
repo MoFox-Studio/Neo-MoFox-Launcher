@@ -38,6 +38,7 @@
     "@codemirror/view": "^6.41.0",
     "@iarna/toml": "^2.2.5",
     "@lezer/highlight": "^1.2.3",
+    "@material/material-color-utilities": "^0.3.0",
     "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
   }

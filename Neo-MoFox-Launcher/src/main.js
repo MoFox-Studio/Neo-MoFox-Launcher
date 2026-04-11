@@ -157,7 +157,7 @@ function createEditorWindow(filePath, fileName) {
 }
 
 // ─── 应用生命周期 ───────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 初始化 StorageService（确保数据目录存在）
   storageService.init();
   
@@ -177,6 +177,15 @@ app.whenReady().then(() => {
   
   createWindow();
   loadSettings();
+  
+  // 初始化主题（根据用户设置生成并保存主题）
+  try {
+    const settings = settingsService.readSettings();
+    await themeService.updateThemeFromSettings(settings);
+    console.log('[Main] 主题服务已初始化');
+  } catch (error) {
+    console.error('[Main] 主题服务初始化失败:', error);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -666,6 +675,7 @@ ipcMain.handle('window-close', (event) => {
 // ─── 实例管理 & 安装向导 IPC ──────────────────────────────────────────────
 const { installWizardService } = require('./services/install/InstallWizardService');
 const { versionService } = require('./services/version/VersionService');
+const { themeService } = require('./services/theme/ThemeService');
 
 // 初始化存储服务
 storageService.init();
@@ -754,6 +764,64 @@ ipcMain.handle('settings-write', (event, patch) => {
 ipcMain.handle('settings-reset', (event, key) => {
   return settingsService.reset(key ?? null);
 });
+
+// ─── 主题系统 IPC ──────────────────────────────────────────────────────────
+
+/**
+ * 根据用户设置更新主题
+ * 前端更改主题设置时调用，自动计算并保存主题
+ */
+ipcMain.handle('theme-update', async (event, settings) => {
+  try {
+    const theme = await themeService.updateThemeFromSettings(settings);
+    return { success: true, theme };
+  } catch (error) {
+    console.error('[IPC] 主题更新失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+/**
+ * 获取当前主题
+ */
+ipcMain.handle('theme-get', () => {
+  try {
+    const theme = themeService.getCurrentTheme();
+    return theme;  // 直接返回主题对象，与 sync 版本一致
+  } catch (error) {
+    console.error('[IPC] 获取主题失败:', error);
+    return null;
+  }
+});
+
+/**
+ * 同步获取主题（用于页面加载时）
+ */
+ipcMain.on('theme-get-sync', (event) => {
+  try {
+    const theme = themeService.getCurrentTheme();
+    event.returnValue = theme;
+  } catch (error) {
+    console.error('[IPC] 同步获取主题失败:', error);
+    event.returnValue = null;
+  }
+});
+
+/**
+ * 重新生成主题（清除缓存并强制重新计算）
+ */
+ipcMain.handle('theme-regenerate', async (event, accentColor, themeMode, options) => {
+  try {
+    themeService.clearCache();
+    const theme = await themeService.generateTheme(accentColor, themeMode, options);
+    themeService.saveTheme(theme);
+    return { success: true, theme };
+  } catch (error) {
+    console.error('[IPC] 重新生成主题失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 
 // 打开日志文件夹
 ipcMain.handle('open-logs-dir', () => {

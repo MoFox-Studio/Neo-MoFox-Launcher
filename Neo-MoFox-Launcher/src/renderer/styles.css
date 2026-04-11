@@ -5,8 +5,8 @@
   justify-content: space-between;
   height: 36px;
   background-color: rgba(var(--md-sys-color-surface-rgb, 30, 30, 36), 0.7);
-  backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
   color: var(--md-sys-color-on-surface);
   -webkit-app-region: drag;
   z-index: 9999;
@@ -17,7 +17,8 @@
   padding: 0;
   font-family: 'Segoe UI', sans-serif;
   font-size: 12px;
-  user-select: none;
+  -webkit-user-select: none;
+    user-select: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   transition: background-color 0.3s ease;
 }
@@ -52,7 +53,7 @@
   align-items: center;
   justify-content: center;
   cursor: default;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;  
 }
 
 .window-btn:hover {
