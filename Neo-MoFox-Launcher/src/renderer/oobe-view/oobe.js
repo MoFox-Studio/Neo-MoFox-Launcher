@@ -183,8 +183,8 @@ class StepManager {
     // "跳过" 按钮
     el.btnSkip.style.display = step.canSkip ? 'inline-flex' : 'none';
 
-    // "下一步/完成" 按钮
-    el.btnNext.querySelector('span:last-child').textContent = isLast ? '开始使用' : '下一步';
+    // "下一步/完成" 按钮 - 修改第一个 span（文字部分）
+    el.btnNext.querySelector('span:first-child').textContent = isLast ? '开始使用' : '下一步';
     
     // 移除/添加箭头图标
     const arrowIcon = el.btnNext.querySelector('.material-symbols-rounded');
