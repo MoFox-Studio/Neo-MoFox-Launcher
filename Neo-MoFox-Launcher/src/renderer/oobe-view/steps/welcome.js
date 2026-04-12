@@ -8,7 +8,7 @@ export async function renderWelcomeStep(container, stepManager) {
       <div class="step-header">
         <h2 class="step-title">欢迎使用 Neo-MoFox Launcher</h2>
         <p class="step-description">
-          感谢您选择 Neo-MoFox！这是一个强大的 QQ 机器人管理工具，让您轻松管理多个机器人实例。
+          感谢您选择 Neo-MoFox Launcher！这是一个强大的  Neo-MoFox 机器人管理工具，让您轻松管理多个机器人实例。
         </p>
       </div>
 
@@ -37,9 +37,9 @@ export async function renderWelcomeStep(container, stepManager) {
           <div class="feature-item" style="margin-top: 24px;">
             <span class="material-symbols-rounded" style="color: var(--md-sys-color-tertiary); font-size: 32px;">extension</span>
             <div>
-              <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 500;">插件生态</h3>
+              <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 500;">丰富功能</h3>
               <p style="margin: 0; font-size: 14px; color: var(--md-sys-color-on-surface-variant);">
-                支持丰富的插件扩展功能
+                支持丰富的功能
               </p>
             </div>
           </div>
