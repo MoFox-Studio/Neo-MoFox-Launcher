@@ -68,7 +68,7 @@ body {
   font-weight: 700;
   margin: 0 0 8px 0;
   color: var(--md-sys-color-on-primary-container);
-  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
 }
 
 .oobe-tagline {
@@ -172,7 +172,7 @@ body {
   font-weight: 600;
   margin: 0 0 8px 0;
   color: var(--md-sys-color-on-surface);
-  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
 }
 
 .step-description {
@@ -423,7 +423,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;

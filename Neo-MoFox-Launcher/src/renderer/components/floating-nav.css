@@ -1,4 +1,4 @@
-/* ═══ Floating Bottom Navigation Bar ═══ */
+/* ═══ Floating Bottom Navigation Bar — Notion Style ═══ */
 
 .floating-nav {
   position: fixed;
@@ -7,22 +7,19 @@
   transform: translateX(-50%);
   z-index: 1000;
   pointer-events: none;
-  animation: floatingNavSlideIn 0.4s cubic-bezier(0.2, 0, 0, 1) both;
+  animation: floatingNavSlideIn 0.4s ease both;
   animation-delay: 0.2s;
 }
 
 .floating-nav-track {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 6px 8px;
-  background: var(--md-sys-color-surface-container-high);
-  border: 1px solid rgba(var(--md-sys-color-on-surface-rgb), 0.08);
-  border-radius: 28px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25),
-              0 2px 8px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--md-sys-color-surface);
+  border: var(--border-whisper);
+  border-radius: 12px;
+  box-shadow: var(--shadow-deep);
   pointer-events: auto;
 }
 
@@ -31,7 +28,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: 22px;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
@@ -39,9 +36,7 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.25s cubic-bezier(0.2, 0, 0, 1),
-              color 0.2s,
-              padding 0.25s cubic-bezier(0.2, 0, 0, 1);
+  transition: background 0.15s ease, color 0.15s ease, padding 0.2s ease;
   white-space: nowrap;
   position: relative;
   text-decoration: none;
@@ -50,16 +45,14 @@
 .floating-nav-item .material-symbols-rounded {
   font-size: 22px;
   flex-shrink: 0;
-  transition: transform 0.2s;
+  transition: transform 0.15s;
 }
 
 .floating-nav-label {
   max-width: 0;
   overflow: hidden;
   opacity: 0;
-  transition: max-width 0.3s cubic-bezier(0.2, 0, 0, 1),
-              opacity 0.2s ease,
-              margin-left 0.3s;
+  transition: max-width 0.25s ease, opacity 0.15s ease, margin-left 0.25s;
   margin-left: 0;
 }
 
@@ -69,13 +62,13 @@
 }
 
 .floating-nav-item.active {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
   padding: 10px 20px;
 }
 
 .floating-nav-item.active .material-symbols-rounded {
-  color: var(--md-sys-color-on-secondary-container);
+  color: var(--md-sys-color-on-primary);
 }
 
 .floating-nav-item.active .floating-nav-label {
@@ -95,11 +88,11 @@
   }
 }
 
-/* ─── Divider (used in settings page) ───── */
+/* ─── Divider ───── */
 .floating-nav-divider {
   width: 1px;
   height: 24px;
-  background: rgba(var(--md-sys-color-on-surface-rgb), 0.15);
+  background: var(--md-sys-color-outline);
   margin: 0 4px;
   flex-shrink: 0;
 }

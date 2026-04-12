@@ -1,4 +1,4 @@
-/* ═══ Toast 消息提示组件 ═══ */
+/* ═══ Toast 消息提示组件 — Notion Style ═══ */
 
 .toast {
   position: fixed;
@@ -9,11 +9,12 @@
   align-items: center;
   gap: 12px;
   padding: 12px 24px;
-  border-radius: 12px;
-  background-color: var(--md-sys-color-surface-container-high);
+  border-radius: 8px;
+  background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
-  box-shadow: var(--md-sys-elevation-level3);
-  font-family: 'Google Sans', 'Noto Sans SC', sans-serif;
+  border: var(--border-whisper);
+  box-shadow: var(--shadow-deep);
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 500;
   opacity: 0;
@@ -42,37 +43,37 @@
 .toast .toast-action {
   padding: 6px 16px;
   border: none;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.15);
-  color: inherit;
+  border-radius: 4px;
+  background-color: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-primary);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.15s;
   white-space: nowrap;
 }
 
 .toast .toast-action:hover {
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: var(--md-sys-color-surface-container-highest);
 }
 
 .toast .toast-action:active {
-  background-color: rgba(255, 255, 255, 0.3);
+  transform: scale(0.97);
 }
 
 .toast .toast-close {
   padding: 4px;
   border: none;
-  border-radius: 50%;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.2s, background-color 0.2s;
+  transition: opacity 0.15s, background-color 0.15s;
   margin-left: -8px;
 }
 
@@ -82,46 +83,46 @@
 
 .toast .toast-close:hover {
   opacity: 1;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--md-sys-color-surface-variant);
 }
 
-.toast .toast-close:active {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Toast 类型变体 */
+/* Toast 类型变体 — subtle left border accent */
 .toast-info {
-  background-color: var(--md-sys-color-surface-container-high);
+  background-color: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
+  border-left: 3px solid var(--md-sys-color-primary);
 }
 
-.toast-info .material-symbols-rounded {
+.toast-info .toast-icon {
   color: var(--md-sys-color-primary);
 }
 
 .toast-success {
-  background-color: #1b5e20;
-  color: #fff;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-left: 3px solid var(--status-running);
 }
 
-.toast-success .material-symbols-rounded {
-  color: #4caf50;
+.toast-success .toast-icon {
+  color: var(--status-running);
 }
 
 .toast-warning {
-  background-color: #f57c00;
-  color: #fff;
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-left: 3px solid var(--md-sys-color-warning);
 }
 
-.toast-warning .material-symbols-rounded {
-  color: #ffb74d;
+.toast-warning .toast-icon {
+  color: var(--md-sys-color-warning);
 }
 
 .toast-error {
-  background-color: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error-container);
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-left: 3px solid var(--md-sys-color-error);
 }
 
-.toast-error .material-symbols-rounded {
+.toast-error .toast-icon {
   color: var(--md-sys-color-error);
 }
