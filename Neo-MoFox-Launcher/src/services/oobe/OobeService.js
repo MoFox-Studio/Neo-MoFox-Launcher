@@ -494,8 +494,14 @@ class OobeService {
 
       const proc = spawn(cmd, args, {
         shell: true,
-        env: { ...process.env },
+        env: { 
+          ...process.env,
+          PYTHONIOENCODING: 'utf-8',
+          LANG: 'en_US.UTF-8',
+          LC_ALL: 'en_US.UTF-8'
+        },
         windowsHide: true,
+        encoding: 'utf-8',
       });
 
       proc.stdout?.on('data', (d) => {
