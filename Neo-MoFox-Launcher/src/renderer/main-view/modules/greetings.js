@@ -11,8 +11,6 @@ const holidayGreetings = [
   { month: 2, day: 14, title: '情人节快乐', subtitle: '愿你和你的代码永远甜蜜。' },
   // 妇女节
   { month: 3, day: 8,  title: '女神节快乐', subtitle: '致每一位了不起的她。' },
-  // 愚人节
-  { month: 4, day: 1,  title: '今天的 Bug 都是 Feature', subtitle: '愚人节快乐！不信你看 console。' },
   // 劳动节
   { month: 5, day: 1,  title: '劳动节快乐', subtitle: '今天，连代码都该放个假。' },
   // 儿童节

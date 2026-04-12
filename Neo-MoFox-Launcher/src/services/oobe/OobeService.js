@@ -329,7 +329,11 @@ class OobeService {
       }
 
       if (!pathExists) {
-        return { valid: false, error: '路径不存在，请选择已存在的目录' };
+        try {
+          await fs.promises.mkdir(targetPath, { recursive: true });
+        } catch (err) {
+          return { valid: false, error: '路径不存在且无法自动创建: ' + err.message };
+        }
       }
 
       // 路径存在，检查是否可写
