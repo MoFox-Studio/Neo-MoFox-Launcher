@@ -10,7 +10,7 @@ const TOML = require('@iarna/toml');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
-const INSTANCES_VERSION = 1;
+const INSTANCES_VERSION = 2;
 const INSTANCES_FILE = 'instances.json';
 
 // ─── StorageService 类 ──────────────────────────────────────────────────
@@ -267,11 +267,42 @@ class StorageService {
    * 实例数据迁移
    */
   _migrateInstances(oldData) {
-    // 当前版本为 1，暂无迁移逻辑
     console.log('[StorageService] 实例数据迁移，旧版本:', oldData.version);
+    
+    const instances = (oldData.instances || []).map(instance => {
+      // 从版本 1 迁移到版本 2：将 displayName 和 description 移到 extra 对象
+      if (oldData.version === 1) {
+        const { displayName, description, ...rest } = instance;
+        return {
+          ...rest,
+          extra: {
+            displayName: displayName || instance.qqNumber || 'Unknown',
+            description: description || '',
+            isLike: false, // 默认不收藏
+          },
+        };
+      }
+      
+      // 对于更早版本或未知版本，确保 extra 对象存在
+      if (!instance.extra) {
+        const { displayName, description, ...rest } = instance;
+        return {
+          ...rest,
+          extra: {
+            displayName: displayName || instance.qqNumber || 'Unknown',
+            description: description || '',
+            isLike: false,
+          },
+        };
+      }
+      
+      return instance;
+    });
+    
+    console.log(`[StorageService] 迁移完成：${instances.length} 个实例`);
     return {
       version: INSTANCES_VERSION,
-      instances: oldData.instances || [],
+      instances,
     };
   }
 

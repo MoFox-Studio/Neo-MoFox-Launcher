@@ -90,12 +90,27 @@
       </div>
     </section>
 
+    <!-- ─── 收藏的实例区域 ─── -->
+    <section class="favorite-instances-section" id="favorite-instances-section" style="display: none;">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="material-symbols-rounded filled-icon">favorite</span>
+          <h2>收藏的实例</h2>
+          <span class="instance-count-badge favorite-badge" id="favorite-count">0</span>
+        </div>
+      </div>
+
+      <div class="instances-grid" id="favorite-instances-grid">
+        <!-- 收藏的实例卡片将在这里动态生成 -->
+      </div>
+    </section>
+
     <!-- ─── 实例列表区域 ─── -->
     <section class="instances-section">
       <div class="section-header">
         <div class="section-title">
           <span class="material-symbols-rounded">grid_view</span>
-          <h2>我的实例</h2>
+          <h2>所有实例</h2>
           <span class="instance-count-badge" id="instance-count">0</span>
         </div>
         <div class="section-actions">
@@ -226,6 +241,21 @@
               <div class="form-group">
                 <label class="form-label">描述</label>
                 <textarea class="form-textarea" id="edit-instance-desc" placeholder="可选：为这个实例添加一些描述" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  <div class="form-label-with-icon">
+                    <span class="material-symbols-rounded">favorite</span>
+                    收藏此实例
+                  </div>
+                </label>
+                <div class="form-switch-wrapper">
+                  <label class="form-switch">
+                    <input type="checkbox" id="edit-instance-like">
+                    <span class="form-switch-slider"></span>
+                  </label>
+                  <span class="form-switch-label" id="edit-instance-like-label">未收藏</span>
+                </div>
               </div>
             </div>
           </div>

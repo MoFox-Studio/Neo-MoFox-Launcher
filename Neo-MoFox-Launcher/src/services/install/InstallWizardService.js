@@ -327,9 +327,10 @@ class InstallWizardService {
       return inst.wsPort === port;
     });
     if (conflicting) {
+      const displayName = conflicting.extra?.displayName || conflicting.qqNumber || 'Unknown';
       return {
         available: false,
-        error: `端口 ${port} 已被实例「${conflicting.displayName}」(${conflicting.id}) 占用，请更换端口`,
+        error: `端口 ${port} 已被实例「${displayName}」(${conflicting.id}) 占用，请更换端口`,
       };
     }
 
@@ -1246,7 +1247,6 @@ class InstallWizardService {
 
     // 更新现有实例，标记为安装完成
     const updates = {
-      displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
       qqNickname: inputs.qqNickname || '',
       ownerQQNumber: inputs.ownerQQNumber,
@@ -1258,6 +1258,11 @@ class InstallWizardService {
       napcatDir: hasNapcat ? napcatDir : null, // 只在安装了 NapCat 时设置路径
       wsPort: parseInt(inputs.wsPort, 10),
       napcatVersion: napcatVersion, // 保存 NapCat 版本号
+      extra: {
+        displayName: inputs.instanceName,
+        description: '',
+        isLike: false,
+      },
       neomofoxVersion: neomofoxVersion,
       installCompleted: true,
       installProgress: null,
@@ -1320,7 +1325,6 @@ class InstallWizardService {
     // 创建/更新实例记录（保留 createdAt）
     const instanceData = {
       id: instanceId,
-      displayName: inputs.instanceName,
       qqNumber: inputs.qqNumber,
       qqNickname: inputs.qqNickname || '',
       ownerQQNumber: inputs.ownerQQNumber,
@@ -1333,6 +1337,11 @@ class InstallWizardService {
       installCompleted: false,
       installProgress: { step: resumeStep, substep: 0 },
       installSteps: configuredSteps, // 保存步骤配置
+      extra: {
+        displayName: inputs.instanceName,
+        description: '',
+        isLike: false,
+      },
     };
 
     if (existing) {

@@ -430,6 +430,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  min-width: 0; /* 允许flex子元素缩小以防止溢出 */
 }
 
 .info-column:first-child {
@@ -511,6 +512,9 @@ body {
   font-size: 13px;
   color: var(--md-sys-color-on-surface-variant);
   line-height: 1.4;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .info-label {
@@ -639,7 +643,9 @@ body {
   font-size: 14px;
   color: var(--md-sys-color-on-surface);
   line-height: 1.5;
+  word-wrap: break-word;
   word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .commit-item-tags {

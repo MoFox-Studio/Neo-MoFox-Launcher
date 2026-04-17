@@ -47,12 +47,13 @@ export async function loadInstances() {
       state.runningStatuses = {};
     }
     
-    // 转换字段名以适配前端显示（后端使用 displayName，前端使用 name）
+    // 转换字段名以适配前端显示（从 extra 对象中读取）
     state.instances = instances.map(instance => ({
       id: instance.id,
-      name: instance.displayName,
+      name: instance.extra?.displayName || instance.qqNumber || 'Unknown',
       path: instance.neomofoxDir,
-      description: instance.description || '', // 用户编辑的描述
+      description: instance.extra?.description || '', // 用户编辑的描述
+      isLike: instance.extra?.isLike || false, // 收藏状态
       autoInfo: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`, // 自动信息
       status: state.runningStatuses[instance.id] || (instance.enabled ? 'stopped' : 'disabled'),
       branch: instance.channel,
@@ -79,206 +80,233 @@ export async function loadInstances() {
 
 export function renderInstances() {
   const grid = document.getElementById('instances-grid');
+  const favoriteGrid = document.getElementById('favorite-instances-grid');
+  const favoriteSection = document.getElementById('favorite-instances-section');
   const addCard = document.getElementById('btn-add-instance');
-  // 仅清空除了添加按钮以外的卡片
-  // 将 addCard 暂时移除，清空 grid，再加回去，或者只移除 .instance-card:not(.add-card)
   
-  // 方法：保留 Add Card，移除其他
+  // 清空两个网格（保留添加按钮）
   const children = Array.from(grid.children);
   children.forEach(child => {
     if (child.id !== 'btn-add-instance') {
       child.remove();
     }
   });
-
+  
+  favoriteGrid.innerHTML = '';
+  
+  // 分离收藏和普通实例
+  const favoriteInstances = state.instances.filter(i => i.isLike);
+  const normalInstances = state.instances.filter(i => !i.isLike);
+  
   // 更新计数
   const countBadge = document.getElementById('instance-count');
   if (countBadge) {
-    countBadge.textContent = state.instances.length.toString();
+    countBadge.textContent = normalInstances.length.toString();
+  }
+  
+  const favoriteCountBadge = document.getElementById('favorite-count');
+  if (favoriteCountBadge) {
+    favoriteCountBadge.textContent = favoriteInstances.length.toString();
+  }
+  
+  // 显示/隐藏收藏区域
+  if (favoriteSection) {
+    favoriteSection.style.display = favoriteInstances.length > 0 ? 'block' : 'none';
   }
   
   refreshActiveCount();
   
-  // 渲染实例
-  state.instances.forEach(instance => {
-    const card = document.createElement('div');
-    card.className = 'instance-card';
-    card.dataset.instanceId = instance.id;
-    
-    // 检查是否是未完成安装的实例
-    const isIncomplete = instance.installCompleted === false;
-    
-    // 实时状态
-    const liveStatus = state.runningStatuses[instance.id] || instance.status || 'stopped';
-    let statusClass = liveStatus;
-    if (isIncomplete) {
-      statusClass = 'incomplete';
-      card.classList.add('incomplete');
-    }
-    
-    // 根据安装状态显示不同内容
-    if (isIncomplete) {
-      card.innerHTML = `
-        <div class="instance-card-header">
-          <div class="instance-icon incomplete">
-            <span class="material-symbols-rounded">construction</span>
-          </div>
-          <div class="instance-status-dot ${statusClass}" title="安装未完成"></div>
-        </div>
-        
-        <div class="instance-card-body">
-          <div class="instance-name" title="${instance.name}">${instance.name}</div>
-          <div class="instance-path" title="${instance.path}">${instance.path}</div>
-          <div class="instance-desc incomplete-warning">
-            <span class="material-symbols-rounded">warning</span>
-            安装未完成，点击继续
-          </div>
-        </div>
-        
-        <div class="instance-card-footer">
-          <button class="md3-btn md3-btn-text md3-btn-sm btn-delete-incomplete">
-            删除
-          </button>
-          <button class="md3-btn md3-btn-filled md3-btn-sm btn-continue-install">
-            继续安装
-          </button>
-        </div>
-      `;
-      
-      // 绑定继续安装按钮
-      const btnContinue = card.querySelector('.btn-continue-install');
-      btnContinue.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // 跳转到安装向导继续安装，传递 instanceId 以预填表单
-        window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
-      });
-      
-      // 绑定删除按钮
-      const btnDelete = card.querySelector('.btn-delete-incomplete');
-      btnDelete.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (await window.customConfirm('确定要删除这个未完成的实例吗？已下载的文件也会被清理。', '确认删除')) {
-          try {
-            await window.mofoxAPI.installCleanup(instance.id);
-            await loadInstances(); // 重新加载列表
-          } catch (err) {
-            console.error('清理失败:', err);
-            await window.customAlert('清理失败: ' + err.message, '错误');
-          }
-        }
-      });
-      
-      // 点击卡片也可以继续安装
-      card.addEventListener('click', () => {
-        window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
-      });
-      
-    } else {
-      const isRunning = isActiveStatus(liveStatus);
-      const isStopped = liveStatus === 'stopped' || liveStatus === 'error';
-      const statusLabel = STATUS_TEXT[liveStatus] || liveStatus;
-      
-      // 运行中的卡片加上特殊 class
-      if (isRunning) card.classList.add('instance-running');
-      if (liveStatus === 'error') card.classList.add('instance-error');
-      
-      card.innerHTML = `
-        <div class="instance-card-header">
-          <div class="instance-icon ${isRunning ? 'running' : ''}">
-            <span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>
-          </div>
-          <div class="instance-status-indicator">
-            <div class="instance-status-dot ${liveStatus}"></div>
-            <span class="instance-status-label">${statusLabel}</span>
-          </div>
-        </div>
-        
-        <div class="instance-card-body">
-          <div class="instance-name" title="${instance.name}">${instance.name}</div>
-          <div class="instance-path" title="${instance.path}">${instance.path}</div>
-          <div class="instance-meta">${instance.autoInfo}</div>
-          ${instance.description ? `<div class="instance-desc" title="${instance.description}">${instance.description}</div>` : ''}
-        </div>
-        
-        <div class="instance-card-footer">
-          <button class="md3-btn md3-btn-text md3-btn-sm btn-settings-instance" title="管理实例">
-            <span class="material-symbols-rounded">settings</span>
-            管理
-          </button>
-          ${isRunning ? `
-            <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${liveStatus !== 'running' ? 'disabled' : ''}>
-              <span class="material-symbols-rounded">stop</span>
-              停止
-            </button>
-            <button class="md3-btn md3-btn-tonal md3-btn-sm btn-view-instance" title="查看日志">
-              <span class="material-symbols-rounded">terminal</span>
-              日志
-            </button>
-          ` : `
-            <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
-              <span class="material-symbols-rounded">system_update</span>
-              版本
-            </button>
-            <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动" ${!isStopped ? 'disabled' : ''}>
-              <span class="material-symbols-rounded">play_arrow</span>
-              启动
-            </button>
-          `}
-        </div>
-      `;
-      
-      // 事件绑定 - 管理按钮 → 打开编辑对话框
-      const btnSettings = card.querySelector('.btn-settings-instance');
-      btnSettings.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openEditModal(instance);
-      });
-      
-      // 事件绑定 - 版本管理按钮 → 跳转到版本管理页面
-      const btnVersion = card.querySelector('.btn-version-instance');
-      if (btnVersion) {
-        btnVersion.addEventListener('click', (e) => {
-          e.stopPropagation();
-          window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
-        });
-      }
-
-      // 事件绑定 - 启动按钮 → 在主界面直接启动，然后刷新卡片
-      const btnStart = card.querySelector('.btn-start-instance');
-      if (btnStart) {
-        btnStart.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await startInstanceFromCard(instance.id);
-        });
-      }
-      
-      // 事件绑定 - 停止按钮 → 在主界面直接停止
-      const btnStop = card.querySelector('.btn-stop-instance');
-      if (btnStop) {
-        btnStop.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await stopInstanceFromCard(instance.id);
-        });
-      }
-      
-      // 事件绑定 - 查看日志按钮 → 跳转到实例视图（不自动启动）
-      const btnView = card.querySelector('.btn-view-instance');
-      if (btnView) {
-        btnView.addEventListener('click', (e) => {
-          e.stopPropagation();
-          window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
-        });
-      }
-      
-      // 整个卡片点击：运行中 → 进入日志，停止中 → 进入实例视图
-      card.addEventListener('click', () => {
-         window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
-      });
-    }
-    
-    // 将卡片插入到 Add Card 后面
+  // 渲染收藏的实例
+  favoriteInstances.forEach(instance => {
+    const card = createInstanceCard(instance);
+    favoriteGrid.appendChild(card);
+  });
+  
+  // 渲染普通实例
+  normalInstances.forEach(instance => {
+    const card = createInstanceCard(instance);
     grid.appendChild(card);
   });
+}
+
+// ─── Create Instance Card ──────────────────────────────────────────────
+
+function createInstanceCard(instance) {
+  const card = document.createElement('div');
+  card.className = 'instance-card';
+  card.dataset.instanceId = instance.id;
+  
+  // 检查是否是未完成安装的实例
+  const isIncomplete = instance.installCompleted === false;
+  
+  // 实时状态
+  const liveStatus = state.runningStatuses[instance.id] || instance.status || 'stopped';
+  let statusClass = liveStatus;
+  if (isIncomplete) {
+    statusClass = 'incomplete';
+    card.classList.add('incomplete');
+  }
+  
+  // 根据安装状态显示不同内容
+  if (isIncomplete) {
+    card.innerHTML = `
+      <div class="instance-card-header">
+        <div class="instance-icon incomplete">
+          <span class="material-symbols-rounded">construction</span>
+        </div>
+        <div class="instance-status-dot ${statusClass}" title="安装未完成"></div>
+      </div>
+      
+      <div class="instance-card-body">
+        <div class="instance-name" title="${instance.name}">${instance.name}</div>
+        <div class="instance-path" title="${instance.path}">${instance.path}</div>
+        <div class="instance-desc incomplete-warning">
+          <span class="material-symbols-rounded">warning</span>
+          安装未完成，点击继续
+        </div>
+      </div>
+      
+      <div class="instance-card-footer">
+        <button class="md3-btn md3-btn-text md3-btn-sm btn-delete-incomplete">
+          删除
+        </button>
+        <button class="md3-btn md3-btn-filled md3-btn-sm btn-continue-install">
+          继续安装
+        </button>
+      </div>
+    `;
+    
+    // 绑定继续安装按钮
+    const btnContinue = card.querySelector('.btn-continue-install');
+    btnContinue.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
+    });
+    
+    // 绑定删除按钮
+    const btnDelete = card.querySelector('.btn-delete-incomplete');
+    btnDelete.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (await window.customConfirm('确定要删除这个未完成的实例吗？已下载的文件也会被清理。', '确认删除')) {
+        try {
+          await window.mofoxAPI.installCleanup(instance.id);
+          await loadInstances();
+        } catch (err) {
+          console.error('清理失败:', err);
+          await window.customAlert('清理失败: ' + err.message, '错误');
+        }
+      }
+    });
+    
+    // 点击卡片也可以继续安装
+    card.addEventListener('click', () => {
+      window.location.href = `../install-wizard/wizard.html?instanceId=${encodeURIComponent(instance.id)}&resume=1`;
+    });
+    
+  } else {
+    const isRunning = isActiveStatus(liveStatus);
+    const isStopped = liveStatus === 'stopped' || liveStatus === 'error';
+    const statusLabel = STATUS_TEXT[liveStatus] || liveStatus;
+    
+    // 运行中的卡片加上特殊 class
+    if (isRunning) card.classList.add('instance-running');
+    if (liveStatus === 'error') card.classList.add('instance-error');
+    
+    card.innerHTML = `
+      <div class="instance-card-header">
+        <div class="instance-icon ${isRunning ? 'running' : ''}">
+          <span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>
+        </div>
+        <div class="instance-status-indicator">
+          <div class="instance-status-dot ${liveStatus}"></div>
+          <span class="instance-status-label">${statusLabel}</span>
+        </div>
+      </div>
+      
+      <div class="instance-card-body">
+        <div class="instance-name" title="${instance.name}">${instance.name}</div>
+        <div class="instance-path" title="${instance.path}">${instance.path}</div>
+        <div class="instance-meta">${instance.autoInfo}</div>
+        ${instance.description ? `<div class="instance-desc" title="${instance.description}">${instance.description}</div>` : ''}
+      </div>
+      
+      <div class="instance-card-footer">
+        <button class="md3-btn md3-btn-text md3-btn-sm btn-settings-instance" title="管理实例">
+          <span class="material-symbols-rounded">settings</span>
+          管理
+        </button>
+        ${isRunning ? `
+          <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${liveStatus !== 'running' ? 'disabled' : ''}>
+            <span class="material-symbols-rounded">stop</span>
+            停止
+          </button>
+          <button class="md3-btn md3-btn-tonal md3-btn-sm btn-view-instance" title="查看日志">
+            <span class="material-symbols-rounded">terminal</span>
+            日志
+          </button>
+        ` : `
+          <button class="md3-btn md3-btn-tonal md3-btn-sm btn-version-instance" title="版本管理">
+            <span class="material-symbols-rounded">system_update</span>
+            版本
+          </button>
+          <button class="md3-btn md3-btn-filled md3-btn-sm btn-start-instance" title="立即启动" ${!isStopped ? 'disabled' : ''}>
+            <span class="material-symbols-rounded">play_arrow</span>
+            启动
+          </button>
+        `}
+      </div>
+    `;
+    
+    // 事件绑定 - 管理按钮 → 打开编辑对话框
+    const btnSettings = card.querySelector('.btn-settings-instance');
+    btnSettings.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(instance);
+    });
+    
+    // 事件绑定 - 版本管理按钮 → 跳转到版本管理页面
+    const btnVersion = card.querySelector('.btn-version-instance');
+    if (btnVersion) {
+      btnVersion.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.location.href = `../version-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+      });
+    }
+
+    // 事件绑定 - 启动按钮 → 在主界面直接启动，然后刷新卡片
+    const btnStart = card.querySelector('.btn-start-instance');
+    if (btnStart) {
+      btnStart.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await startInstanceFromCard(instance.id);
+      });
+    }
+    
+    // 事件绑定 - 停止按钮 → 在主界面直接停止
+    const btnStop = card.querySelector('.btn-stop-instance');
+    if (btnStop) {
+      btnStop.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await stopInstanceFromCard(instance.id);
+      });
+    }
+    
+    // 事件绑定 - 查看日志按钮 → 跳转到实例视图（不自动启动）
+    const btnView = card.querySelector('.btn-view-instance');
+    if (btnView) {
+      btnView.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+      });
+    }
+    
+    // 整个卡片点击：运行中 → 进入日志，停止中 → 进入实例视图
+    card.addEventListener('click', () => {
+      window.location.href = `../instance-view/index.html?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(instance.name)}`;
+    });
+  }
+  
+  return card;
 }
 
 // ─── 主界面直接启动/停止实例 ──────────────────────────────────────────
@@ -471,6 +499,19 @@ function openEditModal(instance) {
   document.getElementById('edit-instance-name').value = instance.name || '';
   document.getElementById('edit-instance-desc').value = instance.description || '';
   
+  // 填充收藏状态
+  const likeCheckbox = document.getElementById('edit-instance-like');
+  const likeLabel = document.getElementById('edit-instance-like-label');
+  if (likeCheckbox && likeLabel) {
+    likeCheckbox.checked = instance.isLike || false;
+    likeLabel.textContent = instance.isLike ? '已收藏' : '未收藏';
+    
+    // 添加切换事件监听
+    likeCheckbox.onchange = function() {
+      likeLabel.textContent = this.checked ? '已收藏' : '未收藏';
+    };
+  }
+  
   // 设置模态框标题
   const modalTitle = document.querySelector('#edit-instance-title') || document.querySelector('#edit-modal-title');
   if (modalTitle) {
@@ -589,6 +630,7 @@ export function createNewInstance() {
 export async function saveInstance() {
   const name = el.editInstanceName.value.trim();
   const description = el.editInstanceDesc.value.trim();
+  const isLike = document.getElementById('edit-instance-like')?.checked || false;
   
   // 验证：名称必填
   if (!name) {
@@ -598,15 +640,29 @@ export async function saveInstance() {
   
   try {
     if (state.currentEditingInstance) {
-      // 编辑现有实例 - 只更新名称和描述
-      console.log('保存实例:', state.currentEditingInstance, { displayName: name, description });
+      // 编辑现有实例 - 更新名称、描述和收藏状态（存储在 extra 对象中）
+      console.log('保存实例:', state.currentEditingInstance, { extra: { displayName: name, description, isLike } });
       
       await window.mofoxAPI.updateInstance(state.currentEditingInstance, {
-        displayName: name,
-        description: description,
+        extra: {
+          displayName: name,
+          description: description,
+          isLike: isLike,
+        },
       });
       
       console.log('实例更新成功');
+      
+      // 立即更新本地状态并重新渲染
+      const instance = state.instances.find(i => i.id === state.currentEditingInstance);
+      if (instance) {
+        instance.name = name;
+        instance.description = description;
+        instance.isLike = isLike;
+        
+        // 重新渲染列表以更新分组
+        renderInstances();
+      }
     } else {
       // 新建实例应该通过安装向导，这里给出提示
       await window.customAlert('请通过安装向导创建新实例', '提示');
@@ -615,9 +671,6 @@ export async function saveInstance() {
     
     // 关闭模态框
     el.editInstanceModal.classList.add('hidden');
-    
-    // 重新加载实例列表以显示最新数据
-    await loadInstances();
     
   } catch (error) {
     console.error('保存实例失败:', error);
@@ -659,5 +712,77 @@ export async function deleteInstance() {
     console.error('删除实例失败:', error);
     await window.customAlert('删除失败: ' + error.message, '错误');
     // 出错时不关闭模态框，让用户可以重试或取消
+  }
+}
+
+// ─── Toggle Instance Like ─────────────────────────────────────────────
+
+async function toggleInstanceLike(instanceId) {
+  try {
+    const instance = state.instances.find(i => i.id === instanceId);
+    if (!instance) return;
+    
+    const newLikeStatus = !instance.isLike;
+    
+    // 获取当前实例的 extra 对象
+    const currentExtra = {
+      displayName: instance.name,
+      description: instance.description,
+      isLike: newLikeStatus,
+    };
+    
+    // 更新后端
+    await window.mofoxAPI.updateInstance(instanceId, {
+      extra: currentExtra,
+    });
+    
+    // 更新本地状态
+    instance.isLike = newLikeStatus;
+    
+    // 重新渲染整个列表以更新分组
+    renderInstances();
+  } catch (error) {
+    console.error('切换收藏状态失败:', error);
+    await window.customAlert('操作失败: ' + error.message, '错误');
+  }
+}
+
+// 更新实例卡片UI（名称、描述）- 收藏状态变化时会重新渲染整个列表
+function updateInstanceCardUI(instanceId) {
+  const instance = state.instances.find(i => i.id === instanceId);
+  if (!instance) return;
+  
+  const card = document.querySelector(`.instance-card[data-instance-id="${instanceId}"]`);
+  if (!card) return;
+  
+  // 更新名称
+  const nameEl = card.querySelector('.instance-name');
+  if (nameEl) {
+    nameEl.textContent = instance.name;
+    nameEl.setAttribute('title', instance.name);
+  }
+  
+  // 更新描述
+  const descEl = card.querySelector('.instance-desc');
+  if (instance.description) {
+    if (descEl) {
+      descEl.textContent = instance.description;
+      descEl.setAttribute('title', instance.description);
+    } else {
+      // 如果之前没有描述，现在添加了，需要创建元素
+      const bodyEl = card.querySelector('.instance-card-body');
+      if (bodyEl) {
+        const newDescEl = document.createElement('div');
+        newDescEl.className = 'instance-desc';
+        newDescEl.textContent = instance.description;
+        newDescEl.setAttribute('title', instance.description);
+        bodyEl.appendChild(newDescEl);
+      }
+    }
+  } else {
+    // 如果删除了描述，移除元素
+    if (descEl) {
+      descEl.remove();
+    }
   }
 }
