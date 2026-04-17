@@ -460,20 +460,50 @@ export function setupInstanceStatusListener() {
 function openEditModal(instance) {
   state.currentEditingInstance = instance.id;
   
-  // 只填充名称和描述
+  // 填充概览数据
+  document.getElementById('overview-state').textContent = STATUS_TEXT[instance.status] || instance.status;
+  document.getElementById('overview-version').textContent = instance.version;
+  document.getElementById('overview-channel').textContent = instance.branch || '未知';
+  document.getElementById('overview-qq').textContent = instance.qqNumber || '未绑定';
+  document.getElementById('overview-post').textContent = instance.wsPort || '未知';
+  
+  // 填充名称和描述
   document.getElementById('edit-instance-name').value = instance.name || '';
   document.getElementById('edit-instance-desc').value = instance.description || '';
   
   // 设置模态框标题
-  const modalTitle = document.querySelector('#edit-instance-modal .modal-title');
+  const modalTitle = document.querySelector('#edit-instance-title') || document.querySelector('#edit-modal-title');
   if (modalTitle) {
-    modalTitle.textContent = '编辑实例';
+    modalTitle.textContent = '实例管理';
   }
   
   // 显示删除按钮
   const deleteBtn = document.getElementById('btn-delete-instance');
   if (deleteBtn) {
     deleteBtn.style.display = 'flex';
+  }
+  
+  // 将 Tab 重新置为 default (实例概览)
+  const sidebarTabs = document.querySelectorAll('#edit-instance-sidebar .sidebar-tab');
+  if (sidebarTabs.length > 0) {
+    sidebarTabs.forEach(t => t.classList.remove('active'));
+    const defaultTab = document.querySelector('#edit-instance-sidebar .sidebar-tab[data-tab="overview"]');
+    if (defaultTab) {
+      defaultTab.classList.add('active');
+    } else {
+      sidebarTabs[0].classList.add('active'); // fallback
+    }
+  }
+  
+  const contentPanes = document.querySelectorAll('#edit-instance-content .tab-pane');
+  if (contentPanes.length > 0) {
+    contentPanes.forEach(p => p.classList.remove('active'));
+    const defaultPane = document.getElementById('tab-overview');
+    if (defaultPane) {
+      defaultPane.classList.add('active');
+    } else {
+      contentPanes[0].classList.add('active');
+    }
   }
   
   // 显示模态框

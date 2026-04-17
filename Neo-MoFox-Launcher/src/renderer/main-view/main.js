@@ -88,6 +88,26 @@ el.editInstanceModal.addEventListener('click', (e) => {
   }
 });
 
+// 编辑实例模态框 - 选项卡切换逻辑
+document.querySelectorAll('#edit-instance-sidebar .sidebar-tab').forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    // 切换 Tab active 状态
+    document.querySelectorAll('#edit-instance-sidebar .sidebar-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    // 切换内容区域
+    const targetId = 'tab-' + tab.dataset.tab;
+    document.querySelectorAll('#edit-instance-content .tab-pane').forEach(pane => {
+      pane.classList.remove('active');
+    });
+    
+    const targetPane = document.getElementById(targetId);
+    if (targetPane) {
+      targetPane.classList.add('active');
+    }
+  });
+});
+
 // ─── 🧲 Ctrl+Shift+M 开发者致谢面板彩蛋 ─────────────────────────────────
 
 function initCreditsPanel() {

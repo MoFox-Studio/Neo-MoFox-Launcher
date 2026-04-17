@@ -131,35 +131,130 @@
 
   <!-- ═══ 编辑实例对话框 ═══ -->
   <div class="modal-overlay hidden" id="edit-instance-modal">
-    <div class="modal-card modal-large">
+    <div class="modal-card modal-xlarge modal-split">
       <div class="modal-header">
-        <span class="material-symbols-rounded">edit</span>
-        <h3 id="edit-modal-title">编辑实例</h3>
+        <span class="material-symbols-rounded">edit_square</span>
+        <h3 id="edit-modal-title">实例管理</h3>
         <button class="icon-btn" id="btn-close-edit-modal">
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
-      <div class="modal-body">
-        <div class="form-section">
-          <div class="form-group">
-            <label class="form-label">实例名称</label>
-            <input type="text" class="form-input" id="edit-instance-name" placeholder="我的 Neo-MoFox">
+      
+      <div class="modal-body modal-body-split">
+        <!-- 左侧菜单 -->
+        <aside class="modal-sidebar" id="edit-instance-sidebar">
+          <button class="sidebar-tab active" data-tab="overview">
+            <span class="material-symbols-rounded">dashboard</span>
+            实例概览
+          </button>
+          <button class="sidebar-tab" data-tab="basic">
+            <span class="material-symbols-rounded">settings</span>
+            基本设置
+          </button>
+          <button class="sidebar-tab" data-tab="danger">
+            <span class="material-symbols-rounded">warning</span>
+            危险操作
+          </button>
+        </aside>
+        
+        <!-- 右侧内容 -->
+        <main class="modal-content-area" id="edit-instance-content">
+          <div class="tab-pane active" id="tab-overview">
+            <div class="pane-header">实例概览</div>
+            <div class="form-section">
+              <div class="modular-grid">
+                <div class="mod-card">
+                  <div class="mod-icon-wrap">
+                    <span class="material-symbols-rounded">data_usage</span>
+                  </div>
+                  <div class="mod-data">
+                    <div class="mod-label">当前状态</div>
+                    <div class="mod-value" id="overview-state">未知</div>
+                  </div>
+                </div>
+                
+                <div class="mod-card">
+                  <div class="mod-icon-wrap">
+                    <span class="material-symbols-rounded">new_releases</span>
+                  </div>
+                  <div class="mod-data">
+                    <div class="mod-label">框架版本</div>
+                    <div class="mod-value" id="overview-version">读取中...</div>
+                  </div>
+                </div>
+                
+                <div class="mod-card">
+                  <div class="mod-icon-wrap">
+                    <span class="material-symbols-rounded">account_tree</span>
+                  </div>
+                  <div class="mod-data">
+                    <div class="mod-label">分支通道</div>
+                    <div class="mod-value" id="overview-channel">读取中...</div>
+                  </div>
+                </div>
+                
+                <div class="mod-card">
+                  <div class="mod-icon-wrap">
+                    <span class="material-symbols-rounded">smart_toy</span>
+                  </div>
+                  <div class="mod-data">
+                    <div class="mod-label">机器人 QQ</div>
+                    <div class="mod-value" id="overview-qq">--</div>
+                  </div>
+                </div>
+                
+                <div class="mod-card">
+                  <div class="mod-icon-wrap">
+                    <span class="material-symbols-rounded">cable</span>
+                  </div>
+                  <div class="mod-data">
+                    <div class="mod-label">WebSocket 端口</div>
+                    <div class="mod-value" id="overview-post">--</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">描述</label>
-            <textarea class="form-textarea" id="edit-instance-desc" placeholder="可选：为这个实例添加一些描述" rows="3"></textarea>
+          
+          <div class="tab-pane" id="tab-basic">
+            <div class="pane-header">基本设置</div>
+            <div class="form-section">
+              <div class="form-group">
+                <label class="form-label">实例名称</label>
+                <input type="text" class="form-input" id="edit-instance-name" placeholder="我的 Neo-MoFox">
+              </div>
+              <div class="form-group">
+                <label class="form-label">描述</label>
+                <textarea class="form-textarea" id="edit-instance-desc" placeholder="可选：为这个实例添加一些描述" rows="3"></textarea>
+              </div>
+            </div>
           </div>
-        </div>
+          
+          <div class="tab-pane" id="tab-danger">
+            <div class="pane-header danger-text">危险操作</div>
+            <div class="form-section">
+              <div class="danger-zone">
+                <div class="danger-item">
+                  <div class="danger-info">
+                    <h5>删除实例</h5>
+                    <p>此操作将永久删除该实例及其所有数据文件，无法恢复。</p>
+                  </div>
+                  <button class="md3-btn md3-btn-danger" id="btn-delete-instance">
+                    <span class="material-symbols-rounded">delete_forever</span>
+                    删除实例
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
+      
       <div class="modal-footer">
         <button class="md3-btn md3-btn-text" id="btn-cancel-edit">取消</button>
-        <button class="md3-btn md3-btn-danger" id="btn-delete-instance">
-          <span class="material-symbols-rounded">delete</span>
-          <span>删除实例</span>
-        </button>
         <button class="md3-btn md3-btn-primary" id="btn-save-instance">
           <span class="material-symbols-rounded">save</span>
-          <span>保存</span>
+          <span>保存更改</span>
         </button>
       </div>
     </div>
