@@ -233,6 +233,7 @@ function createInstanceCard(instance) {
     if (instance.iconFullPath) {
       // 使用完整路径（已通过 getIconFullPath 获取）
       iconHTML = `<img src="${instance.iconFullPath}" alt="${instance.name}" class="instance-icon-img" onerror="this.style.display='none'">`;
+      console.log('使用实例图标:', instance.iconFullPath);
     } else {
       iconHTML = `<span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>`;
     }
@@ -712,7 +713,7 @@ export async function saveInstance() {
           displayName: name,
           description: description,
           isLike: isLike,
-          iconPath: iconResult.iconPath || instance?.extra?.iconPath, // 保留现有图标路径
+          iconPath: iconResult.iconPath, // 直接使用返回的路径（可能是 null，表示删除图标）
         },
       };
       
@@ -725,15 +726,24 @@ export async function saveInstance() {
         instance.name = name;
         instance.description = description;
         instance.isLike = isLike;
+        
+        // 无论是设置新图标还是删除图标，都要更新
+        instance.extra = instance.extra || {};
+        instance.extra.iconPath = iconResult.iconPath;
+        
+        // 更新完整路径
         if (iconResult.iconPath) {
-          instance.extra = instance.extra || {};
-          instance.extra.iconPath = iconResult.iconPath;
-          // 同时更新完整路径
+          console.log('更新实例图标路径:', iconResult.iconPath);
           try {
             instance.iconFullPath = await window.mofoxAPI.getIconFullPath(iconResult.iconPath);
           } catch (err) {
             console.warn('获取图标完整路径失败:', err);
+            instance.iconFullPath = null;
           }
+        } else {
+          // 图标被删除，清除完整路径
+          console.log('清除实例图标路径');
+          instance.iconFullPath = null;
         }
         
         // 重新渲染列表以更新分组
