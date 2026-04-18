@@ -73,6 +73,10 @@
           <span class="material-symbols-rounded">description</span>
           <span class="sidebar-label">日志</span>
         </button>
+        <button class="sidebar-item" data-section="section-data">
+          <span class="material-symbols-rounded">storage</span>
+          <span class="sidebar-label">数据</span>
+        </button>
         <button class="sidebar-item" data-section="section-about">
           <span class="material-symbols-rounded">info</span>
           <span class="sidebar-label">关于</span>
@@ -326,6 +330,109 @@
             <input type="number" class="settings-input" id="log-max-file-size" min="1" max="500" step="1" title="单文件最大大小">
             <span class="input-suffix">MB</span>
           </div>
+        </div>
+
+      </section>
+
+      <!-- ══ 数据 ══ -->
+      <section class="settings-section" id="section-data">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">storage</span>
+          <h2>数据</h2>
+        </div>
+
+        <!-- 实例配置文件 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">edit_document</span>
+            <div>
+              <div class="card-title">实例配置文件</div>
+              <div class="card-desc">在编辑器中打开实例列表配置文件 (instances.json)</div>
+            </div>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-open-instance-data">
+            <span class="material-symbols-rounded">edit_note</span>
+            <span>编辑实例配置</span>
+          </button>
+        </div>
+
+        <!-- 全局设置文件 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">settings_applications</span>
+            <div>
+              <div class="card-title">全局设置文件</div>
+              <div class="card-desc">在编辑器中打开启动器的全局设置文件 (settings.json)</div>
+            </div>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-open-settings-data">
+            <span class="material-symbols-rounded">edit_note</span>
+            <span>编辑全局设置</span>
+          </button>
+        </div>
+
+        <!-- 导出备份 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">cloud_upload</span>
+            <div>
+              <div class="card-title">导出配置备份</div>
+              <div class="card-desc">导出实例配置和全局设置（不包含实例文件夹、日志等数据）</div>
+            </div>
+          </div>
+          <div class="backup-info">
+            <span class="material-symbols-rounded">info</span>
+            <div class="backup-info-text">
+              <p>备份内容包括：</p>
+              <ul>
+                <li>实例配置文件 (instances.json)</li>
+                <li>全局设置文件 (settings.json)</li>
+              </ul>
+              <p class="backup-note">⚠️ 不会备份实例安装目录、运行数据、日志文件等大型文件</p>
+            </div>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-export-backup">
+            <span class="material-symbols-rounded">cloud_upload</span>
+            <span>导出配置备份</span>
+          </button>
+        </div>
+
+        <!-- 导入备份 -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">cloud_download</span>
+            <div>
+              <div class="card-title">导入备份</div>
+              <div class="card-desc">从备份文件恢复实例配置和数据</div>
+            </div>
+          </div>
+          <div class="import-warning">
+            <span class="material-symbols-rounded">warning</span>
+            <span>导入备份将覆盖现有的同名实例配置，请谨慎操作</span>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-import-backup">
+            <span class="material-symbols-rounded">cloud_download</span>
+            <span>选择备份文件导入</span>
+          </button>
+        </div>
+
+        <!-- 实验性功能：手动添加实例 -->
+        <div class="settings-card settings-card-experimental">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">science</span>
+            <div>
+              <div class="card-title">实验性功能</div>
+              <div class="card-desc">⚠️ 高级选项：手动添加实例配置，需要填写所有必需参数</div>
+            </div>
+          </div>
+          <div class="experimental-warning">
+            <span class="material-symbols-rounded">info</span>
+            <span>此功能适合高级用户，错误的配置可能导致实例无法启动</span>
+          </div>
+          <button class="md3-btn md3-btn-tonal" id="btn-manual-add-instance">
+            <span class="material-symbols-rounded">add_circle</span>
+            <span>手动添加实例</span>
+          </button>
         </div>
 
       </section>

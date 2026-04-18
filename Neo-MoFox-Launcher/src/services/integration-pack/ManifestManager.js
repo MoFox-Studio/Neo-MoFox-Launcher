@@ -62,7 +62,7 @@ class ManifestManager {
       launcherVersion,
       content: {
         neoMofox: content.neoMofox || { included: false },
-        napcat: content.napcat || { included: false },
+        napcat: content.napcat || { included: false,installOnImport: false },
         plugins: content.plugins || { included: false, list: [] },
         config: content.config || { included: false },
         data: content.data || { included: false },

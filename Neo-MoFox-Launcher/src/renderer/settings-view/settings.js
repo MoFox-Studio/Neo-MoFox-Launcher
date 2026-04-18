@@ -57,6 +57,13 @@ const el = {
   logMaxFileSize:     $('log-max-file-size'),
   btnOpenLogs:        $('btn-open-logs'),
 
+  // 数据
+  btnOpenInstanceData: $('btn-open-instance-data'),
+  btnOpenSettingsData: $('btn-open-settings-data'),
+  btnExportBackup:     $('btn-export-backup'),
+  btnImportBackup:     $('btn-import-backup'),
+  btnManualAddInstance: $('btn-manual-add-instance'),
+
   // 关于
   aboutVersion:       $('about-version'),
   btnOpenGithub:      $('btn-open-github'),
@@ -304,6 +311,75 @@ function bindEvents() {
     window.mofoxAPI.openLogsDir();
   });
 
+  // 数据 - 打开实例数据文件夹
+  el.btnOpenInstanceData?.addEventListener('click', async () => {
+    try {
+      await window.mofoxAPI.openInstanceDataDir();
+    } catch (e) {
+      console.error('[settings] 打开实例数据文件夹失败', e);
+    }
+  });
+
+  // 数据 - 打开设置数据文件夹
+  el.btnOpenSettingsData?.addEventListener('click', async () => {
+    try {
+      await window.mofoxAPI.openSettingsDataDir();
+    } catch (e) {
+      console.error('[settings] 打开设置数据文件夹失败', e);
+    }
+  });
+
+  // 数据 - 导出配置备份
+  el.btnExportBackup?.addEventListener('click', async () => {
+    try {
+      const result = await window.mofoxAPI.exportBackup();
+      if (result.success) {
+        const sizeKB = (result.size / 1024).toFixed(2);
+        await window.customAlert(
+          `配置备份已成功导出！\n\n文件路径: ${result.path}\n文件大小: ${sizeKB} KB\n\n备份内容包括:\n• 实例配置列表 (instances.json)\n• 全局设置 (settings.json)\n\n⚠️ 此备份不包含实例安装目录、运行数据及日志文件`,
+          '导出成功'
+        );
+      } else if (!result.cancelled) {
+        await window.customAlert(result.error || '导出失败', '导出失败');
+      }
+    } catch (e) {
+      console.error('[settings] 导出配置备份失败', e);
+      await window.customAlert('导出备份时发生错误', '错误');
+    }
+  });
+
+  // 数据 - 导入备份
+  el.btnImportBackup?.addEventListener('click', async () => {
+    const confirmed = await window.customConfirm(
+      '导入备份将覆盖现有的同名实例配置，此操作不可撤销。\n确定要继续吗？',
+      '确认导入'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const result = await window.mofoxAPI.importBackup();
+      if (result.success) {
+        await window.customAlert(
+          `成功导入 ${result.count || 0} 个实例配置`,
+          '导入成功'
+        );
+      } else if (result.cancelled) {
+        // 用户取消了文件选择
+      } else {
+        await window.customAlert(result.error || '导入失败', '导入失败');
+      }
+    } catch (e) {
+      console.error('[settings] 导入备份失败', e);
+      await window.customAlert('导入备份时发生错误', '错误');
+    }
+  });
+
+  // 数据 - 手动添加实例（实验性功能）
+  el.btnManualAddInstance?.addEventListener('click', () => {
+    openManualAddInstanceDialog();
+  });
+
   // 浏览安装目录
   el.btnBrowseInstallDir.addEventListener('click', async () => {
     const selected = await window.mofoxAPI.selectProjectPath();
@@ -468,6 +544,240 @@ function launchConfetti() {
   }
 
   animate();
+}
+
+// ─── 🧪 手动添加实例对话框 ────────────────────────────────────────────
+function openManualAddInstanceDialog() {
+  // 创建对话框容器
+  const dialogOverlay = document.createElement('div');
+  dialogOverlay.className = 'dialog-overlay';
+  dialogOverlay.innerHTML = `
+    <div class="dialog-backdrop" id="manual-instance-backdrop"></div>
+    <div class="dialog-card manual-instance-dialog">
+      <div class="dialog-header">
+        <h3 class="dialog-title">
+          <span class="material-symbols-rounded">science</span>
+          手动添加实例 (实验性)
+        </h3>
+        <button class="dialog-close-btn" id="manual-instance-close">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+      <div class="dialog-content manual-instance-content">
+        <div class="form-warning">
+          <span class="material-symbols-rounded">warning</span>
+          <span>此功能适合高级用户。请确保所有信息准确无误，错误的配置可能导致实例无法启动。</span>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">label</span>
+            显示名称
+          </label>
+          <input type="text" class="form-input" id="instance-display-name" placeholder="例如: 我的机器人">
+          <span class="form-hint">实例的显示名称（可选，默认使用 QQ 号）</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">
+              <span class="material-symbols-rounded">numbers</span>
+              QQ 号 *
+            </label>
+            <input type="text" class="form-input" id="instance-qq" placeholder="例如: 123456789" required>
+            <span class="form-hint">机器人的 QQ 号</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <span class="material-symbols-rounded">person</span>
+              主人 QQ 号 *
+            </label>
+            <input type="text" class="form-input" id="instance-owner-qq" placeholder="例如: 987654321" required>
+            <span class="form-hint">机器人主人的 QQ 号</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">key</span>
+            API 密钥 *
+          </label>
+          <input type="text" class="form-input" id="instance-api-key" placeholder="例如: your-api-key-here" required>
+          <span class="form-hint">用于 API 访问的密钥</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">api</span>
+            WebSocket 端口
+          </label>
+          <input type="number" class="form-input" id="instance-ws-port" placeholder="8080" value="8080" min="1024" max="65535">
+          <span class="form-hint">WebSocket 服务端口</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">folder</span>
+            Neo-MoFox 目录 *
+          </label>
+          <div class="path-input-group">
+            <input type="text" class="form-input" id="instance-neomofox-dir" placeholder="例如: D:\\Bots\\MyBot\\neo-mofox" required>
+            <button class="md3-btn md3-btn-tonal" id="browse-neomofox-dir">
+              <span class="material-symbols-rounded">folder_open</span>
+            </button>
+          </div>
+          <span class="form-hint">Neo-MoFox 项目的根目录（将自动检测 Git 分支作为频道）</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">folder</span>
+            NapCat 目录
+          </label>
+          <div class="path-input-group">
+            <input type="text" class="form-input" id="instance-napcat-dir" placeholder="例如: D:\\Bots\\MyBot\\napcat">
+            <button class="md3-btn md3-btn-tonal" id="browse-napcat-dir">
+              <span class="material-symbols-rounded">folder_open</span>
+            </button>
+          </div>
+          <span class="form-hint">NapCat 目录（可选）</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">tag</span>
+            NapCat 版本
+          </label>
+          <input type="text" class="form-input" id="instance-napcat-version" placeholder="例如: 1.0.0">
+          <span class="form-hint">NapCat 版本号（可选）</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="material-symbols-rounded">description</span>
+            备注
+          </label>
+          <textarea class="form-input" id="instance-description" rows="2" placeholder="关于此实例的补充说明..."></textarea>
+        </div>
+
+      </div>
+      <div class="dialog-actions">
+        <button class="md3-btn md3-btn-text" id="manual-instance-cancel">
+          <span>取消</span>
+        </button>
+        <button class="md3-btn md3-btn-filled" id="manual-instance-confirm">
+          <span class="material-symbols-rounded">add_circle</span>
+          <span>添加实例</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialogOverlay);
+
+  // 获取元素
+  const backdrop = dialogOverlay.querySelector('#manual-instance-backdrop');
+  const closeBtn = dialogOverlay.querySelector('#manual-instance-close');
+  const cancelBtn = dialogOverlay.querySelector('#manual-instance-cancel');
+  const confirmBtn = dialogOverlay.querySelector('#manual-instance-confirm');
+  
+  const displayNameInput = dialogOverlay.querySelector('#instance-display-name');
+  const qqInput = dialogOverlay.querySelector('#instance-qq');
+  const ownerQQInput = dialogOverlay.querySelector('#instance-owner-qq');
+  const apiKeyInput = dialogOverlay.querySelector('#instance-api-key');
+  const wsPortInput = dialogOverlay.querySelector('#instance-ws-port');
+  const neomofoxDirInput = dialogOverlay.querySelector('#instance-neomofox-dir');
+  const napcatDirInput = dialogOverlay.querySelector('#instance-napcat-dir');
+  const napcatVersionInput = dialogOverlay.querySelector('#instance-napcat-version');
+  const descInput = dialogOverlay.querySelector('#instance-description');
+
+  const browseNeomofoxDirBtn = dialogOverlay.querySelector('#browse-neomofox-dir');
+  const browseNapcatDirBtn = dialogOverlay.querySelector('#browse-napcat-dir');
+
+  // 关闭对话框
+  const closeDialog = () => {
+    dialogOverlay.remove();
+  };
+
+  backdrop.addEventListener('click', closeDialog);
+  closeBtn.addEventListener('click', closeDialog);
+  cancelBtn.addEventListener('click', closeDialog);
+
+  // 浏览 Neo-MoFox 目录
+  browseNeomofoxDirBtn.addEventListener('click', async () => {
+    const selected = await window.mofoxAPI.selectProjectPath();
+    if (selected) {
+      neomofoxDirInput.value = selected;
+    }
+  });
+
+  // 浏览 NapCat 目录
+  browseNapcatDirBtn.addEventListener('click', async () => {
+    const selected = await window.mofoxAPI.selectProjectPath();
+    if (selected) napcatDirInput.value = selected;
+  });
+
+  // 确认添加
+  confirmBtn.addEventListener('click', async () => {
+    const qqNumber = qqInput.value.trim();
+    const ownerQQNumber = ownerQQInput.value.trim();
+    const apiKey = apiKeyInput.value.trim();
+    const neomofoxDir = neomofoxDirInput.value.trim();
+
+    // 验证必填字段
+    if (!qqNumber || !ownerQQNumber || !apiKey || !neomofoxDir) {
+      await window.customAlert('请填写所有必填字段（标记有 * 的字段）', '信息不完整');
+      return;
+    }
+
+    // 在保存前检测 Git 信息
+    const gitInfo = await window.mofoxAPI.getGitInfo(neomofoxDir);
+    if (!gitInfo.success) {
+      const confirmed = await window.customConfirm(
+        `无法获取 Git 信息：${gitInfo.error || '未知错误'}\n\n这可能导致实例频道设置为默认值 'dev'。\n\n是否继续添加？`,
+        'Git 信息获取失败'
+      );
+      if (!confirmed) return;
+    }
+
+    // 构建实例配置
+    const instanceConfig = {
+      qqNumber,
+      ownerQQNumber,
+      apiKey,
+      wsPort: wsPortInput.value ? parseInt(wsPortInput.value, 10) : 8080,
+      neomofoxDir,
+      napcatDir: napcatDirInput.value.trim() || null,
+      napcatVersion: napcatVersionInput.value.trim() || null,
+      displayName: displayNameInput.value.trim() || null,
+      description: descInput.value.trim() || null,
+    };
+
+    try {
+      const result = await window.mofoxAPI.manualAddInstance(instanceConfig);
+      
+      if (result.success) {
+        const channelInfo = result.channel ? `\n频道: ${result.channel}` : '';
+        await window.customAlert(
+          `实例已成功添加！\n\nQQ 号: ${qqNumber}\n实例 ID: ${result.instanceId}${channelInfo}\n\n请在主界面刷新实例列表以查看新添加的实例。`,
+          '添加成功'
+        );
+        closeDialog();
+      } else {
+        await window.customAlert(
+          result.error || '添加实例失败，请检查配置信息',
+          '添加失败'
+        );
+      }
+    } catch (e) {
+      console.error('[settings] 手动添加实例失败', e);
+      await window.customAlert('添加实例时发生错误，请查看日志', '错误');
+    }
+  });
+
+  // 聚焦到第一个输入框
+  setTimeout(() => displayNameInput.focus(), 100);
 }
 
 // ─── 启动 ────────────────────────────────────────────────────────────────

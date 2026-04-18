@@ -45,6 +45,7 @@ const api = {
 
   // 文件操作
   selectProjectPath: () => ipcRenderer.invoke('select-project-path'),
+  selectFile: (options) => ipcRenderer.invoke('select-file', options),
   openProjectFolder: () => ipcRenderer.invoke('open-project-folder'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   clearLogs: () => ipcRenderer.invoke('clear-logs'),
@@ -156,6 +157,14 @@ const api = {
   /** 同步读取设置，仅在 <head> 中应用主题时使用，避免 FOUC */
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
+  
+  // ─── 数据管理 ───────────────────────────────────────────────────────────
+  openInstanceDataDir: () => ipcRenderer.invoke('open-instance-data-dir'),
+  openSettingsDataDir: () => ipcRenderer.invoke('open-settings-data-dir'),
+  exportBackup: (options) => ipcRenderer.invoke('export-backup', options),
+  importBackup: () => ipcRenderer.invoke('import-backup'),
+  manualAddInstance: (instanceConfig) => ipcRenderer.invoke('manual-add-instance', instanceConfig),
+  getGitInfo: (repoPath) => ipcRenderer.invoke('get-git-info', repoPath),
 
   // ─── Dialog API ─────────────────────────────────────────────────────────────
   dialog: {

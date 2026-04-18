@@ -576,6 +576,25 @@ ipcMain.handle('select-project-path', async () => {
   return null;
 });
 
+ipcMain.handle('select-file', async (event, options = {}) => {
+  const dialogOptions = {
+    title: options.title || '选择文件',
+    properties: ['openFile'],
+    defaultPath: options.defaultPath || app.getPath('home'),
+  };
+  
+  if (options.filters) {
+    dialogOptions.filters = options.filters;
+  }
+  
+  const result = await dialog.showOpenDialog(mainWindow, dialogOptions);
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
 ipcMain.handle('clear-logs', () => {
   logBuffer = [];
 });
@@ -923,6 +942,405 @@ ipcMain.handle('open-logs-dir', () => {
   // 确保目录存在
   fs.mkdirSync(logsDir, { recursive: true });
   shell.openPath(logsDir);
+});
+
+// ─── 数据管理 IPC ────────────────────────────────────────────────────────
+
+// 编辑实例配置文件
+ipcMain.handle('open-instance-data-dir', () => {
+  const dataDir = storageService.getDataDir();
+  const instancesFile = path.join(dataDir, 'instances.json');
+  
+  // 确保文件存在
+  fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(instancesFile)) {
+    fs.writeFileSync(instancesFile, JSON.stringify({ version: 2, instances: [] }, null, 2), 'utf8');
+  }
+  
+  // 用系统默认编辑器打开
+  shell.openPath(instancesFile);
+});
+
+// 编辑全局设置文件
+ipcMain.handle('open-settings-data-dir', () => {
+  const dataDir = storageService.getDataDir();
+  const settingsFile = path.join(dataDir, 'settings.json');
+  
+  // 确保文件存在
+  fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({}, null, 2), 'utf8');
+  }
+  
+  // 用系统默认编辑器打开
+  shell.openPath(settingsFile);
+});
+
+// 导出配置备份（仅配置文件，不包含实例数据）
+ipcMain.handle('export-backup', async () => {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const defaultFileName = `mofox-config-backup-${timestamp}.zip`;
+    
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出配置备份',
+      defaultPath: path.join(app.getPath('documents'), defaultFileName),
+      filters: [
+        { name: 'ZIP 压缩包', extensions: ['zip'] }
+      ]
+    });
+    
+    if (result.canceled || !result.filePath) {
+      return { success: false, cancelled: true };
+    }
+    
+    const destPath = result.filePath;
+    
+    // 使用 archiver 创建 ZIP 文件
+    const archiver = require('archiver');
+    const output = fs.createWriteStream(destPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    return new Promise((resolve) => {
+      output.on('close', () => {
+        console.log(`[Backup] 配置备份文件已创建: ${destPath} (${archive.pointer()} 字节)`);
+        resolve({ success: true, path: destPath, size: archive.pointer() });
+      });
+      
+      archive.on('error', (err) => {
+        console.error('[Backup] 创建备份失败:', err);
+        resolve({ success: false, error: err.message });
+      });
+      
+      archive.pipe(output);
+      
+      const dataDir = storageService.getDataDir();
+      
+      // 只添加配置文件
+      const instancesFile = path.join(dataDir, 'instances.json');
+      if (fs.existsSync(instancesFile)) {
+        archive.file(instancesFile, { name: 'instances.json' });
+      }
+      
+      const settingsFile = path.join(dataDir, 'settings.json');
+      if (fs.existsSync(settingsFile)) {
+        archive.file(settingsFile, { name: 'settings.json' });
+      }
+      
+      // 添加说明文件
+      const readmeContent = `# Neo-MoFox Launcher 配置备份
+
+导出时间: ${new Date().toLocaleString('zh-CN')}
+
+## 备份内容
+
+- instances.json: 实例配置列表
+- settings.json: 全局设置
+
+## 不包含内容
+
+此备份不包含以下内容：
+- 实例安装目录及文件
+- 实例运行数据（数据库、聊天记录等）
+- 日志文件
+- 缓存文件
+
+请确保您的实例安装目录已单独备份，如有需要。
+
+## 恢复方法
+
+在 Launcher 设置 > 数据 > 导入备份 中选择此文件进行恢复。
+`;
+      archive.append(readmeContent, { name: 'README.txt' });
+      
+      archive.finalize();
+    });
+  } catch (error) {
+    console.error('[Backup] 导出备份失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 导入备份
+ipcMain.handle('import-backup', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择备份文件',
+      properties: ['openFile'],
+      filters: [
+        { name: 'ZIP 压缩包', extensions: ['zip'] }
+      ]
+    });
+    
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, cancelled: true };
+    }
+    
+    const backupPath = result.filePaths[0];
+    
+    // 使用 extract-zip 解压
+    const extract = require('extract-zip');
+    const tempDir = path.join(app.getPath('temp'), `mofox-restore-${Date.now()}`);
+    
+    await extract(backupPath, { dir: tempDir });
+    
+    let importedCount = 0;
+    
+    // 恢复实例配置
+    const instancesDir = path.join(tempDir, 'instances');
+    if (fs.existsSync(instancesDir)) {
+      const targetInstancesDir = path.join(storageService.getDataDir(), 'instances');
+      fs.mkdirSync(targetInstancesDir, { recursive: true });
+      
+      const files = fs.readdirSync(instancesDir);
+      for (const file of files) {
+        const srcPath = path.join(instancesDir, file);
+        const destPath = path.join(targetInstancesDir, file);
+        fs.copyFileSync(srcPath, destPath);
+        importedCount++;
+      }
+    }
+    
+    // 恢复全局设置（可选）
+    const settingsFile = path.join(tempDir, 'settings.json');
+    if (fs.existsSync(settingsFile)) {
+      const targetSettingsFile = path.join(storageService.getDataDir(), 'settings.json');
+      fs.copyFileSync(settingsFile, targetSettingsFile);
+    }
+    
+    // 清理临时目录
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    
+    console.log(`[Backup] 成功导入 ${importedCount} 个实例配置`);
+    return { success: true, count: importedCount };
+  } catch (error) {
+    console.error('[Backup] 导入备份失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 获取 Git 仓库信息（版本和分支）
+ipcMain.handle('get-git-info', async (event, repoPath) => {
+  try {
+    const { spawn } = require('child_process');
+    
+    if (!fs.existsSync(repoPath)) {
+      return { success: false, error: '目录不存在' };
+    }
+    
+    // 检查是否是 git 仓库
+    const gitDir = path.join(repoPath, '.git');
+    if (!fs.existsSync(gitDir)) {
+      return { success: false, error: '该目录不是 Git 仓库' };
+    }
+    
+    // 获取当前提交哈希
+    const getCommitHash = () => {
+      return new Promise((resolve, reject) => {
+        const gitProcess = spawn('git', ['rev-parse', 'HEAD'], { cwd: repoPath });
+        let output = '';
+        let errorOutput = '';
+        
+        gitProcess.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        gitProcess.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        gitProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve(output.trim());
+          } else {
+            reject(new Error(errorOutput || '获取提交哈希失败'));
+          }
+        });
+        
+        gitProcess.on('error', (err) => {
+          reject(err);
+        });
+      });
+    };
+    
+    // 获取当前分支名
+    const getBranchName = () => {
+      return new Promise((resolve, reject) => {
+        const gitProcess = spawn('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoPath });
+        let output = '';
+        let errorOutput = '';
+        
+        gitProcess.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        gitProcess.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        gitProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve(output.trim());
+          } else {
+            reject(new Error(errorOutput || '获取分支名失败'));
+          }
+        });
+        
+        gitProcess.on('error', (err) => {
+          reject(err);
+        });
+      });
+    };
+    
+    const [commitHash, branch] = await Promise.all([
+      getCommitHash(),
+      getBranchName()
+    ]);
+    
+    console.log(`[Git Info] 仓库: ${repoPath}, 提交: ${commitHash.substring(0, 8)}, 分支: ${branch}`);
+    
+    return {
+      success: true,
+      commitHash,
+      branch,
+    };
+  } catch (error) {
+    console.error('[Git Info] 获取 Git 信息失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 手动添加实例
+ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
+  try {
+    const { instanceService } = require('./services/instance/InstanceService');
+    const { spawn } = require('child_process');
+    
+    // 生成唯一 ID
+    const instanceId = `bot-${instanceConfig.qqNumber}`;
+    
+    // 验证必填字段
+    if (!instanceConfig.qqNumber || !instanceConfig.ownerQQNumber || !instanceConfig.apiKey) {
+      return { success: false, error: '缺少必填字段（QQ号、主人QQ号、API密钥）' };
+    }
+    
+    if (!instanceConfig.neomofoxDir) {
+      return { success: false, error: '缺少 Neo-MoFox 目录路径' };
+    }
+    
+    // 验证路径是否存在
+    if (!fs.existsSync(instanceConfig.neomofoxDir)) {
+      return { success: false, error: 'Neo-MoFox 目录不存在' };
+    }
+    
+    // 验证 NapCat 路径（如果提供）
+    if (instanceConfig.napcatDir && !fs.existsSync(instanceConfig.napcatDir)) {
+      return { success: false, error: 'NapCat 目录不存在' };
+    }
+    
+    // 获取 Git 信息
+    let neomofoxVersion = 'unknown';
+    let branch = instanceConfig.branch || 'unknown';
+    
+    try {
+      // 检查是否是 git 仓库
+      const gitDir = path.join(instanceConfig.neomofoxDir, '.git');
+      if (fs.existsSync(gitDir)) {
+        // 获取提交哈希
+        const commitHash = await new Promise((resolve, reject) => {
+          const gitProcess = spawn('git', ['rev-parse', 'HEAD'], { cwd: instanceConfig.neomofoxDir });
+          let output = '';
+          
+          gitProcess.stdout.on('data', (data) => {
+            output += data.toString();
+          });
+          
+          gitProcess.on('close', (code) => {
+            if (code === 0) {
+              resolve(output.trim());
+            } else {
+              resolve('unknown');
+            }
+          });
+          
+          gitProcess.on('error', () => {
+            resolve('unknown');
+          });
+        });
+        
+        // 获取分支名
+        const branchName = await new Promise((resolve, reject) => {
+          const gitProcess = spawn('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: instanceConfig.neomofoxDir });
+          let output = '';
+          
+          gitProcess.stdout.on('data', (data) => {
+            output += data.toString();
+          });
+          
+          gitProcess.on('close', (code) => {
+            if (code === 0) {
+              resolve(output.trim());
+            } else {
+              resolve('unknown');
+            }
+          });
+          
+          gitProcess.on('error', () => {
+            resolve('unknown');
+          });
+        });
+        
+        neomofoxVersion = commitHash;
+        branch = branchName;
+      }
+    } catch (error) {
+      console.warn('[Manual Add] 获取 Git 信息失败，使用默认值:', error);
+    }
+    
+    // 构建实例对象（匹配 InstallWizardService 的数据结构）
+    const instance = {
+      id: instanceId,
+      qqNumber: instanceConfig.qqNumber,
+      ownerQQNumber: instanceConfig.ownerQQNumber,
+      apiKey: instanceConfig.apiKey,
+      channel: branch !== 'unknown' ? branch : (instanceConfig.channel || 'dev'),
+      enabled: true,
+      neomofoxDir: instanceConfig.neomofoxDir,
+      napcatDir: instanceConfig.napcatDir || null,
+      wsPort: instanceConfig.wsPort || 8080,
+      installCompleted: true, // 手动添加的实例默认安装已完成
+      installProgress: null,
+      installSteps: [
+        'clone',
+        'venv',
+        'deps',
+        'gen-config',
+        'write-core',
+        'write-model',
+        'register'
+      ],
+      createdAt: new Date().toISOString(),
+      lastStartedAt: null,
+      napcatVersion: instanceConfig.napcatVersion || null,
+      neomofoxVersion: neomofoxVersion,
+      extra: {
+        displayName: instanceConfig.displayName || instanceConfig.qqNumber,
+        description: instanceConfig.description || '',
+        isLike: false,
+      },
+      isManuallyAdded: true, // 标记为手动添加
+    };
+    
+    // 保存实例
+    await instanceService.addInstance(instance);
+    
+    console.log(`[Manual Add] 成功手动添加实例: ${instance.extra.displayName} (${instanceId})`);
+    console.log(`[Manual Add] Neo-MoFox 版本: ${neomofoxVersion}, 分支/频道: ${branch}`);
+    return { success: true, instanceId, channel: instance.channel };
+  } catch (error) {
+    console.error('[Manual Add] 手动添加实例失败:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // ─── 日志系统 IPC ────────────────────────────────────────────────────────
