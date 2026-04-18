@@ -881,12 +881,21 @@ function bindEvents() {
   });
   
   // 随机生成 API Key
-  el.btnGenerateApiKey?.addEventListener('click', () => {
+  el.btnGenerateApiKey?.addEventListener('click', async () => {
     const newKey = generateSecureApiKey(32);
     el.inputWebuiApiKey.value = newKey;
     
     // 手动触发 input 事件以更新强度显示
     el.inputWebuiApiKey.dispatchEvent(new Event('input'));
+    
+    // 复制到剪贴板
+    try {
+      await navigator.clipboard.writeText(newKey);
+      showSuccess('密钥已生成并复制到剪贴板，请妥善保存！', 4000);
+    } catch (error) {
+      console.error('复制失败:', error);
+      showWarning('密钥已生成，但无法自动复制。请手动复制保存！', 5000);
+    }
     
     // 短暂显示明文以便用户确认
     if (el.inputWebuiApiKey.type === 'password') {

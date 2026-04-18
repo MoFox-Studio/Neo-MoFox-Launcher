@@ -132,7 +132,7 @@ function bindEvents() {
   
   // 步骤 1: 选择整合包
   el.btnSelectPack?.addEventListener('click', selectPack);
-  el.packSelector?.addEventListener('click', selectPack);
+  // 不绑定 packSelector，避免事件冒泡导致重复触发
   
   // 步骤 3: 用户配置
   el.btnToggleApiKey?.addEventListener('click', () => togglePasswordVisibility(el.inputApiKey, el.btnToggleApiKey));
@@ -303,8 +303,8 @@ async function selectPack() {
       
       // 显示加载状态
       el.packInfoBody.innerHTML = `
-        <div class="info-loading spinning">
-          <span class="material-symbols-rounded">progress_activity</span>
+        <div class="info-loading">
+          <span class="material-symbols-rounded spinning">progress_activity</span>
           <span>正在解析整合包...</span>
         </div>
       `;
@@ -554,10 +554,19 @@ function togglePasswordVisibility(input, button) {
   }
 }
 
-function generateWebuiApiKey() {
+async function generateWebuiApiKey() {
   const key = generateSecureApiKey(32);
   el.inputWebuiApiKey.value = key;
   evaluatePasswordStrength();
+  
+  // 复制到剪贴板
+  try {
+    await navigator.clipboard.writeText(key);
+    showSuccess('密钥已生成并复制到剪贴板，请妥善保存！', 4000);
+  } catch (error) {
+    console.error('复制失败:', error);
+    showWarning('密钥已生成，但无法自动复制。请手动复制保存！', 5000);
+  }
 }
 
 function generateSecureApiKey(length = 32) {
