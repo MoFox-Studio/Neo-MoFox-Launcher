@@ -1355,6 +1355,33 @@
   line-height: 1.5;
 }
 
+/* 元数据编辑器 */
+.metadata-editor {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.metadata-editor .options-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.metadata-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
 .export-options {
   display: flex;
   flex-direction: column;

@@ -15,6 +15,12 @@ let isExporting = false;
 // ─── Elements ─────────────────────────────────────────────────────────
 
 const exportElements = {
+  // 元数据编辑器
+  packName: null,
+  packVersion: null,
+  packAuthor: null,
+  packDescription: null,
+  // 导出选项
   includeNeo: null,
   includeNapcat: null,
   napcatOptionItem: null,
@@ -37,7 +43,13 @@ const exportElements = {
 // ─── Initialization ────────────────────────────────────────────────────
 
 export function initExportTab() {
-  // 获取元素引用
+  // 获取元素引用 - 元数据编辑器
+  exportElements.packName = document.getElementById('export-pack-name');
+  exportElements.packVersion = document.getElementById('export-pack-version');
+  exportElements.packAuthor = document.getElementById('export-pack-author');
+  exportElements.packDescription = document.getElementById('export-pack-description');
+  
+  // 导出选项
   exportElements.includeNeo = document.getElementById('export-include-neo');
   exportElements.includeNapcat = document.getElementById('export-include-napcat');
   exportElements.napcatOptionItem = document.getElementById('napcat-option-item');
@@ -99,6 +111,9 @@ export async function onExportTabOpened(instanceId) {
   // 重置状态
   resetExportState();
 
+  // 加载实例信息并填充元数据
+  loadInstanceMetadata(instanceId);
+
   // 检查 NapCat 是否存在
   await checkNapcatAvailability(instanceId);
 
@@ -107,6 +122,28 @@ export async function onExportTabOpened(instanceId) {
 }
 
 // ─── 私有函数 ──────────────────────────────────────────────────────────
+
+/**
+ * 加载实例元数据并填充到表单
+ */
+function loadInstanceMetadata(instanceId) {
+  const instance = state.instances.find(i => i.id === instanceId);
+  if (!instance) return;
+
+  // 填充默认值
+  if (exportElements.packName) {
+    exportElements.packName.value = instance.name || '';
+  }
+  if (exportElements.packVersion) {
+    exportElements.packVersion.value = '1.0.0';
+  }
+  if (exportElements.packAuthor) {
+    exportElements.packAuthor.value = process.env.USERNAME || process.env.USER || '';
+  }
+  if (exportElements.packDescription) {
+    exportElements.packDescription.value = instance.description || `基于 ${instance.name} 实例的整合包`;
+  }
+}
 
 /**
  * 检查 NapCat 是否存在并动态显示选项
@@ -285,8 +322,37 @@ async function startExport() {
     return;
   }
 
+  // 验证元数据
+  if (!exportElements.packName || !exportElements.packVersion) {
+    await window.customAlert('元数据编辑器未正确初始化', '错误');
+    return;
+  }
+
+  const packName = exportElements.packName.value.trim();
+  const packVersion = exportElements.packVersion.value.trim();
+  const packAuthor = exportElements.packAuthor?.value.trim() || '';
+  const packDescription = exportElements.packDescription?.value.trim() || '';
+
+  if (!packName) {
+    await window.customAlert('请输入整合包名称', '提示');
+    exportElements.packName.focus();
+    return;
+  }
+
+  if (!packVersion) {
+    await window.customAlert('请输入版本号', '提示');
+    exportElements.packVersion.focus();
+    return;
+  }
+
   // 收集导出选项
   const options = {
+    // 元数据
+    packName,
+    packVersion,
+    packAuthor,
+    packDescription,
+    // 内容选项
     includeNeoMofox: exportElements.includeNeo.checked,
     includeNapcat: exportElements.includeNapcat.checked,
     includeConfig: exportElements.includeConfig.checked,

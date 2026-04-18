@@ -101,6 +101,10 @@ class ExportService {
    * 导出整合包
    * @param {string} instanceId - 实例 ID
    * @param {Object} options - 导出选项
+   * @param {string} [options.packName] - 整合包名称（可选，默认使用实例名称）
+   * @param {string} [options.packVersion='1.0.0'] - 整合包版本号
+   * @param {string} [options.packAuthor] - 整合包作者（可选，默认使用系统用户名）
+   * @param {string} [options.packDescription] - 整合包描述（可选）
    * @param {boolean} [options.includeNeoMofox=false] - 是否包含 Neo-MoFox 主程序
    * @param {boolean} [options.includeNapcat=false] - 是否包含 NapCat
    * @param {boolean} [options.includeConfig=false] - 是否包含配置文件
@@ -206,10 +210,10 @@ class ExportService {
       this._emitOutput(onOutput, '生成 manifest.json...');
       
       const manifest = ManifestManager.createManifest({
-        packName: instance.name,
-        packVersion: instance.version || '1.0.0',
-        author: process.env.USERNAME || process.env.USER || 'Unknown',
-        description: instance.description || `基于 ${instance.name} 实例的整合包`,
+        packName: options.packName || instance.name,
+        packVersion: options.packVersion || '1.0.0',
+        author: options.packAuthor || process.env.USERNAME || process.env.USER || 'Unknown',
+        description: options.packDescription || instance.description || `基于 ${instance.name} 实例的整合包`,
         content: {
           neoMofox: {
             included: options.includeNeoMofox,
@@ -403,11 +407,9 @@ class ExportService {
         const config = TOML.parse(content);
 
         // 替换敏感信息为占位符
-        if (config.permission && config.permission.master_users) {
-          // 替换所有管理员 QQ 号为占位符
-          for (const platform in config.permission.master_users) {
-            config.permission.master_users[platform] = ['{{OWNER_QQ}}'];
-          }
+        if (config.permissions && config.permissions.owner_list) {
+          // 替换所有 owner QQ 号为占位符
+          config.permissions.owner_list = ['{{OWNER_QQ}}'];
         }
 
         if (config.http_router && config.http_router.api_keys) {

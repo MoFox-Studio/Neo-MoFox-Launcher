@@ -288,6 +288,34 @@
                 将此实例打包为整合包文件（.mfpack），方便分享和快速部署。
               </p>
               
+              <!-- 元数据编辑器 -->
+              <div class="metadata-editor">
+                <h4 class="options-title">
+                  <span class="material-symbols-rounded" style="font-size: 20px; vertical-align: middle;">edit_note</span>
+                  整合包信息
+                </h4>
+                <div class="metadata-fields">
+                  <div class="form-group">
+                    <label class="form-label">整合包名称 *</label>
+                    <input type="text" class="form-input" id="export-pack-name" placeholder="我的 Neo-MoFox 整合包">
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                      <label class="form-label">版本号 *</label>
+                      <input type="text" class="form-input" id="export-pack-version" placeholder="1.0.0">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                      <label class="form-label">作者</label>
+                      <input type="text" class="form-input" id="export-pack-author" placeholder="你的名字">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">整合包描述</label>
+                    <textarea class="form-textarea" id="export-pack-description" placeholder="描述这个整合包的特点和用途..." rows="2"></textarea>
+                  </div>
+                </div>
+              </div>
+              
               <!-- 基础组件选项 -->
               <div class="export-options">
                 <h4 class="options-title">选择要导出的内容</h4>
