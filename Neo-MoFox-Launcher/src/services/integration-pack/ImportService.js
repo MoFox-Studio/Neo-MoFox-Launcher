@@ -183,20 +183,55 @@ class ImportService {
       this._emitProgress(100, '导入完成');
       this._emitOutput('整合包导入成功！');
 
-      // 10. 清理临时目录
-      await this._cleanup();
+      // 10. 清理临时目录（后台执行，不等待）
+      this._cleanup();
 
       return { success: true, instanceId };
     } catch (error) {
       console.error('[ImportService] 导入失败:', error);
       this._emitOutput(`导入失败: ${error.message}`);
 
-      // 清理临时目录
-      await this._cleanup();
+      // 清理临时目录（后台执行，不等待）
+      this._cleanup();
 
-      // 如果实例已注册，标记为失败
-      if (instanceId && instanceRegistered) {
-        storageService.updateInstance(instanceId, { installCompleted: false });
+      // 清理失败的实例
+      if (instanceId) {
+        if (instanceRegistered) {
+          // 如果实例已注册，使用实例管理器删除（会删除目录+记录）
+          try {
+            this._emitOutput(`正在清理已注册的失败实例: ${instanceId}`);
+            storageService.deleteInstance(instanceId);
+            this._emitOutput(`实例已删除: ${instanceId}`);
+          } catch (deleteError) {
+            console.error('[ImportService] 删除失败实例时出错:', deleteError);
+            this._emitOutput(`警告: 删除实例失败，请手动清理: ${deleteError.message}`);
+          }
+        } else if (userInputs.installDir) {
+          // 如果实例未注册，手动删除实例目录（仅删除目录）
+          try {
+            // 安全检查：确保 instanceId 格式正确
+            if (instanceId.startsWith('instance_')) {
+              const instanceRootDir = path.join(userInputs.installDir, instanceId);
+              
+              // 检查目录是否存在
+              if (fs.existsSync(instanceRootDir)) {
+                this._emitOutput(`正在删除未注册的失败实例目录: ${instanceRootDir}`);
+                
+                // 同步删除目录（使用 force 和 recursive 选项）
+                fs.rmSync(instanceRootDir, { recursive: true, force: true });
+                this._emitOutput(`实例目录已删除: ${instanceId}`);
+              } else {
+                this._emitOutput(`实例目录不存在，无需删除: ${instanceRootDir}`);
+              }
+            } else {
+              console.warn('[ImportService] instanceId 格式异常，跳过目录删除:', instanceId);
+              this._emitOutput(`警告: 实例 ID 格式异常，请手动检查: ${instanceId}`);
+            }
+          } catch (deleteError) {
+            console.error('[ImportService] 删除实例目录时出错:', deleteError);
+            this._emitOutput(`警告: 删除实例目录失败，请手动清理: ${deleteError.message}`);
+          }
+        }
       }
 
       return { success: false, error: error.message };
@@ -679,43 +714,66 @@ class ImportService {
   }
 
   /**
-   * 清理临时目录
+   * 清理临时目录（后台异步执行，不阻塞主流程）
    */
-  async _cleanup() {
-    if (this._tempDir) {
-      try {
-        await this._removeDir(this._tempDir);
-        this._emitOutput('临时目录已清理');
-      } catch (cleanupErr) {
-        console.error('[ImportService] 清理临时目录失败:', cleanupErr);
-        this._emitOutput(`警告: 清理临时目录失败 - ${cleanupErr.message}`);
+  _cleanup() {
+    if (!this._tempDir) {
+      return;
+    }
+
+    const tempDir = this._tempDir;
+    this._tempDir = null; // 立即清空引用
+
+    this._emitOutput('临时目录清理已启动（后台执行）');
+
+    // Fire-and-forget：在后台异步删除，不阻塞主流程
+    this._cleanupAsync(tempDir).catch(err => {
+      console.error('[ImportService] 后台清理失败:', err);
+    });
+  }
+
+  /**
+   * 异步清理（内部方法，不对外 await）
+   */
+  async _cleanupAsync(dir) {
+    try {
+      // 检查目录是否存在
+      await fsPromises.access(dir, fs.constants.F_OK);
+    } catch (err) {
+      console.log('[ImportService] 临时目录不存在，无需清理');
+      return;
+    }
+
+    try {
+      // 使用 Node.js 14.14+ 的 rm API（异步删除）
+      if (fsPromises.rm) {
+        await fsPromises.rm(dir, { 
+          recursive: true, 
+          force: true, 
+          maxRetries: 3, 
+          retryDelay: 100 
+        });
+        console.log('[ImportService] 临时目录清理完成');
+      } else {
+        // 手动递归删除（仅用于旧版 Node.js）
+        await this._removeDirRecursive(dir);
+        console.log('[ImportService] 临时目录清理完成（递归删除）');
       }
+    } catch (err) {
+      console.error('[ImportService] 清理失败:', err.message);
     }
   }
 
   /**
-   * 递归删除目录
+   * 递归删除目录（仅用于不支持 fs.rm 的旧版本）
    */
-  async _removeDir(dir) {
-    try {
-      await fsPromises.access(dir, fs.constants.F_OK);
-    } catch (err) {
-      return; // 目录不存在，无需删除
-    }
-
-    // 使用 Node.js 14.14+ 的 fs.rm API
-    if (fsPromises.rm) {
-      await fsPromises.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-      return;
-    }
-
-    // 手动递归删除
+  async _removeDirRecursive(dir) {
     const entries = await fsPromises.readdir(dir, { withFileTypes: true });
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        await this._removeDir(fullPath);
+        await this._removeDirRecursive(fullPath);
       } else {
         await fsPromises.unlink(fullPath);
       }

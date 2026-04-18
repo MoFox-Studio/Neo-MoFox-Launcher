@@ -185,6 +185,7 @@ app.whenReady().then(async () => {
   
   // 启动时检测系统环境
   const sysEnv = platformHelper.detectSystemEnv();
+
   console.log(`[Main] 系统平台: ${sysEnv.platformLabel} (${sysEnv.osType} ${sysEnv.osRelease})${sysEnv.distro ? ' - ' + sysEnv.distroName : ''}`);
   console.log(`[Main] 架构: ${sysEnv.arch}, Shell: ${sysEnv.shell}`);
   
@@ -2741,7 +2742,6 @@ ipcMain.handle('export-integration-pack', async (event, instanceId, options, des
     
     // 输出回调
     const onOutput = (message) => {
-      console.log('[IPC] 发送输出事件:', message);
       event.sender.send('export-output', message);
     };
     

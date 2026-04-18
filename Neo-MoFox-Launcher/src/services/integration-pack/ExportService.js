@@ -165,52 +165,89 @@ class ExportService {
    * @returns {Promise<string>} 导出的文件路径
    */
   static async exportIntegrationPack(instanceId, options, destPath, onProgress, onOutput) {
+    // 立即输出开始日志
+    console.log('[ExportService] ========== 开始导出整合包 ==========');
+    console.log('[ExportService] 实例 ID:', instanceId);
+    console.log('[ExportService] 导出选项:', JSON.stringify(options, null, 2));
+    console.log('[ExportService] 目标路径:', destPath);
+    
+    this._emitOutput(onOutput, '初始化导出服务...');
+    this._emitProgress(onProgress, 1, '初始化中...');
+    
     try {
       // 检查 archiver 是否已安装
+      console.log('[ExportService] 检查 archiver 依赖...');
       let archiver;
       try {
         archiver = require('archiver');
+        console.log('[ExportService] archiver 已加载');
       } catch (err) {
-        throw new Error('缺少依赖：archiver。请运行: npm install archiver');
+        const errorMsg = '缺少依赖：archiver。请运行: npm install archiver';
+        console.error('[ExportService] 错误:', errorMsg);
+        this._emitOutput(onOutput, `错误: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
+      console.log('[ExportService] 获取实例列表...');
       const instances = storageService.getInstances();
       const instance = instances.find(i => i.id === instanceId);
       
       if (!instance) {
-        throw new Error(`实例不存在: ${instanceId}`);
+        const errorMsg = `实例不存在: ${instanceId}`;
+        console.error('[ExportService] 错误:', errorMsg);
+        this._emitOutput(onOutput, `错误: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
+      console.log('[ExportService] 找到实例:', instance.name);
 
       if (!instance.neomofoxDir) {
-        throw new Error(`实例配置错误: 缺少 neomofoxDir 字段 (instanceId: ${instanceId})`);
+        const errorMsg = `实例配置错误: 缺少 neomofoxDir 字段 (instanceId: ${instanceId})`;
+        console.error('[ExportService] 错误:', errorMsg);
+        this._emitOutput(onOutput, `错误: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
+      console.log('[ExportService] Neo-MoFox 目录:', instance.neomofoxDir);
 
       // 实例根目录 = neomofoxDir 的父目录
       // 例如: E:/install/instance_12345/neo-mofox -> E:/install/instance_12345
       const installPath = path.dirname(instance.neomofoxDir);
       const MoFoxPath = instance.neomofoxDir;
+      console.log('[ExportService] 实例根目录:', installPath);
       
       try {
         await fsPromises.access(installPath);
+        console.log('[ExportService] 实例目录存在');
       } catch (err) {
-        throw new Error(`实例目录不存在: ${installPath}`);
+        const errorMsg = `实例目录不存在: ${installPath}`;
+        console.error('[ExportService] 错误:', errorMsg, err);
+        this._emitOutput(onOutput, `错误: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
       // 验证 neo-mofox 子目录存在
       try {
         await fsPromises.access(instance.neomofoxDir);
+        console.log('[ExportService] Neo-MoFox 子目录存在');
       } catch (err) {
-        throw new Error(`Neo-MoFox 目录不存在: ${instance.neomofoxDir}`);
+        const errorMsg = `Neo-MoFox 目录不存在: ${instance.neomofoxDir}`;
+        console.error('[ExportService] 错误:', errorMsg, err);
+        this._emitOutput(onOutput, `错误: ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
       // 创建临时导出目录
       const tempDir = path.join(storageService.getDataDir(), TEMP_EXPORT_DIR, instanceId);
+      console.log('[ExportService] 临时目录:', tempDir);
+      
       try {
         await fsPromises.access(tempDir);
+        console.log('[ExportService] 清理已存在的临时目录...');
+        this._emitOutput(onOutput, '清理已存在的临时目录...');
         await this._removeDir(tempDir);
       } catch (err) {
         // 目录不存在，无需清理
       }
+      
       await fsPromises.mkdir(tempDir, { recursive: true });
 
       this._emitProgress(onProgress, 5, '准备导出...');
@@ -306,7 +343,16 @@ class ExportService {
 
       return destPath;
     } catch (error) {
-      throw new Error(`导出失败: ${error.message}`);
+      const errorMsg = `导出失败: ${error.message}`;
+      console.error('[ExportService] ========== 导出失败 ==========');
+      console.error('[ExportService] 错误详情:', error);
+      console.error('[ExportService] 错误堆栈:', error.stack);
+      
+      // 确保通过回调通知前端
+      this._emitOutput(onOutput, `错误: ${errorMsg}`);
+      this._emitProgress(onProgress, 0, '导出失败');
+      
+      throw new Error(errorMsg);
     }
   }
 
@@ -326,18 +372,26 @@ class ExportService {
     const versions = {};
 
     if (options.includeNeoMofox) {
+      console.log('[ExportService] 收集 Neo-MoFox 版本信息...');
       // 使用 git 命令获取 commit（异步）
       try {
         const neomofoxDir = instance.neomofoxDir;
         const gitDir = path.join(neomofoxDir, '.git');
+        console.log('[ExportService] 检查 Git 目录:', gitDir);
+        
         if (fs.existsSync(gitDir)) {
+          console.log('[ExportService] Git 目录存在，获取 commit...');
           const { stdout } = await execAsync('git rev-parse --short=7 HEAD', {
             cwd: neomofoxDir,
-            encoding: 'utf8'
+            encoding: 'utf8',
+            timeout: 5000 // 5秒超时
           });
           versions.neoMofox = {
             commit: stdout.trim()
           };
+          console.log('[ExportService] Neo-MoFox commit:', versions.neoMofox.commit);
+        } else {
+          console.log('[ExportService] Git 目录不存在，跳过版本收集');
         }
       } catch (err) {
         console.warn('[ExportService] 无法获取 Neo-MoFox commit:', err.message);
@@ -861,6 +915,7 @@ class ExportService {
    * 输出回调辅助方法
    */
   static _emitOutput(callback, message) {
+    console.log(`[ExportService] ${message}`);
     if (callback && typeof callback === 'function') {
       callback(message);
     }

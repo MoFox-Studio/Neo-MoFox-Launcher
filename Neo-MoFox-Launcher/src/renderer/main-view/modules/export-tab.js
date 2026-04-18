@@ -117,10 +117,12 @@ export function initExportTab() {
 
   // 监听导出事件
   window.mofoxAPI.onExportProgress?.(({ percent, message }) => {
+    console.log('[ExportTab] 收到进度事件:', percent, message);
     updateExportProgress(percent, message);
   });
 
   window.mofoxAPI.onExportOutput?.((message) => {
+    console.log('[ExportTab] 收到输出事件:', message);
     addExportOutput(message);
   });
 

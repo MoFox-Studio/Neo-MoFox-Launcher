@@ -226,6 +226,10 @@ function goToStep(step) {
     console.log('[ImportWizard] 进入步骤 5，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
+    
+    // 初始化步骤指示器
+    initializeStepIndicators();
+    
     // 确保步骤指示器可见
     if (el.installSteps) {
       el.installSteps.classList.remove('hidden');
@@ -757,6 +761,34 @@ function getStepDescription(step) {
   };
   
   return descriptions[step] || step;
+}
+
+function initializeStepIndicators() {
+  if (!el.installSteps) {
+    console.error('[ImportWizard] 步骤指示器容器未找到');
+    return;
+  }
+  
+  console.log('[ImportWizard] 初始化步骤指示器，步骤列表:', state.installSteps);
+  
+  // 清空现有内容
+  el.installSteps.innerHTML = '';
+  
+  // 为每个安装步骤创建指示器元素
+  state.installSteps.forEach(step => {
+    const stepItem = document.createElement('div');
+    stepItem.className = 'install-step-item';
+    stepItem.setAttribute('data-step', step);
+    
+    stepItem.innerHTML = `
+      <span class="material-symbols-rounded step-icon">radio_button_unchecked</span>
+      <span class="step-text">${getStepDescription(step)}</span>
+    `;
+    
+    el.installSteps.appendChild(stepItem);
+  });
+  
+  console.log('[ImportWizard] 步骤指示器初始化完成，共', state.installSteps.length, '个步骤');
 }
 
 // ─── 步骤 5: 安装执行 ─────────────────────────────────────────────────
