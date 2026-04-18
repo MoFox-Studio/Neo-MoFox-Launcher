@@ -76,9 +76,147 @@ init();
 // ─── Instance Actions ─────────────────────────────────────────────────
 
 el.btnAddInstance?.addEventListener('click', () => {
-  // 跳转到安装向导
-  window.location.href = '../install-wizard/wizard.html';
+  // 显示选择对话框：从头安装 或 从整合包导入
+  showAddInstanceDialog();
 });
+
+// 显示新增实例选择对话框
+function showAddInstanceDialog() {
+  const container = document.createElement('div');
+  container.className = 'dialog-container';
+  container.innerHTML = `
+    <div class="dialog-backdrop"></div>
+    <div class="dialog-card md3-dialog" style="max-width: 600px;">
+      <div class="dialog-header">
+        <h3 class="dialog-title">选择安装方式</h3>
+      </div>
+      <div class="dialog-content">
+        <p class="dialog-message" style="margin-bottom: 24px; color: var(--md-sys-color-on-surface-variant);">
+          请选择您希望的实例创建方式：
+        </p>
+        <div style="display: grid; gap: 16px;">
+          <div class="install-option-card" data-option="fresh">
+            <div class="option-icon">
+              <span class="material-symbols-rounded">construction</span>
+            </div>
+            <div class="option-content">
+              <h4 class="option-title">从头安装</h4>
+              <p class="option-description">完整配置一个全新的 Neo-MoFox 实例，适合首次使用或需要自定义配置的用户</p>
+            </div>
+            <span class="material-symbols-rounded option-arrow">arrow_forward_ios</span>
+          </div>
+          <div class="install-option-card" data-option="import">
+            <div class="option-icon">
+              <span class="material-symbols-rounded">package_2</span>
+            </div>
+            <div class="option-content">
+              <h4 class="option-title">从整合包导入</h4>
+              <p class="option-description">快速部署预配置的实例，包含插件、配置和数据</p>
+            </div>
+            <span class="material-symbols-rounded option-arrow">arrow_forward_ios</span>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn-text dialog-cancel" type="button">取消</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(container);
+  
+  // 添加样式（如果还没有）
+  if (!document.getElementById('install-option-styles')) {
+    const style = document.createElement('style');
+    style.id = 'install-option-styles';
+    style.textContent = `
+      .install-option-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+        background: var(--md-sys-color-surface-variant);
+        border: 2px solid transparent;
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .install-option-card:hover {
+        background: var(--md-sys-color-surface);
+        border-color: var (--md-sys-color-primary);
+        transform: translateX(4px);
+      }
+      .option-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--md-sys-color-primary-container);
+        border-radius: 12px;
+        flex-shrink: 0;
+      }
+      .option-icon .material-symbols-rounded {
+        font-size: 28px;
+        color: var(--md-sys-color-primary);
+      }
+      .option-content {
+        flex: 1;
+      }
+      .option-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: var(--md-sys-color-on-surface);
+      }
+      .option-description {
+        font-size: 13px;
+        color: var(--md-sys-color-on-surface-variant);
+        line-height: 1.4;
+      }
+      .option-arrow {
+        font-size: 20px;
+        color: var(--md-sys-color-on-surface-variant);
+        flex-shrink: 0;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  // 事件处理
+  const handleClose = () => {
+    container.remove();
+  };
+  
+  const handleSelectOption = (option) => {
+    container.remove();
+    if (option === 'fresh') {
+      window.location.href = '../install-wizard/wizard.html';
+    } else if (option === 'import') {
+      window.location.href = '../import-wizard/import.html';
+    }
+  };
+  
+  // 绑定事件
+  container.querySelector('.dialog-cancel').addEventListener('click', handleClose);
+  container.querySelector('.dialog-backdrop').addEventListener('click', handleClose);
+  
+  container.querySelectorAll('.install-option-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const option = card.dataset.option;
+      handleSelectOption(option);
+    });
+  });
+  
+  // ESC 键关闭
+  const handleEsc = (e) => {
+    if (e.key === 'Escape') {
+      handleClose();
+      document.removeEventListener('keydown', handleEsc);
+    }
+  };
+  document.addEventListener('keydown', handleEsc);
+}
 
 // 环境管理和设置导航已移至悬浮底栏组件 (floating-nav.js)
 

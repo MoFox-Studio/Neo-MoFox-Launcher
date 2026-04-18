@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导入整合包 - Neo-MoFox Launcher</title>
+  <script src="../theme-init.js"></script>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="import.css">
+  <link rel="stylesheet" href="../components/dialog.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="../window-controls.js" defer></script>
+</head>
+<body>
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">导入整合包 - Neo-MoFox Launcher</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
+  
+  <div class="wizard-container">
+    <aside class="wizard-sidebar">
+      <div class="wizard-logo">
+        <span class="material-symbols-rounded">extension</span>
+        <span class="logo-text">整合包导入</span>
+      </div>
+      
+      <nav class="wizard-steps">
+        <div class="step-item active" data-step="1">
+          <div class="step-indicator">1</div>
+          <div class="step-content"><span class="step-title">选择整合包</span></div>
+        </div>
+        <div class="step-item" data-step="2">
+          <div class="step-indicator">2</div>
+          <div class="step-content"><span class="step-title">环境检测</span></div>
+        </div>
+        <div class="step-item" data-step="3">
+          <div class="step-indicator">3</div>
+          <div class="step-content"><span class="step-title">用户配置</span></div>
+        </div>
+        <div class="step-item" data-step="4">
+          <div class="step-indicator">4</div>
+          <div class="step-content"><span class="step-title">安装确认</span></div>
+        </div>
+        <div class="step-item" data-step="5">
+          <div class="step-indicator">5</div>
+          <div class="step-content"><span class="step-title">安装执行</span></div>
+        </div>
+      </nav>
+      
+      <div class="wizard-footer">
+        <span class="version">Neo-MoFox-Launcher</span>
+      </div>
+    </aside>
+    
+    <main class="wizard-main">
+      <div class="wizard-content">
+        <!-- Step 1: 选择整合包 -->
+        <section class="wizard-step" id="step-1">
+          <div class="step-header">
+            <h1>选择整合包文件</h1>
+            <p>请选择要导入的 .mfpack 整合包文件</p>
+          </div>
+          
+          <!-- 安全警告 -->
+          <div class="warning-banner">
+            <div class="warning-icon">
+              <span class="material-symbols-rounded">warning</span>
+            </div>
+            <div class="warning-content">
+              <h3>⚠️ 安全警告</h3>
+              <p>
+                请仅导入来自<strong>可信来源</strong>的整合包。恶意整合包可能包含有害代码，导致数据泄露、系统损坏或其他安全风险。
+              </p>
+              <p>
+                <strong>MoFox Studio 不对因导入非官方整合包导致的任何损失负责。</strong>
+              </p>
+              <p>
+                导入前请确认：
+              </p>
+              <ul>
+                <li>整合包来源是否可信</li>
+                <li>整合包作者是否可靠</li>
+                <li>是否有其他用户验证过此整合包的安全性</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="file-selector-container">
+            <div class="file-selector" id="pack-selector">
+              <div class="file-selector-icon">
+                <span class="material-symbols-rounded">folder_open</span>
+              </div>
+              <div class="file-selector-text">
+                <div class="file-selector-label">点击选择整合包文件</div>
+                <div class="file-selector-hint">支持 .mfpack 格式</div>
+              </div>
+              <button class="md3-btn md3-btn-filled" id="btn-select-pack">
+                <span class="material-symbols-rounded">upload_file</span>
+                <span>浏览文件</span>
+              </button>
+            </div>
+            
+            <div class="selected-pack-info hidden" id="selected-pack-info">
+              <div class="pack-info-header">
+                <span class="material-symbols-rounded">package_2</span>
+                <span class="pack-filename" id="pack-filename"></span>
+              </div>
+              <div class="pack-info-body" id="pack-info-body">
+                <div class="info-loading">
+                  <span class="material-symbols-rounded spinning">progress_activity</span>
+                  <span>正在解析整合包...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 2: 环境检测 -->
+        <section class="wizard-step hidden" id="step-2">
+          <div class="step-header">
+            <h1>环境检测</h1>
+            <p>检查系统环境是否满足安装要求</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-python">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">Python</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-uv">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">uv (Python 包管理器)</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-git">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">Git</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+          </div>
+          <div class="env-check-result hidden" id="env-check-result">
+            <div class="result-icon">
+              <span class="material-symbols-rounded">error</span>
+            </div>
+            <div class="result-text">
+              <p>环境检测未通过，请先安装缺失的依赖。</p>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 3: 用户配置 -->
+        <section class="wizard-step hidden" id="step-3">
+          <div class="step-header">
+            <h1>配置实例参数</h1>
+            <p>请填写实例的基本信息和配置参数</p>
+          </div>
+          
+          <div class="config-form">
+            <div class="form-group">
+              <label for="input-instance-name">实例名称 *</label>
+              <input type="text" id="input-instance-name" class="md3-input" placeholder="例如：我的机器人实例">
+              <span class="form-hint"></span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-qq-number">Bot QQ 号 *</label>
+              <input type="text" id="input-qq-number" class="md3-input" placeholder="5-12 位数字">
+              <span class="form-hint"></span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-qq-nickname">Bot QQ 昵称 *</label>
+              <input type="text" id="input-qq-nickname" class="md3-input" placeholder="例如：小助手">
+              <span class="form-hint"></span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-owner-qq">管理员 QQ 号 *</label>
+              <input type="text" id="input-owner-qq" class="md3-input" placeholder="5-12 位数字">
+              <span class="form-hint">管理员将拥有最高权限</span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-api-key">SiliconFlow API Key *</label>
+              <div class="input-with-button">
+                <input type="password" id="input-api-key" class="md3-input" placeholder="请输入您的硅基流动 API 密钥">
+                <button class="md3-icon-btn" id="btn-toggle-api-key" title="显示/隐藏密钥">
+                  <span class="material-symbols-rounded">visibility</span>
+                </button>
+                <button class="md3-btn md3-btn-text" id="btn-get-api-key">
+                  <span class="material-symbols-rounded">open_in_new</span>
+                  <span>获取密钥</span>
+                </button>
+              </div>
+              <span class="form-hint">用于调用 LLM 服务</span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-ws-port">WebSocket 端口 *</label>
+              <input type="number" id="input-ws-port" class="md3-input" value="8095" min="1024" max="65535">
+              <span class="form-hint">NapCat 通信端口，默认 8095</span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-webui-api-key">WebUI API 密钥（可选）</label>
+              <div class="input-with-button">
+                <input type="password" id="input-webui-api-key" class="md3-input" placeholder="留空自动生成">
+                <button class="md3-icon-btn" id="btn-toggle-webui-key" title="显示/隐藏密钥">
+                  <span class="material-symbols-rounded">visibility</span>
+                </button>
+                <button class="md3-btn md3-btn-text" id="btn-generate-webui-key">
+                  <span class="material-symbols-rounded">key</span>
+                  <span>生成密钥</span>
+                </button>
+              </div>
+              <div class="password-strength hidden" id="password-strength">
+                <div class="strength-bar">
+                  <div class="strength-fill" id="strength-fill"></div>
+                </div>
+                <span class="strength-text" id="strength-text"></span>
+              </div>
+              <span class="form-hint">用于访问 WebUI 管理界面</span>
+            </div>
+            
+            <div class="form-group">
+              <label for="input-install-dir">安装路径 *</label>
+              <div class="input-with-button">
+                <input type="text" id="input-install-dir" class="md3-input" readonly>
+                <button class="md3-btn md3-btn-text" id="btn-browse-dir">
+                  <span class="material-symbols-rounded">folder_open</span>
+                  <span>浏览</span>
+                </button>
+              </div>
+              <span class="form-hint"></span>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 4: 安装确认 -->
+        <section class="wizard-step hidden" id="step-4">
+          <div class="step-header">
+            <h1>确认安装信息</h1>
+            <p>请检查以下配置是否正确</p>
+          </div>
+          
+          <div class="summary-container">
+            <div class="summary-section">
+              <h3>整合包信息</h3>
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <span class="summary-label">包名称</span>
+                  <span class="summary-value" id="summary-pack-name"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">版本</span>
+                  <span class="summary-value" id="summary-pack-version"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">作者</span>
+                  <span class="summary-value" id="summary-pack-author"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">描述</span>
+                  <span class="summary-value summary-value-full" id="summary-pack-description"></span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="summary-section">
+              <h3>包含内容</h3>
+              <div class="content-list" id="summary-content-list">
+                <!-- 动态生成 -->
+              </div>
+            </div>
+            
+            <div class="summary-section">
+              <h3>实例配置</h3>
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <span class="summary-label">实例名称</span>
+                  <span class="summary-value" id="summary-instance-name"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Bot QQ 号</span>
+                  <span class="summary-value" id="summary-qq-number"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Bot 昵称</span>
+                  <span class="summary-value" id="summary-qq-nickname"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">管理员 QQ</span>
+                  <span class="summary-value" id="summary-owner-qq"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">WebSocket 端口</span>
+                  <span class="summary-value" id="summary-ws-port"></span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">安装路径</span>
+                  <span class="summary-value summary-value-full" id="summary-install-dir"></span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="summary-section">
+              <h3>安装步骤</h3>
+              <div class="step-list" id="summary-step-list">
+                <!-- 动态生成 -->
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 5: 安装执行 -->
+        <section class="wizard-step hidden" id="step-5">
+          <div class="step-header">
+            <h1>正在安装</h1>
+            <p>请稍候，正在导入整合包...</p>
+          </div>
+          
+          <div class="install-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-info">
+              <span class="progress-step" id="progress-step">准备中...</span>
+              <span class="progress-percent" id="progress-percent">0%</span>
+            </div>
+          </div>
+          
+          <div class="install-log">
+            <div class="log-header">
+              <span>安装日志</span>
+              <button class="md3-icon-btn" id="btn-toggle-log" title="展开/折叠">
+                <span class="material-symbols-rounded">expand_more</span>
+              </button>
+            </div>
+            <div class="log-content" id="install-log-content"></div>
+          </div>
+          
+          <div class="install-result hidden" id="install-result">
+            <div class="result-icon">
+              <span class="material-symbols-rounded">check_circle</span>
+            </div>
+            <div class="result-text">
+              <h3>导入成功！</h3>
+              <p>实例已成功创建，现在可以启动使用了。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+      
+      <div class="wizard-actions">
+        <button class="md3-btn md3-btn-text" id="btn-back">
+          <span class="material-symbols-rounded">arrow_back</span>
+          <span>上一步</span>
+        </button>
+        <button class="md3-btn md3-btn-text hidden" id="btn-cancel">取消</button>
+        <button class="md3-btn md3-btn-text hidden" id="btn-retry">重试</button>
+        <button class="md3-btn md3-btn-filled" id="btn-next">
+          <span>下一步</span>
+          <span class="material-symbols-rounded">arrow_forward</span>
+        </button>
+        <button class="md3-btn md3-btn-filled hidden" id="btn-finish">完成</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 安装步骤指示器 (用于步骤5) -->
+  <div class="install-steps hidden" id="install-steps">
+    <div class="install-step-item" data-step="extract-pack">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">解压整合包</span>
+    </div>
+    <div class="install-step-item" data-step="clone">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">克隆 Neo-MoFox 仓库</span>
+    </div>
+    <div class="install-step-item" data-step="venv">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">创建虚拟环境</span>
+    </div>
+    <div class="install-step-item" data-step="deps">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">安装 Python 依赖</span>
+    </div>
+    <div class="install-step-item" data-step="gen-config">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">生成配置文件</span>
+    </div>
+    <div class="install-step-item" data-step="write-core">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入 core.toml</span>
+    </div>
+    <div class="install-step-item" data-step="write-model">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入 model.toml</span>
+    </div>
+    <div class="install-step-item" data-step="write-adapter">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">写入适配器配置</span>
+    </div>
+    <div class="install-step-item" data-step="napcat">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">安装 NapCat</span>
+    </div>
+    <div class="install-step-item" data-step="napcat-config">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">配置 NapCat</span>
+    </div>
+    <div class="install-step-item" data-step="register">
+      <span class="step-icon material-symbols-rounded">pending</span>
+      <span class="step-text">注册实例</span>
+    </div>
+  </div>
+
+  <script src="../components/dialog.js"></script>
+  <script src="import.js" type="module"></script>
+</body>
+</html>
