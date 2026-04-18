@@ -122,7 +122,8 @@
   includeData: boolean,          // 是否包含数据文件
   installNapcatOnImport: boolean // 导入时是否安装 NapCat（仅当未打包 NapCat 时有效）
 }
-```文件（主程序、NapCat、插件、数据等）
+```
+文件（主程序、NapCat、插件、数据等）
    - 处理配置文件（脱敏占位符替换）
    - 生成 manifest.json
    - 压缩为 `.mfpack` 文件

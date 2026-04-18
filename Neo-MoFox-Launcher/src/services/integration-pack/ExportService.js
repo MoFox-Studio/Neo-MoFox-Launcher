@@ -7,6 +7,7 @@
  */
 
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 const TOML = require('@iarna/toml');
 const { ManifestManager } = require('./ManifestManager');
@@ -32,23 +33,22 @@ class ExportService {
    * @returns {Promise<boolean>} 是否存在 NapCat
    */
   static async checkNapcatExists(instanceId) {
-    return new Promise((resolve, reject) => {
-      const instances = storageService.getInstances();
-      const instance = instances.find(i => i.id === instanceId);
-      
-      if (!instance || !instance.neomofoxDir) {
-        return resolve(false);
-      }
+    const instances = storageService.getInstances();
+    const instance = instances.find(i => i.id === instanceId);
+    
+    if (!instance || !instance.neomofoxDir) {
+      return false;
+    }
 
-      const instanceRoot = path.dirname(instance.neomofoxDir);
-      const napcatDir = path.join(instanceRoot, 'napcat');
-      
-      try {
-        resolve(fs.existsSync(napcatDir));
-      } catch (err) {
-        resolve(false);
-      }
-    });
+    const instanceRoot = path.dirname(instance.neomofoxDir);
+    const napcatDir = path.join(instanceRoot, 'napcat');
+    
+    try {
+      await fsPromises.access(napcatDir);
+      return true;
+    } catch (err) {
+      return false;
+    }
   }
 
   /**
@@ -57,43 +57,44 @@ class ExportService {
    * @returns {Promise<Array>} 插件列表 [{ name: 'plugin1', type: 'folder'|'file' }]
    */
   static async scanInstancePlugins(instanceId) {
-    return new Promise((resolve, reject) => {
-      // 获取实例信息
-      const instances = storageService.getInstances();
-      const instance = instances.find(i => i.id === instanceId);
+    // 获取实例信息
+    const instances = storageService.getInstances();
+    const instance = instances.find(i => i.id === instanceId);
+    
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    if (!instance.neomofoxDir) {
+      throw new Error(`实例配置错误: 缺少 neomofoxDir 字段 (instanceId: ${instanceId})`);
+    }
+
+    // 实例根目录 = neomofoxDir 的父目录
+    // 例如: E:/install/instance_12345/neo-mofox
+    const instanceRoot = instance.neomofoxDir;
+    const pluginsDir = path.join(instanceRoot, 'plugins');
+    console.log(`[ExportService] 扫描插件目录: ${pluginsDir}`);
+    
+    // 检查插件目录是否存在
+    try {
+      await fsPromises.access(pluginsDir);
+    } catch (err) {
+      return [];
+    }
+
+    try {
+      // 读取插件目录
+      const items = await fsPromises.readdir(pluginsDir, { withFileTypes: true });
       
-      if (!instance) {
-        return reject(new Error(`实例不存在: ${instanceId}`));
-      }
+      const plugins = items.map(item => ({
+        name: item.name,
+        type: item.isDirectory() ? 'folder' : 'file',
+      }));
 
-      if (!instance.neomofoxDir) {
-        return reject(new Error(`实例配置错误: 缺少 neomofoxDir 字段 (instanceId: ${instanceId})`));
-      }
-
-      // 实例根目录 = neomofoxDir 的父目录
-      // 例如: E:/install/instance_12345/neo-mofox -> E:/install/instance_12345
-      const instanceRoot = path.dirname(instance.neomofoxDir);
-      const pluginsDir = path.join(instanceRoot, 'plugins');
-      
-      // 检查插件目录是否存在
-      if (!fs.existsSync(pluginsDir)) {
-        return resolve([]);
-      }
-
-      try {
-        // 读取插件目录
-        const items = fs.readdirSync(pluginsDir, { withFileTypes: true });
-        
-        const plugins = items.map(item => ({
-          name: item.name,
-          type: item.isDirectory() ? 'folder' : 'file',
-        }));
-
-        resolve(plugins);
-      } catch (err) {
-        reject(new Error(`扫描插件目录失败: ${err.message}`));
-      }
-    });
+      return plugins;
+    } catch (err) {
+      throw new Error(`扫描插件目录失败: ${err.message}`);
+    }
   }
 
   /**
@@ -136,28 +137,36 @@ class ExportService {
       // 实例根目录 = neomofoxDir 的父目录
       // 例如: E:/install/instance_12345/neo-mofox -> E:/install/instance_12345
       const installPath = path.dirname(instance.neomofoxDir);
+      const MoFoxPath = instance.neomofoxDir;
       
-      if (!fs.existsSync(installPath)) {
+      try {
+        await fsPromises.access(installPath);
+      } catch (err) {
         throw new Error(`实例目录不存在: ${installPath}`);
       }
 
       // 验证 neo-mofox 子目录存在
-      if (!fs.existsSync(instance.neomofoxDir)) {
+      try {
+        await fsPromises.access(instance.neomofoxDir);
+      } catch (err) {
         throw new Error(`Neo-MoFox 目录不存在: ${instance.neomofoxDir}`);
       }
 
       // 创建临时导出目录
       const tempDir = path.join(storageService.getDataDir(), TEMP_EXPORT_DIR, instanceId);
-      if (fs.existsSync(tempDir)) {
-        this._removeDir(tempDir);
+      try {
+        await fsPromises.access(tempDir);
+        await this._removeDir(tempDir);
+      } catch (err) {
+        // 目录不存在，无需清理
       }
-      fs.mkdirSync(tempDir, { recursive: true });
+      await fsPromises.mkdir(tempDir, { recursive: true });
 
       this._emitProgress(onProgress, 5, '准备导出...');
       this._emitOutput(onOutput, '开始导出整合包...');
 
       // 收集版本信息
-      const versions = await this._collectVersionInfo(instance.neomofoxDir, installPath, options);
+      const versions = await this._collectVersionInfo(instance, options);
       
       // 复制文件
       let progress = 10;
@@ -178,29 +187,18 @@ class ExportService {
         progress += 15;
       }
 
-      // 3. 复制配置文件（脱敏处理）
-      if (options.includeConfig) {
-        this._emitProgress(onProgress, progress, '处理配置文件...');
-        this._emitOutput(onOutput, '处理配置文件（移除敏感信息）...');
-        await this._copyConfigWithPlaceholders(installPath, tempDir);
-        progress += 10;
-      }
-
-      // 4. 复制插件
+      // 3. 复制额外文件（配置、插件、数据）到 extra 目录
       let exportedPlugins = [];
-      if (options.includePlugins && options.selectedPlugins.length > 0) {
-        this._emitProgress(onProgress, progress, '打包插件...');
-        this._emitOutput(onOutput, `复制 ${options.selectedPlugins.length} 个插件...`);
-        exportedPlugins = await this._copyPlugins(installPath, tempDir, options.selectedPlugins);
-        progress += 15;
-      }
-
-      // 5. 复制数据文件
-      if (options.includeData) {
-        this._emitProgress(onProgress, progress, '打包数据文件...');
-        this._emitOutput(onOutput, '复制数据文件...');
-        await this._copyData(installPath, tempDir);
-        progress += 10;
+      if (options.includeConfig || options.includePlugins || options.includeData) {
+        this._emitProgress(onProgress, progress, '打包额外文件...');
+        let extraItems = [];
+        if (options.includeConfig) extraItems.push('配置文件');
+        if (options.includePlugins) extraItems.push(`${options.selectedPlugins.length} 个插件`);
+        if (options.includeData) extraItems.push('数据文件');
+        this._emitOutput(onOutput, `复制 ${extraItems.join('、')}...`);
+        
+        exportedPlugins = await this._copyExtraFiles(MoFoxPath, tempDir, options);
+        progress += 35;
       }
 
       // 生成 manifest.json
@@ -249,7 +247,7 @@ class ExportService {
 
       // 清理临时目录
       this._emitProgress(onProgress, 95, '清理临时文件...');
-      this._removeDir(tempDir);
+      await this._removeDir(tempDir);
 
       this._emitProgress(onProgress, 100, '导出完成');
       this._emitOutput(onOutput, `整合包已导出: ${destPath}`);
@@ -266,59 +264,54 @@ class ExportService {
 
   /**
    * 收集版本信息
-   * @param {string} neomofoxDir - Neo-MoFox 目录路径
-   * @param {string} installPath - 实例根目录路径
+   * @param {Object} instance - 实例对象
+   * @param {Object} options - 导出选项
    */
-  static async _collectVersionInfo(neomofoxDir, installPath, options) {
+  static async _collectVersionInfo(instance, options) {
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
     const versions = {};
 
     if (options.includeNeoMofox) {
-      // 读取 Neo-MoFox 版本
+      // 使用 git 命令获取 commit（异步）
       try {
-        const pyprojectPath = path.join(neomofoxDir, 'pyproject.toml');
-        if (fs.existsSync(pyprojectPath)) {
-          const content = fs.readFileSync(pyprojectPath, 'utf8');
-          const pyproject = TOML.parse(content);
+        const neomofoxDir = instance.neomofoxDir;
+        const gitDir = path.join(neomofoxDir, '.git');
+        if (fs.existsSync(gitDir)) {
+          const { stdout } = await execAsync('git rev-parse --short=7 HEAD', {
+            cwd: neomofoxDir,
+            encoding: 'utf8'
+          });
           versions.neoMofox = {
-            version: pyproject.project?.version || 'unknown',
+            commit: stdout.trim()
           };
-          
-          // 尝试获取 git commit（可选）
-          try {
-            const gitHeadPath = path.join(neomofoxDir, '.git', 'HEAD');
-            if (fs.existsSync(gitHeadPath)) {
-              const headContent = fs.readFileSync(gitHeadPath, 'utf8').trim();
-              if (headContent.startsWith('ref:')) {
-                const refPath = headContent.replace('ref: ', '').trim();
-                const commitPath = path.join(neomofoxDir, '.git', refPath);
-                if (fs.existsSync(commitPath)) {
-                  versions.neoMofox.commit = fs.readFileSync(commitPath, 'utf8').trim().substring(0, 7);
-                }
-              } else {
-                versions.neoMofox.commit = headContent.substring(0, 7);
-              }
-            }
-          } catch (gitErr) {
-            // Git 信息可选，忽略错误
-          }
         }
       } catch (err) {
-        console.warn('[ExportService] 无法读取 Neo-MoFox 版本:', err.message);
+        console.warn('[ExportService] 无法获取 Neo-MoFox commit:', err.message);
+        versions.neoMofox = {
+          commit: 'unknown'
+        };
       }
     }
 
     if (options.includeNapcat) {
-      // 读取 NapCat 版本
+      // 从实例配置读取 NapCat 版本
       try {
-        const napcatPackagePath = path.join(installPath, 'napcat', 'package.json');
-        if (fs.existsSync(napcatPackagePath)) {
-          const packageData = JSON.parse(fs.readFileSync(napcatPackagePath, 'utf8'));
+        if (instance.napcatVersion) {
           versions.napcat = {
-            version: packageData.version || 'unknown',
+            version: instance.napcatVersion
+          };
+        } else {
+          versions.napcat = {
+            version: 'unknown'
           };
         }
       } catch (err) {
         console.warn('[ExportService] 无法读取 NapCat 版本:', err.message);
+        versions.napcat = {
+          version: 'unknown'
+        };
       }
     }
 
@@ -331,12 +324,11 @@ class ExportService {
    */
   static async _copyNeoMofox(neomofoxDir, tempDir) {
     const destDir = path.join(tempDir, 'neo-mofox');
-    fs.mkdirSync(destDir, { recursive: true });
+    await fsPromises.mkdir(destDir, { recursive: true });
 
-    // 需要复制的目录和文件
+    // 需要复制的目录和文件（不包含 config 和 data，它们会在 extra 目录中处理）
     const itemsToCopy = [
       'src',
-      'config',
       'main.py',
       'bot.py',
       'pyproject.toml',
@@ -351,93 +343,136 @@ class ExportService {
       const srcPath = path.join(neomofoxDir, item);
       const destPath = path.join(destDir, item);
       
-      if (fs.existsSync(srcPath)) {
-        if (fs.statSync(srcPath).isDirectory()) {
-          this._copyDirRecursive(srcPath, destPath);
+      try {
+        const stats = await fsPromises.stat(srcPath);
+        if (stats.isDirectory()) {
+          await this._copyDirRecursive(srcPath, destPath);
         } else {
-          fs.copyFileSync(srcPath, destPath);
+          await fsPromises.copyFile(srcPath, destPath);
         }
+      } catch (err) {
+        // 文件不存在，跳过
       }
+      
+      // 让出事件循环，防止阻塞
+      await new Promise(resolve => setImmediate(resolve));
     }
   }
 
   /**
-   * 复制 NapCat
+   * 复制 NapCat（使用系统命令避免 asar 文件访问问题）
    */
   static async _copyNapcat(installPath, tempDir) {
     const srcPath = path.join(installPath, 'napcat');
     const destPath = path.join(tempDir, 'napcat');
     
-    if (fs.existsSync(srcPath)) {
-      this._copyDirRecursive(srcPath, destPath);
+    try {
+      await fsPromises.access(srcPath);
+    } catch (err) {
+      return;
     }
+
+    // 使用系统命令复制，避免 Node.js fs 模块对 .asar 文件的特殊处理
+    await this._copyDirWithSystemCommand(srcPath, destPath);
   }
 
   /**
-   * 复制配置文件并替换敏感信息为占位符
+   * 复制额外文件（配置、插件、数据）到 extra 目录
+   * @param {string} installPath - 实例根目录路径
+   * @param {string} tempDir - 临时导出目录
+   * @param {Object} options - 导出选项
+   * @returns {Array} 复制的插件列表
    */
-  static async _copyConfigWithPlaceholders(installPath, tempDir) {
-    const configSrcDir = path.join(installPath, 'config');
-    const configDestDir = path.join(tempDir, 'config');
-    fs.mkdirSync(configDestDir, { recursive: true });
-
-    // 只处理 core.toml
-    const coreTomlPath = path.join(configSrcDir, 'core.toml');
-    if (fs.existsSync(coreTomlPath)) {
-      const content = fs.readFileSync(coreTomlPath, 'utf8');
-      const config = TOML.parse(content);
-
-      // 替换敏感信息为占位符
-      if (config.permission && config.permission.master_users) {
-        // 替换所有管理员 QQ 号为占位符
-        for (const platform in config.permission.master_users) {
-          config.permission.master_users[platform] = ['{{OWNER_QQ}}'];
-        }
-      }
-
-      if (config.http_router && config.http_router.api_keys) {
-        // 替换 WebUI API 密钥
-        config.http_router.api_keys = ['{{WEBUI_KEY}}'];
-      }
-
-      // 写入处理后的配置（直接使用 core.toml 文件名）
-      const destPath = path.join(configDestDir, 'core.toml');
-      const modifiedContent = TOML.stringify(config);
-      fs.writeFileSync(destPath, modifiedContent, 'utf8');
-    }
-
-    // 不导出 model.toml（包含 LLM API Key）
-  }
-
-  /**
-   * 复制插件
-   */
-  static async _copyPlugins(installPath, tempDir, selectedPlugins) {
-    const pluginsSrcDir = path.join(installPath, 'plugins');
-    const pluginsDestDir = path.join(tempDir, 'plugins');
-    
-    if (!fs.existsSync(pluginsSrcDir)) {
-      return [];
-    }
-
-    fs.mkdirSync(pluginsDestDir, { recursive: true });
+  static async _copyExtraFiles(installPath, tempDir, options) {
+    const extraDir = path.join(tempDir, 'extra');
+    await fsPromises.mkdir(extraDir, { recursive: true });
     
     const copiedPlugins = [];
 
-    for (const pluginName of selectedPlugins) {
-      const srcPath = path.join(pluginsSrcDir, pluginName);
-      const destPath = path.join(pluginsDestDir, pluginName);
-      
-      if (fs.existsSync(srcPath)) {
-        const stats = fs.statSync(srcPath);
-        
-        if (stats.isDirectory()) {
-          this._copyDirRecursive(srcPath, destPath);
-          copiedPlugins.push(pluginName);
-        } else if (stats.isFile()) {
-          fs.copyFileSync(srcPath, destPath);
-          copiedPlugins.push(pluginName);
+    // 1. 复制配置文件（脱敏处理）
+    if (options.includeConfig) {
+      const configSrcDir = path.join(installPath, 'config');
+      const configDestDir = path.join(extraDir, 'config');
+      await fsPromises.mkdir(configDestDir, { recursive: true });
+
+      // 只处理 core.toml
+      const coreTomlPath = path.join(configSrcDir, 'core.toml');
+      try {
+        await fsPromises.access(coreTomlPath);
+        const content = await fsPromises.readFile(coreTomlPath, 'utf8');
+        const config = TOML.parse(content);
+
+        // 替换敏感信息为占位符
+        if (config.permission && config.permission.master_users) {
+          // 替换所有管理员 QQ 号为占位符
+          for (const platform in config.permission.master_users) {
+            config.permission.master_users[platform] = ['{{OWNER_QQ}}'];
+          }
         }
+
+        if (config.http_router && config.http_router.api_keys) {
+          // 替换 WebUI API 密钥
+          config.http_router.api_keys = ['{{WEBUI_KEY}}'];
+        }
+
+        // 写入处理后的配置
+        const destPath = path.join(configDestDir, 'core.toml');
+        const modifiedContent = TOML.stringify(config);
+        await fsPromises.writeFile(destPath, modifiedContent, 'utf8');
+      } catch (err) {
+        // 文件不存在，跳过
+      }
+      // 不导出 model.toml（包含 LLM API Key）
+    }
+
+    // 2. 复制插件
+    if (options.includePlugins && options.selectedPlugins.length > 0) {
+      const pluginsSrcDir = path.join(installPath, 'plugins');
+      console.log(`[ExportService] 复制插件，源目录: ${pluginsSrcDir}`);
+      const pluginsDestDir = path.join(extraDir, 'plugins');
+      console.log(`[ExportService] 复制插件，目标目录: ${pluginsDestDir}`);
+      
+      try {
+        await fsPromises.access(pluginsSrcDir);
+        await fsPromises.mkdir(pluginsDestDir, { recursive: true });
+        
+        for (const pluginName of options.selectedPlugins) {
+          const srcPath = path.join(pluginsSrcDir, pluginName);
+          const destPath = path.join(pluginsDestDir, pluginName);
+          
+          try {
+            const stats = await fsPromises.stat(srcPath);
+            
+            if (stats.isDirectory()) {
+              await this._copyDirRecursive(srcPath, destPath);
+              copiedPlugins.push(pluginName);
+            } else if (stats.isFile()) {
+              await fsPromises.copyFile(srcPath, destPath);
+              copiedPlugins.push(pluginName);
+            }
+          } catch (err) {
+            // 插件不存在，跳过
+          }
+          
+          // 让出事件循环
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      } catch (err) {
+        // plugins 目录不存在
+      }
+    }
+
+    // 3. 复制数据文件（使用系统命令以提高性能和可靠性）
+    if (options.includeData) {
+      const dataSrcDir = path.join(installPath, 'data');
+      const dataDestDir = path.join(extraDir, 'data');
+      
+      try {
+        await fsPromises.access(dataSrcDir);
+        // 使用系统命令复制大目录
+        await this._copyDirWithSystemCommand(dataSrcDir, dataDestDir);
+      } catch (err) {
+        // data 目录不存在
       }
     }
 
@@ -445,62 +480,146 @@ class ExportService {
   }
 
   /**
-   * 复制数据文件
+   * 使用系统命令复制目录（适用于大目录或包含特殊文件）
+   * @param {string} srcPath - 源目录路径
+   * @param {string} destPath - 目标目录路径
    */
-  static async _copyData(installPath, tempDir) {
-    const dataSrcDir = path.join(installPath, 'data');
-    const dataDestDir = path.join(tempDir, 'data');
-    
-    if (fs.existsSync(dataSrcDir)) {
-      this._copyDirRecursive(dataSrcDir, dataDestDir);
+  static async _copyDirWithSystemCommand(srcPath, destPath) {
+    try {
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      const isWindows = process.platform === 'win32';
+      
+      if (isWindows) {
+        // Windows: 使用 robocopy
+        const cmd = `robocopy "${srcPath}" "${destPath}" /E /NFL /NDL /NJH /NJS /NC /NS /NP`;
+        try {
+          await execAsync(cmd);
+        } catch (err) {
+          // robocopy 返回值 <= 7 表示成功
+          if (err.code && err.code > 7) {
+            throw err;
+          }
+        }
+      } else {
+        // Linux/macOS: 使用 cp -r
+        await execAsync(`cp -r "${srcPath}" "${destPath}"`);
+      }
+      
+      console.log(`[ExportService] 目录已使用系统命令复制: ${srcPath} -> ${destPath}`);
+    } catch (err) {
+      console.error(`[ExportService] 使用系统命令复制失败，回退到 Node.js 方法: ${err.message}`);
+      // 回退到原方法
+      await this._copyDirRecursive(srcPath, destPath);
     }
   }
 
   /**
-   * 递归复制目录
+   * 递归复制目录（异步版本，避免阻塞事件循环）
    */
-  static _copyDirRecursive(src, dest) {
-    if (!fs.existsSync(src)) return;
+  static async _copyDirRecursive(src, dest) {
+    try {
+      await fsPromises.access(src);
+    } catch (err) {
+      return; // 源路径不存在
+    }
 
-    fs.mkdirSync(dest, { recursive: true });
+    // 特殊处理：如果源路径本身是 .asar 文件，直接复制不递归
+    if (src.endsWith('.asar')) {
+      const destDir = path.dirname(dest);
+      await fsPromises.mkdir(destDir, { recursive: true });
+      await fsPromises.copyFile(src, dest);
+      return;
+    }
+
+    // 使用 try-catch 保护文件系统操作，避免 asar 路径误解析
+    let stats;
+    try {
+      stats = await fsPromises.stat(src);
+      
+      // 如果是文件而不是目录，直接复制
+      if (stats.isFile()) {
+        const destDir = path.dirname(dest);
+        await fsPromises.mkdir(destDir, { recursive: true });
+        await fsPromises.copyFile(src, dest);
+        return;
+      }
+    } catch (err) {
+      console.warn(`[ExportService] 无法访问路径 ${src}: ${err.message}`);
+      return;
+    }
+
+    await fsPromises.mkdir(dest, { recursive: true });
     
-    const entries = fs.readdirSync(src, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await fsPromises.readdir(src, { withFileTypes: true });
+    } catch (err) {
+      console.warn(`[ExportService] 无法读取目录 ${src}: ${err.message}`);
+      return;
+    }
     
+    let processedCount = 0;
     for (const entry of entries) {
       const srcPath = path.join(src, entry.name);
       const destPath = path.join(dest, entry.name);
+      
+      // 跳过 .asar 文件（作为普通文件处理，不递归）
+      if (entry.name.endsWith('.asar')) {
+        try {
+          await fsPromises.copyFile(srcPath, destPath);
+        } catch (err) {
+          console.warn(`[ExportService] 复制 asar 文件失败 ${srcPath}: ${err.message}`);
+        }
+        continue;
+      }
       
       if (entry.isDirectory()) {
         // 跳过某些目录
         if (entry.name === '__pycache__' || entry.name === '.git' || entry.name === 'node_modules') {
           continue;
         }
-        this._copyDirRecursive(srcPath, destPath);
+        await this._copyDirRecursive(srcPath, destPath);
       } else {
-        fs.copyFileSync(srcPath, destPath);
+        try {
+          await fsPromises.copyFile(srcPath, destPath);
+        } catch (err) {
+          console.warn(`[ExportService] 复制文件失败 ${srcPath}: ${err.message}`);
+        }
+      }
+      
+      // 每处理 10 个文件让出一次事件循环，防止阻塞
+      processedCount++;
+      if (processedCount % 10 === 0) {
+        await new Promise(resolve => setImmediate(resolve));
       }
     }
   }
 
   /**
-   * 递归删除目录
+   * 递归删除目录（异步版本）
    */
-  static _removeDir(dir) {
-    if (!fs.existsSync(dir)) return;
+  static async _removeDir(dir) {
+    try {
+      await fsPromises.access(dir);
+    } catch (err) {
+      return; // 目录不存在
+    }
 
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = await fsPromises.readdir(dir, { withFileTypes: true });
     
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       
       if (entry.isDirectory()) {
-        this._removeDir(fullPath);
+        await this._removeDir(fullPath);
       } else {
-        fs.unlinkSync(fullPath);
+        await fsPromises.unlink(fullPath);
       }
     }
     
-    fs.rmdirSync(dir);
+    await fsPromises.rmdir(dir);
   }
 
   /**
