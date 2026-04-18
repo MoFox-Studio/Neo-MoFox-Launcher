@@ -2716,6 +2716,18 @@ ipcMain.handle('scan-instance-plugins', async (event, instanceId) => {
   }
 });
 
+// scan-instance-plugin-configs: 扫描实例插件配置文件
+ipcMain.handle('scan-instance-plugin-configs', async (event, instanceId) => {
+  try {
+    const { ExportService } = require('./services/integration-pack/ExportService');
+    const pluginConfigs = await ExportService.scanInstancePluginConfigs(instanceId);
+    return pluginConfigs;
+  } catch (error) {
+    console.error('[IPC] scanInstancePluginConfigs 失败:', error);
+    throw error;
+  }
+});
+
 // export-integration-pack: 导出整合包
 ipcMain.handle('export-integration-pack', async (event, instanceId, options, destPath) => {
   try {

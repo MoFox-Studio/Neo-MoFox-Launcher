@@ -10,6 +10,7 @@ import { state } from './instances.js';
 // ─── State ────────────────────────────────────────────────────────────
 
 let currentPlugins = [];
+let currentPluginConfigs = [];
 let isExporting = false;
 
 // ─── Elements ─────────────────────────────────────────────────────────
@@ -32,6 +33,10 @@ const exportElements = {
   pluginSelector: null,
   pluginList: null,
   selectAllPlugins: null,
+  includePluginConfigs: null,
+  pluginConfigSelector: null,
+  pluginConfigList: null,
+  selectAllPluginConfigs: null,
   btnStartExport: null,
   progressContainer: null,
   progressText: null,
@@ -61,6 +66,10 @@ export function initExportTab() {
   exportElements.pluginSelector = document.getElementById('plugin-selector');
   exportElements.pluginList = document.getElementById('export-plugin-list');
   exportElements.selectAllPlugins = document.getElementById('select-all-plugins');
+  exportElements.includePluginConfigs = document.getElementById('export-include-plugin-configs');
+  exportElements.pluginConfigSelector = document.getElementById('plugin-config-selector');
+  exportElements.pluginConfigList = document.getElementById('export-plugin-config-list');
+  exportElements.selectAllPluginConfigs = document.getElementById('select-all-plugin-configs');
   exportElements.btnStartExport = document.getElementById('btn-start-export');
   exportElements.progressContainer = document.getElementById('export-progress-container');
   exportElements.progressText = document.getElementById('export-progress-text');
@@ -83,6 +92,14 @@ export function initExportTab() {
 
   if (exportElements.selectAllPlugins) {
     exportElements.selectAllPlugins.addEventListener('change', toggleSelectAllPlugins);
+  }
+
+  if (exportElements.includePluginConfigs) {
+    exportElements.includePluginConfigs.addEventListener('change', togglePluginConfigSelector);
+  }
+
+  if (exportElements.selectAllPluginConfigs) {
+    exportElements.selectAllPluginConfigs.addEventListener('change', toggleSelectAllPluginConfigs);
   }
 
   if (exportElements.btnStartExport) {
@@ -119,6 +136,9 @@ export async function onExportTabOpened(instanceId) {
 
   // 扫描插件
   await scanPlugins(instanceId);
+
+  // 扫描插件配置
+  await scanPluginConfigs(instanceId);
 }
 
 // ─── 私有函数 ──────────────────────────────────────────────────────────
@@ -138,7 +158,7 @@ function loadInstanceMetadata(instanceId) {
     exportElements.packVersion.value = '1.0.0';
   }
   if (exportElements.packAuthor) {
-    exportElements.packAuthor.value = process.env.USERNAME || process.env.USER || '';
+    exportElements.packAuthor.value = '';
   }
   if (exportElements.packDescription) {
     exportElements.packDescription.value = instance.description || `基于 ${instance.name} 实例的整合包`;
@@ -256,6 +276,28 @@ function toggleSelectAllPlugins() {
 }
 
 /**
+ * 切换插件配置选择器显示/隐藏
+ */
+function togglePluginConfigSelector() {
+  if (exportElements.includePluginConfigs?.checked) {
+    exportElements.pluginConfigSelector.style.display = 'block';
+  } else {
+    exportElements.pluginConfigSelector.style.display = 'none';
+  }
+}
+
+/**
+ * 全选/取消全选插件配置
+ */
+function toggleSelectAllPluginConfigs() {
+  const isChecked = exportElements.selectAllPluginConfigs.checked;
+  const checkboxes = exportElements.pluginConfigList.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+  });
+}
+
+/**
  * 扫描实例插件
  */
 async function scanPlugins(instanceId) {
@@ -305,6 +347,59 @@ async function scanPlugins(instanceId) {
   } catch (error) {
     console.error('[ExportTab] 扫描插件失败:', error);
     exportElements.pluginList.innerHTML = `<div class="loading-plugins"><span style="color: var(--md-sys-color-error);">扫描失败: ${error.message}</span></div>`;
+  }
+}
+
+/**
+ * 扫描实例插件配置文件
+ */
+async function scanPluginConfigs(instanceId) {
+  try {
+    exportElements.pluginConfigList.innerHTML = '<div class="loading-plugins"><span class="spinner"></span><span>扫描插件配置中...</span></div>';
+
+    const pluginConfigs = await window.mofoxAPI.scanInstancePluginConfigs(instanceId);
+    currentPluginConfigs = pluginConfigs;
+
+    if (pluginConfigs.length === 0) {
+      exportElements.pluginConfigList.innerHTML = '<div class="loading-plugins"><span>此实例没有插件配置文件</span></div>';
+      return;
+    }
+
+    // 渲染插件配置列表
+    exportElements.pluginConfigList.innerHTML = '';
+    pluginConfigs.forEach(config => {
+      const item = document.createElement('label');
+      item.className = 'plugin-item';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = config.name;
+      checkbox.dataset.configName = config.name;
+      
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'material-symbols-rounded plugin-item-icon';
+      iconSpan.textContent = config.type === 'folder' ? 'folder' : 'description';
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'plugin-item-name';
+      nameSpan.textContent = config.name;
+      
+      const typeSpan = document.createElement('span');
+      typeSpan.className = 'plugin-item-type';
+      typeSpan.textContent = config.type === 'folder' ? '文件夹' : '文件';
+      
+      item.appendChild(checkbox);
+      item.appendChild(iconSpan);
+      item.appendChild(nameSpan);
+      item.appendChild(typeSpan);
+      
+      exportElements.pluginConfigList.appendChild(item);
+    });
+
+    console.log(`[ExportTab] 已扫描到 ${pluginConfigs.length} 个插件配置`);
+  } catch (error) {
+    console.error('[ExportTab] 扫描插件配置失败:', error);
+    exportElements.pluginConfigList.innerHTML = `<div class="loading-plugins"><span style="color: var(--md-sys-color-error);">扫描失败: ${error.message}</span></div>`;
   }
 }
 
@@ -359,7 +454,9 @@ async function startExport() {
     includePlugins: exportElements.includePlugins.checked,
     includeData: exportElements.includeData.checked,
     installNapcatOnImport: exportElements.installNapcatOnImport?.checked || false,
+    includePluginConfigs: exportElements.includePluginConfigs.checked,
     selectedPlugins: [],
+    selectedPluginConfigs: [],
   };
 
   // 收集选中的插件
@@ -369,6 +466,17 @@ async function startExport() {
 
     if (options.selectedPlugins.length === 0) {
       await window.customAlert('请至少选择一个插件，或取消"包含插件"选项', '提示');
+      return;
+    }
+  }
+
+  // 收集选中的插件配置
+  if (options.includePluginConfigs) {
+    const checkedConfigs = exportElements.pluginConfigList.querySelectorAll('input[type="checkbox"]:checked');
+    options.selectedPluginConfigs = Array.from(checkedConfigs).map(cb => cb.value);
+
+    if (options.selectedPluginConfigs.length === 0) {
+      await window.customAlert('请至少选择一个插件配置文件，或取消"包含插件配置文件"选项', '提示');
       return;
     }
   }
@@ -433,12 +541,19 @@ function disableExportOptions(disable) {
   exportElements.includeNapcat.disabled = disable;
   exportElements.includeConfig.disabled = disable;
   exportElements.includePlugins.disabled = disable;
+  exportElements.includePluginConfigs.disabled = disable;
   exportElements.includeData.disabled = disable;
   exportElements.selectAllPlugins.disabled = disable;
+  exportElements.selectAllPluginConfigs.disabled = disable;
   exportElements.btnStartExport.disabled = disable;
 
   const pluginCheckboxes = exportElements.pluginList.querySelectorAll('input[type="checkbox"]');
   pluginCheckboxes.forEach(cb => {
+    cb.disabled = disable;
+  });
+
+  const configCheckboxes = exportElements.pluginConfigList.querySelectorAll('input[type="checkbox"]');
+  configCheckboxes.forEach(cb => {
     cb.disabled = disable;
   });
 }
@@ -482,6 +597,7 @@ export function onExportComplete(success, message) {
 function resetExportState() {
   isExporting = false;
   currentPlugins = [];
+  currentPluginConfigs = [];
   
   if (exportElements.includeNeo) exportElements.includeNeo.checked = false;
   if (exportElements.includeNapcat) {
@@ -494,6 +610,7 @@ function resetExportState() {
   }
   if (exportElements.includeConfig) exportElements.includeConfig.checked = false;
   if (exportElements.includePlugins) exportElements.includePlugins.checked = false;
+  if (exportElements.includePluginConfigs) exportElements.includePluginConfigs.checked = false;
   if (exportElements.includeData) exportElements.includeData.checked = false;
   if (exportElements.installNapcatOnImport) {
     exportElements.installNapcatOnImport.checked = false;
@@ -504,9 +621,12 @@ function resetExportState() {
     exportElements.installNapcatOptionItem.style.pointerEvents = 'auto';
   }
   if (exportElements.selectAllPlugins) exportElements.selectAllPlugins.checked = false;
+  if (exportElements.selectAllPluginConfigs) exportElements.selectAllPluginConfigs.checked = false;
   
   if (exportElements.pluginSelector) exportElements.pluginSelector.style.display = 'none';
+  if (exportElements.pluginConfigSelector) exportElements.pluginConfigSelector.style.display = 'none';
   if (exportElements.progressContainer) exportElements.progressContainer.style.display = 'none';
   if (exportElements.pluginList) exportElements.pluginList.innerHTML = '';
+  if (exportElements.pluginConfigList) exportElements.pluginConfigList.innerHTML = '';
   if (exportElements.exportOutput) exportElements.exportOutput.textContent = '';
 }

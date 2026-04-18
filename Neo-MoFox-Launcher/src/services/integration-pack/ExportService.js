@@ -98,6 +98,51 @@ class ExportService {
   }
 
   /**
+   * 扫描实例的插件配置目录
+   * @param {string} instanceId - 实例 ID
+   * @returns {Promise<Array>} 插件配置列表 [{ name: 'plugin1', type: 'folder'|'file' }]
+   */
+  static async scanInstancePluginConfigs(instanceId) {
+    // 获取实例信息
+    const instances = storageService.getInstances();
+    const instance = instances.find(i => i.id === instanceId);
+    
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    if (!instance.neomofoxDir) {
+      throw new Error(`实例配置错误: 缺少 neomofoxDir 字段 (instanceId: ${instanceId})`);
+    }
+
+    // 实例根目录 = neomofoxDir
+    const instanceRoot = instance.neomofoxDir;
+    const pluginConfigsDir = path.join(instanceRoot, 'config', 'plugins');
+    console.log(`[ExportService] 扫描插件配置目录: ${pluginConfigsDir}`);
+    
+    // 检查插件配置目录是否存在
+    try {
+      await fsPromises.access(pluginConfigsDir);
+    } catch (err) {
+      return [];
+    }
+
+    try {
+      // 读取配置目录
+      const items = await fsPromises.readdir(pluginConfigsDir, { withFileTypes: true });
+      
+      const pluginConfigs = items.map(item => ({
+        name: item.name,
+        type: item.isDirectory() ? 'folder' : 'file',
+      }));
+
+      return pluginConfigs;
+    } catch (err) {
+      throw new Error(`扫描插件配置目录失败: ${err.message}`);
+    }
+  }
+
+  /**
    * 导出整合包
    * @param {string} instanceId - 实例 ID
    * @param {Object} options - 导出选项
@@ -110,6 +155,8 @@ class ExportService {
    * @param {boolean} [options.includeConfig=false] - 是否包含配置文件
    * @param {boolean} [options.includePlugins=false] - 是否包含插件
    * @param {string[]} [options.selectedPlugins=[]] - 选中的插件列表（插件名称数组）
+   * @param {boolean} [options.includePluginConfigs=false] - 是否包含插件配置文件
+   * @param {string[]} [options.selectedPluginConfigs=[]] - 选中的插件配置列表（配置文件名称数组）
    * @param {boolean} [options.includeData=false] - 是否包含数据文件
    * @param {boolean} [options.installNapcatOnImport=false] - 导入时是否安装 NapCat（仅当未包含 NapCat 时有效，将存储在 content.napcat.installOnImport）
    * @param {string} destPath - 导出目标路径（完整文件路径，包含文件名）
@@ -193,10 +240,11 @@ class ExportService {
 
       // 3. 复制额外文件（配置、插件、数据）到 extra 目录
       let exportedPlugins = [];
-      if (options.includeConfig || options.includePlugins || options.includeData) {
+      if (options.includeConfig || options.includePluginConfigs || options.includePlugins || options.includeData) {
         this._emitProgress(onProgress, progress, '打包额外文件...');
         let extraItems = [];
         if (options.includeConfig) extraItems.push('配置文件');
+        if (options.includePluginConfigs) extraItems.push(`${options.selectedPluginConfigs.length} 个插件配置`);
         if (options.includePlugins) extraItems.push(`${options.selectedPlugins.length} 个插件`);
         if (options.includeData) extraItems.push('数据文件');
         this._emitOutput(onOutput, `复制 ${extraItems.join('、')}...`);
@@ -425,6 +473,41 @@ class ExportService {
         // 文件不存在，跳过
       }
       // 不导出 model.toml（包含 LLM API Key）
+    }
+
+    // 1.5 复制插件配置文件
+    if (options.includePluginConfigs && options.selectedPluginConfigs.length > 0) {
+      const pluginConfigsSrcDir = path.join(installPath, 'config', 'plugins');
+      console.log(`[ExportService] 复制插件配置，源目录: ${pluginConfigsSrcDir}`);
+      const pluginConfigsDestDir = path.join(extraDir, 'config', 'plugins');
+      console.log(`[ExportService] 复制插件配置，目标目录: ${pluginConfigsDestDir}`);
+      
+      try {
+        await fsPromises.access(pluginConfigsSrcDir);
+        await fsPromises.mkdir(pluginConfigsDestDir, { recursive: true });
+        
+        for (const configName of options.selectedPluginConfigs) {
+          const srcPath = path.join(pluginConfigsSrcDir, configName);
+          const destPath = path.join(pluginConfigsDestDir, configName);
+          
+          try {
+            const stats = await fsPromises.stat(srcPath);
+            
+            if (stats.isDirectory()) {
+              await this._copyDirRecursive(srcPath, destPath);
+            } else if (stats.isFile()) {
+              await fsPromises.copyFile(srcPath, destPath);
+            }
+          } catch (err) {
+            console.warn(`[ExportService] 插件配置不存在，跳过: ${configName}`);
+          }
+          
+          // 让出事件循环
+          await new Promise(resolve => setImmediate(resolve));
+        }
+      } catch (err) {
+        console.warn(`[ExportService] config/plugins 目录不存在`);
+      }
     }
 
     // 2. 复制插件

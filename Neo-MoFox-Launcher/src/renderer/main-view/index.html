@@ -419,6 +419,39 @@
                 
                 <label class="export-option-item">
                   <div class="option-info">
+                    <span class="material-symbols-rounded">folder_managed</span>
+                    <div class="option-text">
+                      <strong>插件配置文件</strong>
+                      <small>选择要导出的插件配置文件（config/plugins 目录下）</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-plugin-configs">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <!-- 插件配置选择器 -->
+                <div class="plugin-selector" id="plugin-config-selector" style="display: none;">
+                  <div class="plugin-selector-header">
+                    <h5>选择插件配置</h5>
+                    <label class="select-all-plugins">
+                      <input type="checkbox" id="select-all-plugin-configs">
+                      <span>全选</span>
+                    </label>
+                  </div>
+                  <div class="plugin-list" id="export-plugin-config-list">
+                    <div class="loading-plugins">
+                      <span class="spinner"></span>
+                      <span>扫描插件配置中...</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <label class="export-option-item">
+                  <div class="option-info">
                     <span class="material-symbols-rounded">database</span>
                     <div class="option-text">
                       <strong>数据文件</strong>

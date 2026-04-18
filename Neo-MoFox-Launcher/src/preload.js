@@ -174,6 +174,7 @@ const api = {
   // ─── 整合包导出/导入 ─────────────────────────────────────────────────────
   checkNapcatExists: (instanceId) => ipcRenderer.invoke('check-napcat-exists', instanceId),
   scanInstancePlugins: (instanceId) => ipcRenderer.invoke('scan-instance-plugins', instanceId),
+  scanInstancePluginConfigs: (instanceId) => ipcRenderer.invoke('scan-instance-plugin-configs', instanceId),
   exportIntegrationPack: (instanceId, options, destPath) => ipcRenderer.invoke('export-integration-pack', instanceId, options, destPath),
   onExportProgress: (callback) => {
     ipcRenderer.on('export-progress', (_event, data) => callback(data));
