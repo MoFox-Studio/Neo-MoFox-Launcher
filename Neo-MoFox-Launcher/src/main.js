@@ -2762,6 +2762,126 @@ ipcMain.handle('export-integration-pack', async (event, instanceId, options, des
   }
 });
 
+// ─── 整合包导入相关 IPC Handlers ──────────────────────────────────────
+
+// select-integration-pack: 选择整合包文件
+ipcMain.handle('select-integration-pack', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: '选择整合包文件',
+      filters: [
+        { name: 'MoFox 整合包', extensions: ['mfpack'] },
+        { name: '所有文件', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, filePath: null, fileName: null };
+    }
+
+    const filePath = result.filePaths[0];
+    const fileName = path.basename(filePath);
+
+    return { success: true, filePath, fileName };
+  } catch (error) {
+    console.error('[IPC] selectIntegrationPack 失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// parse-integration-pack: 解析整合包
+ipcMain.handle('parse-integration-pack', async (event, packPath) => {
+  try {
+    const { PackValidator } = require('./services/integration-pack/PackValidator');
+    
+    // 快速验证并解析 manifest
+    const result = await PackValidator.quickValidate(packPath);
+    
+    if (!result.valid) {
+      return { success: false, manifest: null, error: result.error };
+    }
+
+    return { success: true, manifest: result.manifest };
+  } catch (error) {
+    console.error('[IPC] parseIntegrationPack 失败:', error);
+    return { success: false, manifest: null, error: error.message };
+  }
+});
+
+// get-default-install-path: 获取默认安装路径
+ipcMain.handle('get-default-install-path', () => {
+  try {
+    const { installWizardService } = require('./services/install/InstallWizardService');
+    const defaultPath = installWizardService.getDefaultInstallPath();
+    return { success: true, path: defaultPath };
+  } catch (error) {
+    console.error('[IPC] getDefaultInstallPath 失败:', error);
+    return { success: false, path: null, error: error.message };
+  }
+});
+
+// select-directory: 选择目录
+ipcMain.handle('select-directory', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: '选择安装目录',
+      properties: ['openDirectory', 'createDirectory']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: false, path: null };
+    }
+
+    return { success: true, path: result.filePaths[0] };
+  } catch (error) {
+    console.error('[IPC] selectDirectory 失败:', error);
+    return { success: false, path: null, error: error.message };
+  }
+});
+
+// import-integration-pack: 导入整合包
+ipcMain.handle('import-integration-pack', async (event, options) => {
+  try {
+    const { importService } = require('./services/integration-pack/ImportService');
+    
+    // 设置回调
+    importService.setProgressCallback((progress) => {
+      event.sender.send('import-progress', progress);
+    });
+    
+    importService.setOutputCallback((message) => {
+      event.sender.send('import-output', message);
+    });
+    
+    importService.setStepChangeCallback((stepChange) => {
+      event.sender.send('import-step-change', stepChange);
+    });
+    
+    // 执行导入
+    const result = await importService.importIntegrationPack(options.packPath, {
+      instanceName: options.instanceName,
+      qqNumber: options.qqNumber,
+      qqNickname: options.qqNickname,
+      ownerQQNumber: options.ownerQQNumber,
+      apiKey: options.apiKey,
+      webuiApiKey: options.webuiApiKey,
+      wsPort: options.wsPort,
+      installDir: options.installDir,
+      pythonCmd: options.pythonCmd,
+    });
+    
+    // 发送完成事件
+    event.sender.send('import-complete', result);
+    return result;
+  } catch (error) {
+    console.error('[IPC] importIntegrationPack 失败:', error);
+    const errorResult = { success: false, error: error.message };
+    event.sender.send('import-complete', errorResult);
+    return errorResult;
+  }
+});
+
 // ─── TOML 验证（使用 @iarna/toml 完整解析）─────────────────────────────
 ipcMain.handle('validate-toml', async (event, content) => {
   try {

@@ -39,6 +39,7 @@
     "@iarna/toml": "^2.2.5",
     "@lezer/highlight": "^1.2.3",
     "@material/material-color-utilities": "^0.3.0",
+    "adm-zip": "^0.5.17",
     "archiver": "^7.0.1",
     "extract-zip": "^2.0.1",
     "systeminformation": "^5.31.1",

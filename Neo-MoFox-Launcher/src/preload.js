@@ -185,6 +185,25 @@ const api = {
   onExportComplete: (callback) => {
     ipcRenderer.on('export-complete', (_event, data) => callback(data));
   },
+
+  // 整合包导入 API
+  selectIntegrationPack: () => ipcRenderer.invoke('select-integration-pack'),
+  parseIntegrationPack: (packPath) => ipcRenderer.invoke('parse-integration-pack', packPath),
+  getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  importIntegrationPack: (options) => ipcRenderer.invoke('import-integration-pack', options),
+  onImportProgress: (callback) => {
+    ipcRenderer.on('import-progress', (_event, data) => callback(data));
+  },
+  onImportOutput: (callback) => {
+    ipcRenderer.on('import-output', (_event, message) => callback(message));
+  },
+  onImportStepChange: (callback) => {
+    ipcRenderer.on('import-step-change', (_event, data) => callback(data));
+  },
+  onImportComplete: (callback) => {
+    ipcRenderer.on('import-complete', (_event, data) => callback(data));
+  },
   
   // ─── OOBE 完成处理 ──────────────────────────────────────────────────────
   oobeComplete: () => ipcRenderer.invoke('oobe-complete'),
