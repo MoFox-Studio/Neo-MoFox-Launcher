@@ -1,4 +1,5 @@
 import { el } from './elements.js';
+import { setCurrentInstance, saveIcon } from './icon-manager.js';
 
 // ─── Instance State ───────────────────────────────────────────────────
 
@@ -48,23 +49,38 @@ export async function loadInstances() {
     }
     
     // 转换字段名以适配前端显示（从 extra 对象中读取）
-    state.instances = instances.map(instance => ({
-      id: instance.id,
-      name: instance.extra?.displayName || instance.qqNumber || 'Unknown',
-      path: instance.neomofoxDir,
-      description: instance.extra?.description || '', // 用户编辑的描述
-      isLike: instance.extra?.isLike || false, // 收藏状态
-      autoInfo: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`, // 自动信息
-      status: state.runningStatuses[instance.id] || (instance.enabled ? 'stopped' : 'disabled'),
-      branch: instance.channel,
-      version: instance.neomofoxVersion || 'unknown',
-      // 保留原始数据
-      qqNumber: instance.qqNumber,
-      wsPort: instance.wsPort,
-      napcatDir: instance.napcatDir,
-      installCompleted: instance.installCompleted,
-      createdAt: instance.createdAt,
-      lastStartedAt: instance.lastStartedAt,
+    // 同时获取图标的完整路径
+    state.instances = await Promise.all(instances.map(async instance => {
+      let iconFullPath = null;
+      if (instance.extra?.iconPath) {
+        try {
+          iconFullPath = await window.mofoxAPI.getIconFullPath(instance.extra.iconPath);
+        } catch (err) {
+          console.warn(`获取图标路径失败 (${instance.id}):`, err);
+        }
+      }
+      
+      return {
+        id: instance.id,
+        name: instance.extra?.displayName || instance.qqNumber || 'Unknown',
+        path: instance.neomofoxDir,
+        description: instance.extra?.description || '', // 用户编辑的描述
+        isLike: instance.extra?.isLike || false, // 收藏状态
+        autoInfo: `QQ: ${instance.qqNumber} | 端口: ${instance.wsPort}`, // 自动信息
+        status: state.runningStatuses[instance.id] || (instance.enabled ? 'stopped' : 'disabled'),
+        branch: instance.channel,
+        version: instance.neomofoxVersion || 'unknown',
+        // 图标路径
+        iconFullPath: iconFullPath, // 完整路径
+        // 保留原始数据
+        extra: instance.extra, // 保留 extra 对象用于编辑
+        qqNumber: instance.qqNumber,
+        wsPort: instance.wsPort,
+        napcatDir: instance.napcatDir,
+        installCompleted: instance.installCompleted,
+        createdAt: instance.createdAt,
+        lastStartedAt: instance.lastStartedAt,
+      };
     }));
     
     renderInstances();
@@ -212,10 +228,19 @@ function createInstanceCard(instance) {
     if (isRunning) card.classList.add('instance-running');
     if (liveStatus === 'error') card.classList.add('instance-error');
     
+    // 准备图标HTML - 优先显示自定义图标，否则显示默认图标
+    let iconHTML = '';
+    if (instance.iconFullPath) {
+      // 使用完整路径（已通过 getIconFullPath 获取）
+      iconHTML = `<img src="${instance.iconFullPath}" alt="${instance.name}" class="instance-icon-img" onerror="this.style.display='none'">`;
+    } else {
+      iconHTML = `<span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>`;
+    }
+    
     card.innerHTML = `
       <div class="instance-card-header">
         <div class="instance-icon ${isRunning ? 'running' : ''}">
-          <span class="material-symbols-rounded">${isRunning ? 'play_circle' : 'dns'}</span>
+          ${iconHTML}
         </div>
         <div class="instance-status-indicator">
           <div class="instance-status-dot ${liveStatus}"></div>
@@ -388,13 +413,35 @@ function updateCardDOM(card, instance, status) {
   // 更新图标
   const icon = card.querySelector('.instance-icon');
   const iconSymbol = card.querySelector('.instance-icon .material-symbols-rounded');
-  if (icon && iconSymbol) {
-    if (isRunning) {
-      icon.classList.add('running');
-      iconSymbol.textContent = 'play_circle';
-    } else {
-      icon.classList.remove('running');
-      iconSymbol.textContent = 'dns';
+  const iconImg = card.querySelector('.instance-icon-img');
+  
+  if (icon) {
+    // 如果有自定义图标，保留图标；否则更新默认图标
+    if (!instance.iconFullPath) {
+      // 清除可能存在的图标图片
+      if (iconImg) iconImg.remove();
+      
+      // 确保有图标元素
+      if (!iconSymbol) {
+        const newSymbol = document.createElement('span');
+        newSymbol.className = 'material-symbols-rounded';
+        icon.appendChild(newSymbol);
+      }
+      
+      const symbol = icon.querySelector('.material-symbols-rounded');
+      if (symbol) {
+        symbol.textContent = isRunning ? 'play_circle' : 'dns';
+      }
+      
+      if (isRunning) {
+        icon.classList.add('running');
+      } else {
+        icon.classList.remove('running');
+      }
+    }
+    // 如果有自定义图标，移除默认图标并保持图片
+    else if (iconSymbol && !iconImg) {
+      iconSymbol.remove();
     }
   }
   
@@ -488,6 +535,9 @@ export function setupInstanceStatusListener() {
 function openEditModal(instance) {
   state.currentEditingInstance = instance.id;
   
+  // 设置图标管理器的当前实例
+  setCurrentInstance(instance.id, instance.extra?.iconPath);
+  
   // 填充概览数据
   document.getElementById('overview-state').textContent = STATUS_TEXT[instance.status] || instance.status;
   document.getElementById('overview-version').textContent = instance.version;
@@ -506,9 +556,14 @@ function openEditModal(instance) {
     likeCheckbox.checked = instance.isLike || false;
     likeLabel.textContent = instance.isLike ? '已收藏' : '未收藏';
     
+    // 初始化卡片样式
+    const toggleCard = likeCheckbox.closest('.favorite-toggle-card');
+    if (toggleCard) toggleCard.classList.toggle('is-active', instance.isLike);
+    
     // 添加切换事件监听
     likeCheckbox.onchange = function() {
       likeLabel.textContent = this.checked ? '已收藏' : '未收藏';
+      if (toggleCard) toggleCard.classList.toggle('is-active', this.checked);
     };
   }
   
@@ -640,25 +695,46 @@ export async function saveInstance() {
   
   try {
     if (state.currentEditingInstance) {
-      // 编辑现有实例 - 更新名称、描述和收藏状态（存储在 extra 对象中）
+      // 保存图标（如果有修改）
+      const iconResult = await saveIcon(state.currentEditingInstance);
+      if (!iconResult.success) {
+        console.error('保存图标失败:', iconResult.error);
+        await window.customAlert('保存图标失败: ' + iconResult.error, '错误');
+        return;
+      }
+      
+      // 编辑现有实例 - 更新名称、描述、收藏状态和图标路径（存储在 extra 对象中）
       console.log('保存实例:', state.currentEditingInstance, { extra: { displayName: name, description, isLike } });
       
-      await window.mofoxAPI.updateInstance(state.currentEditingInstance, {
+      const instance = state.instances.find(i => i.id === state.currentEditingInstance);
+      const updateData = {
         extra: {
           displayName: name,
           description: description,
           isLike: isLike,
+          iconPath: iconResult.iconPath || instance?.extra?.iconPath, // 保留现有图标路径
         },
-      });
+      };
+      
+      await window.mofoxAPI.updateInstance(state.currentEditingInstance, updateData);
       
       console.log('实例更新成功');
       
       // 立即更新本地状态并重新渲染
-      const instance = state.instances.find(i => i.id === state.currentEditingInstance);
       if (instance) {
         instance.name = name;
         instance.description = description;
         instance.isLike = isLike;
+        if (iconResult.iconPath) {
+          instance.extra = instance.extra || {};
+          instance.extra.iconPath = iconResult.iconPath;
+          // 同时更新完整路径
+          try {
+            instance.iconFullPath = await window.mofoxAPI.getIconFullPath(iconResult.iconPath);
+          } catch (err) {
+            console.warn('获取图标完整路径失败:', err);
+          }
+        }
         
         // 重新渲染列表以更新分组
         renderInstances();

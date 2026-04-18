@@ -10,6 +10,7 @@ import {
   deleteInstance,
   setupInstanceStatusListener,
 } from './modules/instances.js';
+import { initIconManager } from './modules/icon-manager.js';
 import { performAutoUpdateCheck } from './modules/update-checker.js';
 
 // ─── Initialization ───────────────────────────────────────────────────
@@ -30,6 +31,9 @@ async function init() {
 
   // 更新名言
   updateQuotes();
+  
+  // 初始化图标管理器
+  initIconManager();
   
   // 加载实例列表
   await loadInstances();

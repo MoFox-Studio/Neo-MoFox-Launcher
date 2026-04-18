@@ -483,6 +483,16 @@
   justify-content: center;
   font-size: 18px;
   font-weight: bold;
+  overflow: hidden;
+  position: relative;
+}
+
+.instance-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
 }
 
 .instance-status-dot {
@@ -1040,6 +1050,83 @@
 }
 
 /* ─── Toggle Switch ──────────────────────────────────────────────────── */
+.favorite-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  margin-top: 12px;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.favorite-toggle-card:hover {
+  border-color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.favorite-toggle-card.is-active {
+  background: rgba(233, 30, 99, 0.08);
+  border-color: #e91e63;
+}
+
+[data-theme="dark"] .favorite-toggle-card.is-active {
+  background: rgba(244, 143, 177, 0.12);
+  border-color: #f48fb1;
+}
+
+.favorite-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.favorite-icon {
+  font-size: 28px;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: all 0.3s ease;
+}
+
+.favorite-toggle-card.is-active .favorite-icon {
+  color: #e91e63;
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  animation: heartBeat 0.4s ease-in-out;
+}
+
+[data-theme="dark"] .favorite-toggle-card.is-active .favorite-icon {
+  color: #f48fb1;
+}
+
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.favorite-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.favorite-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.favorite-desc {
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.favorite-toggle-card .form-switch-wrapper {
+  margin: 0;
+}
+
 .form-switch-wrapper {
   display: flex;
   align-items: center;
@@ -1409,4 +1496,89 @@
 .update-item:hover .update-item-arrow {
   transform: translateX(4px);
   opacity: 0.7;
+}
+
+/* ─── Icon Upload Area ──────────────────────────────────────────────── */
+.icon-upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.icon-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 16px;
+  border: 2px dashed var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-variant);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.icon-preview:hover {
+  border-color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+}
+
+.icon-preview .material-symbols-rounded {
+  font-size: 48px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.icon-preview .icon-hint {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.icon-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+
+.icon-preview.has-icon {
+  border-style: solid;
+}
+
+.icon-preview.has-icon:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Icon Crop Modal ───────────────────────────────────────────────── */
+.crop-container {
+  max-height: 400px;
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.crop-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-top: 16px;
+}
+
+.crop-hint .material-symbols-rounded {
+  font-size: 20px;
 }

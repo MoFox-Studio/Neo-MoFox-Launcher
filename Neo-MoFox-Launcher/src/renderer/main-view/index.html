@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: file: https:;">
   <title>Neo-MoFox Launcher</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,6 +234,22 @@
           <div class="tab-pane" id="tab-basic">
             <div class="pane-header">基本设置</div>
             <div class="form-section">
+              <!-- 图标设置 -->
+              <div class="form-group">
+                <label class="form-label">实例图标</label>
+                <div class="icon-upload-area" id="icon-upload-area">
+                  <div class="icon-preview" id="icon-preview">
+                    <span class="material-symbols-rounded">add_photo_alternate</span>
+                    <span class="icon-hint">点击上传图标</span>
+                  </div>
+                  <input type="file" id="icon-file-input" accept="image/*" style="display: none;">
+                  <button class="md3-btn md3-btn-text md3-btn-sm" id="btn-remove-icon" style="display: none;">
+                    <span class="material-symbols-rounded">delete</span>
+                    移除图标
+                  </button>
+                </div>
+              </div>
+              
               <div class="form-group">
                 <label class="form-label">实例名称</label>
                 <input type="text" class="form-input" id="edit-instance-name" placeholder="我的 Neo-MoFox">
@@ -242,13 +258,14 @@
                 <label class="form-label">描述</label>
                 <textarea class="form-textarea" id="edit-instance-desc" placeholder="可选：为这个实例添加一些描述" rows="3"></textarea>
               </div>
-              <div class="form-group">
-                <label class="form-label">
-                  <div class="form-label-with-icon">
-                    <span class="material-symbols-rounded">favorite</span>
-                    收藏此实例
+              <div class="favorite-toggle-card">
+                <div class="favorite-info">
+                  <span class="material-symbols-rounded favorite-icon">favorite</span>
+                  <div class="favorite-text">
+                    <span class="favorite-title">收藏此实例</span>
+                    <span class="favorite-desc">在主页面置顶显示，快速访问</span>
                   </div>
-                </label>
+                </div>
                 <div class="form-switch-wrapper">
                   <label class="form-switch">
                     <input type="checkbox" id="edit-instance-like">
@@ -442,6 +459,39 @@
     </div>
   </div>
 
+  <!-- ═══ 图标裁剪对话框 ═══ -->
+  <div class="modal-overlay hidden" id="icon-crop-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="material-symbols-rounded">crop</span>
+        <h3>裁剪图标</h3>
+        <button class="icon-btn" id="btn-close-crop-modal">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="crop-container">
+          <img id="crop-image" style="max-width: 100%;">
+        </div>
+        <div class="crop-hint">
+          <span class="material-symbols-rounded">info</span>
+          拖拽或调整白框来选择图标区域（将裁剪为 256x256 正方形）
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="md3-btn md3-btn-text" id="btn-cancel-crop">取消</button>
+        <button class="md3-btn md3-btn-primary" id="btn-confirm-crop">
+          <span class="material-symbols-rounded">check</span>
+          <span>确认</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
   <script src="../components/dialog.js"></script>
   <script type="module" src="main.js"></script>
 </body>

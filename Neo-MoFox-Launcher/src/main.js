@@ -739,13 +739,49 @@ ipcMain.handle('instances-has-any', () => {
   return storageService.hasInstances();
 });
 
-// 全局状态（stub，StorageService 暂不实现全局状态持久化）
-ipcMain.handle('state-read', () => {
-  return {};
+// 实例图标管理
+ipcMain.handle('instance-save-icon', async (event, instanceId, imageDataURL) => {
+  try {
+    // 将 Data URL 转换为 Buffer
+    const base64Data = imageDataURL.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    // 保存图标并更新实例（StorageService 会自动处理）
+    const updatedInstance = storageService.saveInstanceIcon(instanceId, imageBuffer);
+    
+    return { success: true, iconPath: updatedInstance.extra?.iconPath };
+  } catch (error) {
+    console.error('[Main] 保存图标失败:', error);
+    return { success: false, error: error.message };
+  }
 });
 
-ipcMain.handle('state-write', (event, patch) => {
-  return {};
+ipcMain.handle('instance-delete-icon', async (event, instanceId) => {
+  try {
+    const instance = storageService.getInstance(instanceId);
+    if (instance?.extra?.iconPath) {
+      storageService.deleteInstanceIcon(instanceId);
+      
+      // 更新实例记录，清除 iconPath
+      const newExtra = { ...instance.extra };
+      delete newExtra.iconPath;
+      storageService.updateInstance(instanceId, { extra: newExtra });
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] 删除图标失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('instance-get-icon-path', (event, relativePath) => {
+  try {
+    return storageService.getIconFullPath(relativePath);
+  } catch (error) {
+    console.error('[Main] 获取图标路径失败:', error);
+    return null;
+  }
 });
 
 // 安装向导

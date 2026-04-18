@@ -78,6 +78,11 @@ const api = {
   updateInstance: (instanceId, updates) => ipcRenderer.invoke('instances-update', instanceId, updates),
   deleteInstance: (instanceId) => ipcRenderer.invoke('instances-delete', instanceId),
   hasInstances: () => ipcRenderer.invoke('instances-has-any'),
+  
+  // 实例图标管理
+  saveInstanceIcon: (instanceId, imageDataURL) => ipcRenderer.invoke('instance-save-icon', instanceId, imageDataURL),
+  deleteInstanceIcon: (instanceId) => ipcRenderer.invoke('instance-delete-icon', instanceId),
+  getIconFullPath: (relativePath) => ipcRenderer.invoke('instance-get-icon-path', relativePath),
 
   // ─── 全局状态 ───────────────────────────────────────────────────────────
   readState: () => ipcRenderer.invoke('state-read'),

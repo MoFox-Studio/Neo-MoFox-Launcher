@@ -59,6 +59,9 @@ class StorageService {
     
     // 创建日志目录
     fs.mkdirSync(path.join(dataDir, 'logs'), { recursive: true });
+    
+    // 创建图标目录
+    fs.mkdirSync(path.join(dataDir, 'icons'), { recursive: true });
 
     this._initialized = true;
     console.log(`[StorageService] 初始化完成，数据目录: ${dataDir}`);
@@ -180,6 +183,16 @@ class StorageService {
       throw new Error(`实例不存在: ${instanceId}`);
     }
     
+    // 删除实例图标（如果存在）
+    if (instance.extra?.iconPath) {
+      try {
+        this.deleteInstanceIcon(instanceId);
+      } catch (e) {
+        console.error(`[StorageService] 删除实例图标失败:`, e);
+        // 即使图标删除失败，仍继续删除实例
+      }
+    }
+    
     // 删除实例文件夹
     if (instance.neomofoxDir) {
       // 从 neomofoxDir 推导实例根目录（父目录）
@@ -261,6 +274,83 @@ class StorageService {
    */
   getIncompleteInstances() {
     return this.getInstances().filter(i => i.installCompleted === false);
+  }
+
+  // ─── 图标管理 ──────────────────────────────────────────────────────────
+
+  /**
+   * 获取图标目录路径
+   */
+  getIconsDir() {
+    this.init();
+    return path.join(this.getDataDir(), 'icons');
+  }
+
+  /**
+   * 保存实例图标并更新实例数据
+   * @param {string} instanceId - 实例 ID
+   * @param {Buffer} imageBuffer - 图像数据（PNG 格式）
+   * @returns {object} 更新后的实例对象
+   */
+  saveInstanceIcon(instanceId, imageBuffer) {
+    const iconsDir = this.getIconsDir();
+    const fileName = `instance_${instanceId}.png`;
+    const iconPath = path.join(iconsDir, fileName);
+    
+    // 限制文件大小为 2MB
+    const maxSize = 2 * 1024 * 1024;
+    if (imageBuffer.length > maxSize) {
+      throw new Error('图标文件过大，最大支持 2MB');
+    }
+    
+    // 保存文件
+    fs.writeFileSync(iconPath, imageBuffer);
+    console.log(`[StorageService] 图标已保存: ${iconPath}`);
+    
+    // 相对路径
+    const relativePath = path.join('icons', fileName);
+    
+    // 更新实例的 extra.iconPath
+    const instance = this.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+    
+    const updatedInstance = this.updateInstance(instanceId, {
+      extra: {
+        ...instance.extra,
+        iconPath: relativePath,
+      }
+    });
+    
+    console.log(`[StorageService] 实例图标路径已更新: ${relativePath}`);
+    return updatedInstance;
+  }
+
+  /**
+   * 删除实例图标
+   * @param {string} instanceId - 实例 ID
+   */
+  deleteInstanceIcon(instanceId) {
+    const iconsDir = this.getIconsDir();
+    const fileName = `instance_${instanceId}.png`;
+    const iconPath = path.join(iconsDir, fileName);
+    
+    if (fs.existsSync(iconPath)) {
+      fs.unlinkSync(iconPath);
+      console.log(`[StorageService] 图标已删除: ${iconPath}`);
+    }
+  }
+
+  /**
+   * 获取图标的绝对路径
+   * @param {string} relativePath - 相对路径（来自 extra.iconPath）
+   * @returns {string|null} 图标绝对路径，如果不存在则返回 null
+   */
+  getIconFullPath(relativePath) {
+    if (!relativePath) return null;
+    const fullPath = path.join(this.getDataDir(), relativePath);
+    return fs.existsSync(fullPath) ? fullPath : null;
   }
 
   /**
