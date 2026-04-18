@@ -261,10 +261,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🧹 清理旧的每夜构建版本，保留最新的 6 个..."
-          gh release list --limit 100 | grep "nightly-" | awk '{print $1}' | tail -n +7 | while read tag; do
-            echo "删除旧版本: $tag"
-            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          
+          # 获取所有 nightly 版本的标签（按时间倒序，使用 JSON 格式更可靠）
+          NIGHTLY_TAGS=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt \
+            --jq '.[] | select(.isPrerelease == true and (.tagName | startswith("nightly-"))) | .tagName' | sort -r)
+          
+          # 统计总数
+          TOTAL_COUNT=$(echo "$NIGHTLY_TAGS" | wc -l)
+          echo "📊 找到 $TOTAL_COUNT 个每夜构建版本"
+          
+          if [ "$TOTAL_COUNT" -le 6 ]; then
+            echo "✅ 版本数量 <= 6，无需清理"
+            exit 0
+          fi
+          
+          # 跳过前 6 个，删除剩余的
+          TO_DELETE=$(echo "$NIGHTLY_TAGS" | tail -n +7)
+          DELETE_COUNT=$(echo "$TO_DELETE" | wc -l)
+          echo "🗑️  将删除 $DELETE_COUNT 个旧版本"
+          
+          echo "$TO_DELETE" | while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              echo "  删除: $tag"
+              gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || echo "  ⚠️  删除失败: $tag"
+            fi
           done
+          
           echo "✅ 清理完成"
 
       - name: Collect release files
