@@ -683,7 +683,7 @@ class ExportService {
   }
 
   /**
-   * 递归删除目录（异步版本）
+   * 递归删除目录（异步版本，带重试机制）
    */
   static async _removeDir(dir) {
     try {
@@ -692,6 +692,23 @@ class ExportService {
       return; // 目录不存在
     }
 
+    // 使用 Node.js 14.14+ 的 fs.rm API（支持递归删除和重试）
+    if (fsPromises.rm) {
+      try {
+        await fsPromises.rm(dir, {
+          recursive: true,
+          force: true,
+          maxRetries: 3,
+          retryDelay: 100
+        });
+        return;
+      } catch (err) {
+        console.warn(`[ExportService] fs.rm 删除失败，回退到手动删除: ${err.message}`);
+        // 如果 fs.rm 失败，继续使用下面的手动删除逻辑
+      }
+    }
+
+    // 手动递归删除（带重试机制）
     const entries = await fsPromises.readdir(dir, { withFileTypes: true });
     
     for (const entry of entries) {
@@ -700,11 +717,77 @@ class ExportService {
       if (entry.isDirectory()) {
         await this._removeDir(fullPath);
       } else {
-        await fsPromises.unlink(fullPath);
+        // 带重试的文件删除
+        await this._unlinkWithRetry(fullPath);
       }
     }
     
-    await fsPromises.rmdir(dir);
+    // 带重试的目录删除
+    await this._rmdirWithRetry(dir);
+  }
+
+  /**
+   * 带重试机制的文件删除
+   * @param {string} filePath - 文件路径
+   * @param {number} maxRetries - 最大重试次数
+   * @param {number} retryDelay - 重试延迟（毫秒）
+   */
+  static async _unlinkWithRetry(filePath, maxRetries = 3, retryDelay = 100) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await fsPromises.unlink(filePath);
+        return;
+      } catch (err) {
+        if (err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'ENOENT') {
+          if (err.code === 'ENOENT') {
+            // 文件已不存在，视为成功
+            return;
+          }
+          
+          if (i < maxRetries - 1) {
+            // 等待后重试
+            await new Promise(resolve => setTimeout(resolve, retryDelay * (i + 1)));
+            continue;
+          }
+        }
+        // 最后一次重试失败或其他错误，记录警告但不抛出
+        console.warn(`[ExportService] 无法删除文件 ${filePath}: ${err.message}`);
+        // 不抛出错误，允许继续处理其他文件
+        return;
+      }
+    }
+  }
+
+  /**
+   * 带重试机制的目录删除
+   * @param {string} dirPath - 目录路径
+   * @param {number} maxRetries - 最大重试次数
+   * @param {number} retryDelay - 重试延迟（毫秒）
+   */
+  static async _rmdirWithRetry(dirPath, maxRetries = 3, retryDelay = 100) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await fsPromises.rmdir(dirPath);
+        return;
+      } catch (err) {
+        if (err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'ENOTEMPTY' || err.code === 'ENOENT') {
+          if (err.code === 'ENOENT') {
+            // 目录已不存在，视为成功
+            return;
+          }
+          
+          if (i < maxRetries - 1) {
+            // 等待后重试
+            await new Promise(resolve => setTimeout(resolve, retryDelay * (i + 1)));
+            continue;
+          }
+        }
+        // 最后一次重试失败，记录警告但不抛出
+        console.warn(`[ExportService] 无法删除目录 ${dirPath}: ${err.message}`);
+        // 不抛出错误，允许继续
+        return;
+      }
+    }
   }
 
   /**
