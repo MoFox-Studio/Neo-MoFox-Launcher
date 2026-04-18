@@ -9,9 +9,17 @@ import {
   saveInstance,
   deleteInstance,
   setupInstanceStatusListener,
+  state as instanceState,
 } from './modules/instances.js';
 import { initIconManager } from './modules/icon-manager.js';
 import { performAutoUpdateCheck } from './modules/update-checker.js';
+import { 
+  initExportTab, 
+  onExportTabOpened,
+  updateExportProgress,
+  addExportOutput,
+  onExportComplete 
+} from './modules/export-tab.js';
 
 // ─── Initialization ───────────────────────────────────────────────────
 
@@ -34,6 +42,9 @@ async function init() {
   
   // 初始化图标管理器
   initIconManager();
+  
+  // 初始化导出选项卡
+  initExportTab();
   
   // 加载实例列表
   await loadInstances();
@@ -94,7 +105,7 @@ el.editInstanceModal.addEventListener('click', (e) => {
 
 // 编辑实例模态框 - 选项卡切换逻辑
 document.querySelectorAll('#edit-instance-sidebar .sidebar-tab').forEach(tab => {
-  tab.addEventListener('click', (e) => {
+  tab.addEventListener('click', async (e) => {
     // 切换 Tab active 状态
     document.querySelectorAll('#edit-instance-sidebar .sidebar-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
@@ -108,6 +119,14 @@ document.querySelectorAll('#edit-instance-sidebar .sidebar-tab').forEach(tab => 
     const targetPane = document.getElementById(targetId);
     if (targetPane) {
       targetPane.classList.add('active');
+    }
+    
+    // 如果是导出选项卡，加载插件列表
+    if (tab.dataset.tab === 'export') {
+      const instanceId = instanceState.currentEditingInstance;
+      if (instanceId) {
+        await onExportTabOpened(instanceId);
+      }
     }
   });
 });

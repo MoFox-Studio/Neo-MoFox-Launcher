@@ -105,11 +105,12 @@ instance-name.mfpack (ZIP Archive)
     },
     "napcat": {
       "included": true,
-      "version": "2.5.0"
+      "version": "2.5.0",
+      "installNapcatOnImport": false
     },
     "plugins": {
       "included": true,
-      "list": ["plugin1", "plugin2"]  // 实际导出的插件名称列表
+      "list": ["plugin1", "plugin2"]
     },
     "config": {
       "included": true
@@ -122,6 +123,7 @@ instance-name.mfpack (ZIP Archive)
 ```
 
 **字段说明**：
+- **新增** `installNapcatOnImport`：布尔值，当 `napcat.included = false` 时，此字段指示导入时是否自动下载安装 NapCat
 - **移除** `requirements`：不需要在整合包内指定环境要求，导入时使用 Launcher 内置的环境检查
 - **移除** `installInstructions.userInputFields`：用户输入字段固定为 `[qqNumber, qqNickname, wsPort, apiKey, ownerQQNumber, webuiKey?]`
 - **简化** `config.included`：`true` = 包含 core.toml，`false` = 不包含（不导出 model.toml）
@@ -172,27 +174,33 @@ instance-name.mfpack (ZIP Archive)
 实现整合包导出功能，用户可在编辑实例对话框中导出配置好的实例。
 
 #### 任务清单
-- [ ] **步骤 2.1**: 创建导出服务 `ExportService.js`
-  - 实现文件扫描和选择性复制逻辑
-  - **实现插件目录扫描**：
+- [x] **步骤 2.1**: 创建导出服务 `ExportService.js`
+  - [x] 实现文件扫描和选择性复制逻辑
+  - [x] **实现插件目录扫描**：
     - 读取实例的 `plugins/` 目录
     - 列出所有子目录和文件（1级目录结构）
     - 返回插件列表供前端显示
-  - 实现配置文件模板化（移除敏感信息）
-  - 实现元数据生成（manifest.json）
-  - 实现 ZIP 打包（使用 `archiver`）
-  - 添加进度回调和错误处理
+  - [x] **实现 NapCat 存在性检测** ✨ **新增**：
+    - `checkNapcatExists(instanceId)` 方法
+    - 检查实例的 `napcat/` 目录是否存在
+    - 返回布尔值供前端动态显示选项
+  - [x] 实现配置文件模板化（移除敏感信息）
+  - [x] 实现元数据生成（manifest.json，含 `installNapcatOnImport` 字段）
+  - [x] 实现 ZIP 打包（使用 `archiver`）
+  - [x] 添加进度回调和错误处理
 
-- [ ] **步骤 2.2**: 创建元数据管理器 `ManifestManager.js`
-  - 定义 manifest.json 数据结构验证
-  - 实现元数据读写方法
-  - 版本检测和兼容性检查
+- [x] **步骤 2.2**: 创建元数据管理器 `ManifestManager.js`
+  - [x] 定义 manifest.json 数据结构验证
+  - [x] 实现元数据读写方法
+  - [x] 版本检测和兼容性检查
+  - [x] **支持 `installNapcatOnImport` 字段** ✨ **新增**
 
-- [ ] **步骤 2.3**: 编辑实例对话框 UI 修改
-  - 在 `main.html` 中添加"导出整合包"侧边栏选项
-  - 创建导出选项界面（复选框列表）：
+- [x] **步骤 2.3**: 编辑实例对话框 UI 修改
+  - [x] 在 `main.html` 中添加"导出整合包"侧边栏选项
+  - [x] 创建导出选项界面（复选框列表）：
     - Neo-MoFox 主程序（复选框）
-    - NapCat 程序（复选框）
+    - **NapCat 程序（复选框，动态显示）** ✨ **修改**
+    - **导入时安装 NapCat（复选框，动态显示）** ✨ **新增**
     - 配置文件（复选框）
     - **插件选择器（高级）**：
       - "全选插件"复选框
@@ -202,47 +210,62 @@ instance-name.mfpack (ZIP Archive)
       - 支持全选/取消全选
     - 数据库文件（复选框）
     - 其他资源（复选框）
-  - **插件扫描与显示**：
+  - [x] **NapCat 选项动态显示逻辑** ✨ **新增**：
+    - 打开导出对话框时调用 `checkNapcatExists(instanceId)` API
+    - 实例**有 NapCat** → 显示"打包 NapCat"选项，隐藏"导入时安装"选项
+    - 实例**无 NapCat** → 隐藏"打包 NapCat"选项，显示"导入时安装 NapCat"选项
+    - 勾选"打包 NapCat"时自动隐藏"导入时安装"选项
+  - [x] **插件扫描与显示**：
     - 打开导出对话框时调用 `scanInstancePlugins(instanceId)` API
     - 接收插件列表：`[{ name: 'plugin1', type: 'folder' }, { name: 'plugin2.py', type: 'file' }]`
     - 动态生成插件复选框列表
     - 实现"全选插件"功能
-  - 实现导出选项状态管理（包括选中的插件列表）按钮
-  - 添加"开始导出"按钮
+  - [x] 实现导出选项状态管理（包括选中的插件列表和 `installNapcatOnImport`）
+  - [x] 添加"开始导出"按钮
 
-- [ ] **步骤 2.4**: 导出流程前端逻辑
-  - 在 `instances.js` 中添加导出处理函数
-  - 实现导出选项状态管理：
+- [x] **步骤 2.4**: 导出流程前端逻辑
+  - [x] 在 `export-tab.js` 中添加导出处理函数
+  - [x] 实现导出选项状态管理：
+    - `checkNapcatAvailability(instanceId)` - 检测 NapCat 并动态显示选项 ✨ **新增**
+    - `toggleInstallNapcatOption()` - 切换"导入时安装"选项显示 ✨ **新增**
     - `scanInstancePlugins(instanceId)` - 扫描插件目录，返回插件列表
     - `exportIntegrationPack(instanceId, options, destPath)` - 执行导出
       - `options.selectedPlugins` - 用户选中的插件列表
-  - 实现导出进度显示（进度条 + 状态文本）
+      - `options.installNapcatOnImport` - 是否导入时安装 NapCat ✨ **新增**
+  - [x] 实现导出进度显示（进度条 + 状态文本）
 
-- [ ] **步骤 2.5**: IPC 通信实现
-  - 在 `src/main.js` 中注册导出 API
-  - `exportIntegrationPack(instanceId, options, destPath)`
-  - 进度事件：`integration-pack:export-progress`
+- [x] **步骤 2.5**: IPC 通信实现
+  - [x] 在 `src/main.js` 中注册导出 API
+  - [x] `checkNapcatExists(instanceId)` - 检查 NapCat 存在性 ✨ **新增**
+  - [x] `scanInstancePlugins(instanceId)` - 扫描插件目录
+  - [x] `exportIntegrationPack(instanceId, options, destPath)` - 执行导出
+  - [x] 进度事件：`export-progress` ✨ **修改事件名**
+  - [x] 输出事件：`export-output` ✨ **修改事件名**
+  - [x] 完成事件：`export-complete` ✨ **修改事件名**
 
-- [ ] **步骤 2.6**: 配置文件占位符替换逻辑（仅处理 core.toml）
-  - 读取实例的 `config/core.toml`
-  - 替换敏感字段为占位符：
+- [x] **步骤 2.6**: 配置文件占位符替换逻辑（仅处理 core.toml）
+  - [x] 读取实例的 `config/core.toml`
+  - [x] 替换敏感字段为占位符：
     - `permission.master_users` 中的所有 QQ 号 → `{{OWNER_QQ}}`
     - `http_router.api_keys` 数组 → `["{{WEBUI_KEY}}"]`
-  - **直接覆盖保存为 `core.toml`**（不使用 .template 后缀）
-  - **不导出 `model.toml`**（导入时启动 Neo-MoFox 自动生成）
+  - [x] **直接覆盖保存为 `core.toml`**（不使用 .template 后缀）
+  - [x] **不导出 `model.toml`**（导入时启动 Neo-MoFox 自动生成）
 
 #### 关键文件
-- `src/services/integration-pack/ExportService.js` (新建)
-- `src/services/integration-pack/ManifestManager.js` (新建)
-- `src/renderer/main-view/main.html` (修改)
-- `src/renderer/main-view/modules/instances.js` (修改)
-- `src/main.js` (修改)
+- `src/services/integration-pack/ExportService.js` (新建) ✅ **已完成**
+- `src/services/integration-pack/ManifestManager.js` (新建) ✅ **已完成**
+- `src/renderer/main-view/index.html` (修改) ✅ **已完成**
+- `src/renderer/main-view/modules/export-tab.js` (新建) ✅ **已完成**
+- `src/main.js` (修改) ✅ **已完成**
+- `src/preload.js` (修改) ✅ **已完成**
 
 #### 交付物
-- ✅ 导出服务模块
-- ✅ 编辑实例对话框新增导出栏目
-- ✅ 可生成合法的 `.mfpack` 文件
-- ✅ 敏感信息正确过滤
+- ✅ **导出服务模块**（含 NapCat 检测功能）
+- ✅ **编辑实例对话框新增导出栏目**（含动态 NapCat 选项）
+- ✅ **可生成合法的 `.mfpack` 文件**（含 `installNapcatOnImport` 字段）
+- ✅ **敏感信息正确过滤**
+
+**Phase 2 状态**: ✅ **已完成** (2026-04-18)
 
 ---
 
@@ -550,15 +573,15 @@ instance-name.mfpack (ZIP Archive)
   - 重试机制
 
 ---
-
-## 📊 里程碑时间表
-
-| 阶段 | 预计工期 | 关键交付物 |
-|------|---------|-----------|
-| 阶段 1 | 1-2天 | 重构后的安装服务 |
-| 阶段 2 | 2-3天 | 导出功能完成 |
-| 阶段 3 | 2-3天 | 导入向导 UI 完成 |
-| 阶段 4 | 3-4天 | 导入服务完成 |
+ 状态 |
+|------|---------|-----------|------|
+| 阶段 1 | 1-2天 | 重构后的安装服务 | ✅ **已完成** |
+| 阶段 2 | 2-3天 | 导出功能完成（含动态 NapCat 选项） | ✅ **已完成** (2026-04-18) |
+| 阶段 3 | 2-3天 | 导入向导 UI 完成 | ⏰ 待开始 |
+| 阶段 4 | 3-4天 | 导入服务完成 | ⏰ 待开始 |
+| 阶段 5 | 2-3天 | 测试通过 | ⏰ 待开始 |
+| 阶段 6 | 1-2天 | 文档和发布 | ⏰ 待开始 |
+| **总计** | **11-17天** | **功能上线** | **进行中 (2/6)
 | 阶段 5 | 2-3天 | 测试通过 |
 | 阶段 6 | 1-2天 | 文档和发布 |
 | **总计** | **11-17天** | **功能上线** |

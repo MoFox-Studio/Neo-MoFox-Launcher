@@ -166,6 +166,10 @@
             <span class="material-symbols-rounded">settings</span>
             基本设置
           </button>
+          <button class="sidebar-tab" data-tab="export">
+            <span class="material-symbols-rounded">package_2</span>
+            导出整合包
+          </button>
           <button class="sidebar-tab" data-tab="danger">
             <span class="material-symbols-rounded">warning</span>
             危险操作
@@ -273,6 +277,156 @@
                   </label>
                   <span class="form-switch-label" id="edit-instance-like-label">未收藏</span>
                 </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="tab-pane" id="tab-export">
+            <div class="pane-header">导出整合包</div>
+            <div class="form-section">
+              <p class="section-desc">
+                将此实例打包为整合包文件（.mfpack），方便分享和快速部署。
+              </p>
+              
+              <!-- 基础组件选项 -->
+              <div class="export-options">
+                <h4 class="options-title">选择要导出的内容</h4>
+                
+                <label class="export-option-item">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">folder_copy</span>
+                    <div class="option-text">
+                      <strong>Neo-MoFox 主程序</strong>
+                      <small>包含完整的框架代码和依赖</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-neo">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <label class="export-option-item" id="napcat-option-item">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">pets</span>
+                    <div class="option-text">
+                      <strong>NapCat</strong>
+                      <small>QQ 协议适配器程序</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-napcat">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <label class="export-option-item" id="install-napcat-option-item" style="display: none;">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">download</span>
+                    <div class="option-text">
+                      <strong>导入时安装 NapCat</strong>
+                      <small>导入整合包时自动下载并安装 NapCat</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-install-napcat-on-import">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <label class="export-option-item">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">settings</span>
+                    <div class="option-text">
+                      <strong>配置文件</strong>
+                      <small>core.toml（敏感信息将被替换为占位符）</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-config">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <label class="export-option-item">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">extension</span>
+                    <div class="option-text">
+                      <strong>插件</strong>
+                      <small>选择要导出的插件（点击下方列表选择）</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-plugins">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+                
+                <!-- 插件选择器 -->
+                <div class="plugin-selector" id="plugin-selector" style="display: none;">
+                  <div class="plugin-selector-header">
+                    <h5>选择插件</h5>
+                    <label class="select-all-plugins">
+                      <input type="checkbox" id="select-all-plugins">
+                      <span>全选</span>
+                    </label>
+                  </div>
+                  <div class="plugin-list" id="export-plugin-list">
+                    <div class="loading-plugins">
+                      <span class="spinner"></span>
+                      <span>扫描插件中...</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <label class="export-option-item">
+                  <div class="option-info">
+                    <span class="material-symbols-rounded">database</span>
+                    <div class="option-text">
+                      <strong>数据文件</strong>
+                      <small>包含会话记录、记忆图谱等（可能较大）</small>
+                    </div>
+                  </div>
+                  <div class="form-switch-wrapper">
+                    <label class="form-switch">
+                      <input type="checkbox" id="export-include-data">
+                      <span class="form-switch-slider"></span>
+                    </label>
+                  </div>
+                </label>
+              </div>
+              
+              <!-- 导出按钮 -->
+              <div class="export-actions">
+                <button class="md3-btn md3-btn-primary" id="btn-start-export">
+                  <span class="material-symbols-rounded">package_2</span>
+                  <span>开始导出</span>
+                </button>
+              </div>
+              
+              <!-- 导出进度（默认隐藏） -->
+              <div class="export-progress-container" id="export-progress-container" style="display: none;">
+                <div class="progress-header">
+                  <span class="material-symbols-rounded spinning">sync</span>
+                  <span id="export-progress-text">准备导出...</span>
+                </div>
+                <div class="progress-bar-wrapper">
+                  <div class="progress-bar">
+                    <div class="progress-fill" id="export-progress-fill" style="width: 0%;"></div>
+                  </div>
+                  <span class="progress-percent" id="export-progress-percent">0%</span>
+                </div>
+                <div class="export-output" id="export-output"></div>
               </div>
             </div>
           </div>

@@ -835,6 +835,7 @@ ipcMain.handle('settings-reset', (event, key) => {
   return settingsService.reset(key ?? null);
 });
 
+
 // ─── OOBE 完成处理 ───────────────────────────────────────────────────────
 
 /**
@@ -2260,6 +2261,74 @@ ipcMain.handle('config-editor:get-theme', () => {
     };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+/**
+ * Dialog API - 显示保存对话框
+ */
+ipcMain.handle('dialog-show-save', async (event, options) => {
+  const result = await dialog.showSaveDialog(mainWindow, options);
+  return result.filePath; // 返回路径或 undefined（取消）
+});
+
+// ─── 整合包导出相关 IPC Handlers ──────────────────────────────────────
+
+// check-napcat-exists: 检查实例是否包含 NapCat
+ipcMain.handle('check-napcat-exists', async (event, instanceId) => {
+  try {
+    const { ExportService } = require('./services/integration-pack/ExportService');
+    const napcatExists = await ExportService.checkNapcatExists(instanceId);
+    return napcatExists;
+  } catch (error) {
+    console.error('[IPC] checkNapcatExists 失败:', error);
+    return false;
+  }
+});
+
+// scan-instance-plugins: 扫描实例插件
+ipcMain.handle('scan-instance-plugins', async (event, instanceId) => {
+  try {
+    const { ExportService } = require('./services/integration-pack/ExportService');
+    const plugins = await ExportService.scanInstancePlugins(instanceId);
+    return plugins;
+  } catch (error) {
+    console.error('[IPC] scanInstancePlugins 失败:', error);
+    throw error;
+  }
+});
+
+// export-integration-pack: 导出整合包
+ipcMain.handle('export-integration-pack', async (event, instanceId, options, destPath) => {
+  try {
+    const { ExportService } = require('./services/integration-pack/ExportService');
+    
+    // 进度回调
+    const onProgress = (percent, message) => {
+      event.sender.send('export-progress', { percent, message });
+    };
+    
+    // 输出回调
+    const onOutput = (message) => {
+      event.sender.send('export-output', message);
+    };
+    
+    // 执行导出
+    const filePath = await ExportService.exportIntegrationPack(
+      instanceId,
+      options,
+      destPath,
+      onProgress,
+      onOutput
+    );
+    
+    // 发送完成事件
+    event.sender.send('export-complete', { success: true, filePath });
+    return { success: true, filePath };
+  } catch (error) {
+    console.error('[IPC] exportIntegrationPack 失败:', error);
+    event.sender.send('export-complete', { success: false, error: error.message });
+    throw error;
   }
 });
 

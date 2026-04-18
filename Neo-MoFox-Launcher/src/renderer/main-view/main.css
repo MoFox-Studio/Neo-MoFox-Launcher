@@ -1345,6 +1345,258 @@
 
 .credits-fox {
   font-size: 48px;
+}
+
+/* ─── Export Options (导出整合包选项卡) ────────────────────────────────── */
+.section-desc {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.options-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 12px;
+}
+
+.export-option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-option-item:hover {
+  background: var(--md-sys-color-surface-container);
+  border-color: var(--md-sys-color-primary);
+}
+
+.option-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.option-info .material-symbols-rounded {
+  color: var(--md-sys-color-primary);
+  font-size: 24px;
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.option-text strong {
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.option-text small {
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* 插件选择器 */
+.plugin-selector {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.plugin-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.plugin-selector-header h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.select-all-plugins {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  user-select: none;
+}
+
+.select-all-plugins input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.plugin-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loading-plugins {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.9rem;
+}
+
+.loading-plugins .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--md-sys-color-outline-variant);
+  border-top-color: var(--md-sys-color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.plugin-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--md-sys-color-surface);
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.plugin-item:hover {
+  background: var(--md-sys-color-surface-container-low);
+  border-color: var(--md-sys-color-primary);
+}
+
+.plugin-item input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.plugin-item-icon {
+  color: var(--md-sys-color-tertiary);
+  font-size: 20px;
+}
+
+.plugin-item-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--md-sys-color-on-surface);
+}
+
+.plugin-item-type {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 2px 8px;
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 4px;
+}
+
+/* 导出按钮 */
+.export-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 导出进度 */
+.export-progress-container {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--md-sys-color-on-surface);
+  font-weight: 500;
+}
+
+.progress-header .material-symbols-rounded.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.progress-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--md-sys-color-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-percent {
+  min-width: 45px;
+  text-align: right;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--md-sys-color-primary);
+}
+
+.export-output {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--md-sys-color-surface);
+  border-radius: 8px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
   display: block;
   margin-bottom: 8px;
   animation: creditsFloat 3s ease-in-out infinite;

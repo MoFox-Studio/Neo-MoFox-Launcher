@@ -156,6 +156,25 @@ const api = {
   /** 同步读取设置，仅在 <head> 中应用主题时使用，避免 FOUC */
   settingsReadSync: () => ipcRenderer.sendSync('settings-read-sync'),
   openLogsDir: () => ipcRenderer.invoke('open-logs-dir'),
+
+  // ─── Dialog API ─────────────────────────────────────────────────────────────
+  dialog: {
+    showSaveDialog: (options) => ipcRenderer.invoke('dialog-show-save', options),
+  },
+
+  // ─── 整合包导出/导入 ─────────────────────────────────────────────────────
+  checkNapcatExists: (instanceId) => ipcRenderer.invoke('check-napcat-exists', instanceId),
+  scanInstancePlugins: (instanceId) => ipcRenderer.invoke('scan-instance-plugins', instanceId),
+  exportIntegrationPack: (instanceId, options, destPath) => ipcRenderer.invoke('export-integration-pack', instanceId, options, destPath),
+  onExportProgress: (callback) => {
+    ipcRenderer.on('export-progress', (_event, data) => callback(data));
+  },
+  onExportOutput: (callback) => {
+    ipcRenderer.on('export-output', (_event, message) => callback(message));
+  },
+  onExportComplete: (callback) => {
+    ipcRenderer.on('export-complete', (_event, data) => callback(data));
+  },
   
   // ─── OOBE 完成处理 ──────────────────────────────────────────────────────
   oobeComplete: () => ipcRenderer.invoke('oobe-complete'),
