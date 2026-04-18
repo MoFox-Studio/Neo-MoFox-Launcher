@@ -77,6 +77,15 @@ export function initExportTab() {
   exportElements.progressPercent = document.getElementById('export-progress-percent');
   exportElements.exportOutput = document.getElementById('export-output');
 
+  // 验证关键元素是否正确获取
+  console.log('[ExportTab] 元素初始化状态:', {
+    exportOutput: !!exportElements.exportOutput,
+    progressContainer: !!exportElements.progressContainer,
+    progressText: !!exportElements.progressText,
+    progressFill: !!exportElements.progressFill,
+    progressPercent: !!exportElements.progressPercent,
+  });
+
   // 绑定事件
   if (exportElements.includeNapcat) {
     exportElements.includeNapcat.addEventListener('change', toggleInstallNapcatOption);
@@ -116,10 +125,11 @@ export function initExportTab() {
   });
 
   window.mofoxAPI.onExportComplete?.(({ success, filePath, error }) => {
+    console.log('[ExportTab] 收到完成事件:', success, filePath, error);
     onExportComplete(success, filePath || error);
   });
 
-  console.log('[ExportTab] 导出选项卡已初始化');
+  console.log('[ExportTab] 导出选项卡已初始化，监听器已注册');
 }
 
 // ─── 打开导出选项卡时加载插件列表 ─────────────────────────────────────
@@ -556,12 +566,46 @@ function disableExportOptions(disable) {
   configCheckboxes.forEach(cb => {
     cb.disabled = disable;
   });
+
+  // 禁用/启用模态框的保存、取消和关闭按钮
+  const btnSaveInstance = document.getElementById('btn-save-instance');
+  const btnCancelEdit = document.getElementById('btn-cancel-edit');
+  const btnCloseEditModal = document.getElementById('btn-close-edit-modal');
+  
+  if (btnSaveInstance) btnSaveInstance.disabled = disable;
+  if (btnCancelEdit) btnCancelEdit.disabled = disable;
+  if (btnCloseEditModal) btnCloseEditModal.disabled = disable;
+  
+  // 禁用/启用侧边栏 tab 切换（除了当前的导出 tab）
+  const sidebarTabs = document.querySelectorAll('#edit-instance-sidebar .sidebar-tab');
+  sidebarTabs.forEach(tab => {
+    if (tab.dataset.tab !== 'export') {
+      if (disable) {
+        tab.style.pointerEvents = 'none';
+        tab.style.opacity = '0.5';
+      } else {
+        tab.style.pointerEvents = '';
+        tab.style.opacity = '';
+      }
+    }
+  });
+  
+  // 如果禁用，还需要禁用元数据输入框
+  if (exportElements.packName) exportElements.packName.disabled = disable;
+  if (exportElements.packVersion) exportElements.packVersion.disabled = disable;
+  if (exportElements.packAuthor) exportElements.packAuthor.disabled = disable;
+  if (exportElements.packDescription) exportElements.packDescription.disabled = disable;
 }
 
 /**
  * 更新进度
  */
 export function updateExportProgress(percent, message) {
+  console.log(`[ExportTab] 进度: ${percent}%, ${message}`);
+  if (!exportElements.progressFill || !exportElements.progressPercent || !exportElements.progressText) {
+    console.error('[ExportTab] 进度元素未找到');
+    return;
+  }
   exportElements.progressFill.style.width = `${percent}%`;
   exportElements.progressPercent.textContent = `${Math.round(percent)}%`;
   exportElements.progressText.textContent = message;
@@ -571,6 +615,11 @@ export function updateExportProgress(percent, message) {
  * 添加输出日志
  */
 export function addExportOutput(message) {
+  console.log('[ExportTab] 导出日志:', message);
+  if (!exportElements.exportOutput) {
+    console.error('[ExportTab] exportOutput 元素未找到');
+    return;
+  }
   exportElements.exportOutput.textContent += message + '\n';
   exportElements.exportOutput.scrollTop = exportElements.exportOutput.scrollHeight;
 }

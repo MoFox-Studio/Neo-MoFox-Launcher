@@ -189,8 +189,6 @@ const api = {
   // 整合包导入 API
   selectIntegrationPack: () => ipcRenderer.invoke('select-integration-pack'),
   parseIntegrationPack: (packPath) => ipcRenderer.invoke('parse-integration-pack', packPath),
-  getDefaultInstallPath: () => ipcRenderer.invoke('get-default-install-path'),
-  selectDirectory: () => ipcRenderer.invoke('select-directory'),
   importIntegrationPack: (options) => ipcRenderer.invoke('import-integration-pack', options),
   onImportProgress: (callback) => {
     ipcRenderer.on('import-progress', (_event, data) => callback(data));

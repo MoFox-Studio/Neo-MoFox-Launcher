@@ -10,12 +10,21 @@ const fs = require('fs');
 const fsPromises = require('fs').promises;
 const path = require('path');
 const os = require('os');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const TOML = require('@iarna/toml');
 const { storageService } = require('../install/StorageService');
 const { installStepExecutor } = require('../install/InstallStepExecutor');
 const { PackValidator } = require('./PackValidator');
 const { ManifestManager, MANIFEST_FILENAME } = require('./ManifestManager');
+
+// ─── 工具函数 ───────────────────────────────────────────────────────────
+
+/**
+ * 生成 UUID v4
+ */
+function uuidv4() {
+  return crypto.randomUUID();
+}
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -72,8 +81,12 @@ class ImportService {
    */
   async importIntegrationPack(packPath, userInputs) {
     let instanceId = null;
+    let instanceRegistered = false;
 
     try {
+      // 验证输入参数
+      this._validateInputs(packPath, userInputs);
+
       // 1. 验证整合包
       this._emitProgress(0, '验证整合包...');
       this._emitOutput('开始验证整合包');
@@ -95,13 +108,21 @@ class ImportService {
       this._emitStepChange('extract-pack', 'running');
 
       const tempDir = await this._extractPack(packPath);
+      if (!tempDir) {
+        throw new Error('解压整合包失败：临时目录路径为空');
+      }
       this._tempDir = tempDir;
       this._emitOutput(`整合包已解压到: ${tempDir}`);
       this._emitStepChange('extract-pack', 'completed');
 
       // 3. 生成实例 ID
       instanceId = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      if (!userInputs.installDir) {
+        throw new Error('安装目录 (installDir) 未设置');
+      }
       const neoMofoxDir = path.join(userInputs.installDir, instanceId, 'neo-mofox');
+      this._emitOutput(`实例 ID: ${instanceId}`);
+      this._emitOutput(`Neo-MoFox 目录: ${neoMofoxDir}`);
 
       // 4. 处理配置文件（如果整合包包含配置）
       if (manifest.content.config.included) {
@@ -151,6 +172,7 @@ class ImportService {
       };
 
       storageService.addInstance({ ...instanceData, createdAt: new Date().toISOString() });
+      instanceRegistered = true;
       this._emitOutput(`实例已注册: ${instanceId}`);
 
       // 8. 执行安装步骤
@@ -172,8 +194,8 @@ class ImportService {
       // 清理临时目录
       await this._cleanup();
 
-      // 如果实例已创建，标记为失败
-      if (instanceId) {
+      // 如果实例已注册，标记为失败
+      if (instanceId && instanceRegistered) {
         storageService.updateInstance(instanceId, { installCompleted: false });
       }
 
@@ -186,31 +208,121 @@ class ImportService {
   // ───────────────────────────────────────────────────────────────────────
 
   /**
+   * 验证输入参数
+   */
+  _validateInputs(packPath, userInputs) {
+    if (!packPath) {
+      throw new Error('整合包路径 (packPath) 不能为空');
+    }
+    if (!userInputs) {
+      throw new Error('用户输入参数 (userInputs) 不能为空');
+    }
+
+    const requiredFields = [
+      'instanceName',
+      'qqNumber',
+      'ownerQQNumber',
+      'apiKey',
+      'wsPort',
+      'installDir'
+    ];
+
+    const missingFields = requiredFields.filter(field => !userInputs[field]);
+    if (missingFields.length > 0) {
+      throw new Error(`缺少必需参数: ${missingFields.join(', ')}`);
+    }
+
+    this._emitOutput(`参数验证通过`);
+    this._emitOutput(`- 实例名称: ${userInputs.instanceName}`);
+    this._emitOutput(`- QQ 号: ${userInputs.qqNumber}`);
+    this._emitOutput(`- 管理员 QQ: ${userInputs.ownerQQNumber}`);
+    this._emitOutput(`- 端口: ${userInputs.wsPort}`);
+    this._emitOutput(`- 安装目录: ${userInputs.installDir}`);
+  }
+
+  /**
    * 解压整合包到临时目录
    */
   async _extractPack(packPath) {
-    const AdmZip = require('adm-zip');
-    const zip = new AdmZip(packPath);
+    // 禁用 Electron 的 asar 拦截，避免将 .asar 文件作为目录处理
+    const originalNoAsar = process.noAsar;
+    process.noAsar = true;
 
-    const tempDirBase = path.join(os.tmpdir(), TEMP_EXTRACT_DIR);
-    await fsPromises.mkdir(tempDirBase, { recursive: true });
+    try {
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(packPath);
 
-    const tempDir = path.join(tempDirBase, `extract_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
-    await fsPromises.mkdir(tempDir, { recursive: true });
+      const tempDirBase = path.join(os.tmpdir(), TEMP_EXTRACT_DIR);
+      await fsPromises.mkdir(tempDirBase, { recursive: true });
 
-    // 解压所有文件
-    zip.extractAllTo(tempDir, true);
+      const tempDir = path.join(tempDirBase, `extract_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+      await fsPromises.mkdir(tempDir, { recursive: true });
 
-    return tempDir;
+      // 解压所有文件，特殊处理 .asar 文件
+      this._emitOutput(`开始解压到: ${tempDir}`);
+      const entries = zip.getEntries();
+      let extractedCount = 0;
+      
+      for (const entry of entries) {
+        const entryPath = path.join(tempDir, entry.entryName);
+        
+        // 跳过目录条目，它们会在创建文件时自动创建
+        if (entry.isDirectory) {
+          await fsPromises.mkdir(entryPath, { recursive: true });
+          continue;
+        }
+        
+        // 创建目标目录
+        const entryDir = path.dirname(entryPath);
+        await fsPromises.mkdir(entryDir, { recursive: true });
+        
+        // 特殊处理 .asar 文件：直接写入二进制数据，不尝试解压
+        if (entry.entryName.endsWith('.asar')) {
+          const asarData = entry.getData();
+          await fsPromises.writeFile(entryPath, asarData);
+          extractedCount++;
+          continue;
+        }
+        
+        // 普通文件正常解压
+        try {
+          zip.extractEntryTo(entry, entryDir, false, true);
+          extractedCount++;
+        } catch (extractErr) {
+          // 如果解压失败，尝试直接写入数据
+          this._emitOutput(`警告: 解压 ${entry.entryName} 失败，尝试直接写入`);
+          const data = entry.getData();
+          await fsPromises.writeFile(entryPath, data);
+          extractedCount++;
+        }
+      }
+      
+      this._emitOutput(`解压完成，共 ${extractedCount} 个文件`);
+
+      return tempDir;
+    } catch (error) {
+      this._emitOutput(`解压失败: ${error.message}`);
+      throw new Error(`解压整合包失败: ${error.message}`);
+    } finally {
+      // 恢复 asar 设置
+      process.noAsar = originalNoAsar;
+    }
   }
 
   /**
    * 处理配置文件（占位符替换）
    */
   async _processConfigFiles(tempDir, neoMofoxDir, userInputs) {
+    if (!tempDir || !neoMofoxDir) {
+      throw new Error(`路径参数无效: tempDir=${tempDir}, neoMofoxDir=${neoMofoxDir}`);
+    }
+
     const configSourcePath = path.join(tempDir, 'extra', 'config', 'core.toml');
     const configDestDir = path.join(neoMofoxDir, 'config');
     const configDestPath = path.join(configDestDir, 'core.toml');
+
+    this._emitOutput(`配置源路径: ${configSourcePath}`);
+    this._emitOutput(`配置目标路径: ${configDestPath}`);
 
     // 检查源配置文件是否存在
     try {
@@ -229,14 +341,9 @@ class ImportService {
     }
 
     // 替换占位符
-    // 1. 替换管理员 QQ 号（permission.master_users）
-    if (config.permission && config.permission.master_users) {
-      const platformKey = Object.keys(config.permission.master_users).find(k => k === 'qq');
-      if (platformKey) {
-        config.permission.master_users[platformKey] = [userInputs.ownerQQNumber];
-      } else {
-        config.permission.master_users.qq = [userInputs.ownerQQNumber];
-      }
+    // 1. 替换管理员 QQ 号（permissions.owner_list 是字符串数组格式）
+    if (config.permissions && config.permissions.owner_list) {
+      config.permissions.owner_list = [`qq:${userInputs.ownerQQNumber}`];
     }
 
     // 2. 替换 WebUI API 密钥（http_router.api_keys）
@@ -257,7 +364,12 @@ class ImportService {
    * 复制已包含的文件（Neo-MoFox、NapCat、插件、数据）
    */
   async _copyIncludedFiles(tempDir, installDir, instanceId, manifest) {
+    if (!tempDir || !installDir || !instanceId) {
+      throw new Error(`复制文件参数无效: tempDir=${tempDir}, installDir=${installDir}, instanceId=${instanceId}`);
+    }
+
     const instanceRoot = path.join(installDir, instanceId);
+    this._emitOutput(`实例根目录: ${instanceRoot}`);
 
     // 1. 复制 Neo-MoFox 主程序
     if (manifest.content.neoMofox.included) {
@@ -312,14 +424,63 @@ class ImportService {
    * 递归复制目录（异步版本）
    */
   async _copyDirRecursive(src, dest) {
+    // 禁用 Electron 的 asar 拦截
+    const originalNoAsar = process.noAsar;
+    process.noAsar = true;
+
     try {
       await fsPromises.access(src, fs.constants.F_OK);
     } catch (err) {
       this._emitOutput(`警告: 源目录不存在，跳过 ${src}`);
+      process.noAsar = originalNoAsar;
       return;
     }
 
-    await fsPromises.mkdir(dest, { recursive: true });
+    // 检查目标路径是否存在
+    try {
+      const destStat = await fsPromises.stat(dest);
+      if (destStat.isFile()) {
+        // 如果目标是文件，删除它
+        this._emitOutput(`警告: 目标路径是文件，删除后重新创建 ${dest}`);
+        await fsPromises.unlink(dest);
+      }
+    } catch (err) {
+      // 目标不存在，正常情况
+      if (err.code !== 'ENOENT') {
+        throw err;
+      }
+    }
+
+    // 创建目标目录
+    try {
+      await fsPromises.mkdir(dest, { recursive: true });
+    } catch (err) {
+      if (err.code === 'ENOTDIR') {
+        // 父路径中存在文件，尝试清理
+        this._emitOutput(`错误: 无法创建目录 ${dest}，父路径中可能存在同名文件`);
+        this._emitOutput(`尝试清理路径...`);
+        
+        // 找到问题路径并清理
+        const pathParts = dest.split(path.sep);
+        for (let i = 1; i <= pathParts.length; i++) {
+          const checkPath = pathParts.slice(0, i).join(path.sep);
+          try {
+            const stat = await fsPromises.stat(checkPath);
+            if (stat.isFile()) {
+              this._emitOutput(`发现文件冲突: ${checkPath}，删除后重试`);
+              await fsPromises.unlink(checkPath);
+            }
+          } catch (statErr) {
+            // 路径不存在，继续
+          }
+        }
+        
+        // 重试创建目录
+        await fsPromises.mkdir(dest, { recursive: true });
+      } else {
+        throw err;
+      }
+    }
 
     const entries = await fsPromises.readdir(src, { withFileTypes: true });
 
@@ -330,9 +491,27 @@ class ImportService {
       if (entry.isDirectory()) {
         await this._copyDirRecursive(srcPath, destPath);
       } else {
-        await fsPromises.copyFile(srcPath, destPath);
+        // 确保父目录存在
+        const parentDir = path.dirname(destPath);
+        try {
+          await fsPromises.mkdir(parentDir, { recursive: true });
+        } catch (mkdirErr) {
+          if (mkdirErr.code !== 'EEXIST') {
+            this._emitOutput(`警告: 创建父目录失败 ${parentDir}: ${mkdirErr.message}`);
+          }
+        }
+        
+        // 复制文件
+        try {
+          await fsPromises.copyFile(srcPath, destPath);
+        } catch (copyErr) {
+          this._emitOutput(`警告: 复制文件失败 ${srcPath} -> ${destPath}: ${copyErr.message}`);
+        }
       }
     }
+
+    // 恢复 asar 设置
+    process.noAsar = originalNoAsar;
   }
 
   /**
@@ -412,7 +591,7 @@ class ImportService {
       qqNickname: userInputs.qqNickname || '',
       ownerQQNumber: userInputs.ownerQQNumber,
       apiKey: userInputs.apiKey,
-      webuiApiKey: userInputs.webuiApiKey || uuidv4(),
+      webuiApiKey: userInputs.webuiApiKey || "",
       wsPort: userInputs.wsPort,
       channel: 'main',
       instanceName: userInputs.instanceName,
@@ -483,6 +662,7 @@ class ImportService {
               napcatDir,
               napcatShellPath,
               napcatVersion,
+              installSteps,
             });
             break;
 

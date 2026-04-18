@@ -401,16 +401,12 @@
 
 /* ===== 安装步骤指示器 ===== */
 .install-steps {
-  position: fixed;
-  top: 120px;
-  right: 48px;
-  width: 280px;
-  background: var(--md-sys-color-surface);
+  margin: 24px 0;
+  background: var(--md-sys-color-surface-container-low);
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .install-step-item {
@@ -523,12 +519,6 @@
 }
 
 /* ===== 响应式适配 ===== */
-@media (max-width: 1200px) {
-  .install-steps {
-    display: none;
-  }
-}
-
 @media (max-width: 768px) {
   .wizard-container {
     flex-direction: column;

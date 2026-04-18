@@ -378,32 +378,36 @@ class ExportService {
     const destDir = path.join(tempDir, 'neo-mofox');
     await fsPromises.mkdir(destDir, { recursive: true });
 
-    // 需要复制的目录和文件（不包含 config 和 data，它们会在 extra 目录中处理）
-    const itemsToCopy = [
-      'src',
-      'main.py',
-      'bot.py',
-      'pyproject.toml',
-      'uv.lock',
-      'README.md',
-      'LICENSE',
-      'eula.md',
-      'PRIVACY.md',
-    ];
+    // 排除列表（这些目录会在 extra 目录中单独处理）
+    const excludeItems = ['data', 'config', 'plugins'];
 
-    for (const item of itemsToCopy) {
-      const srcPath = path.join(neomofoxDir, item);
-      const destPath = path.join(destDir, item);
+    // 读取 Neo-MoFox 目录下的所有项
+    let allItems;
+    try {
+      allItems = await fsPromises.readdir(neomofoxDir, { withFileTypes: true });
+    } catch (err) {
+      console.error(`[ExportService] 无法读取 Neo-MoFox 目录: ${err.message}`);
+      return;
+    }
+
+    // 复制所有项，除了排除列表中的
+    for (const item of allItems) {
+      // 跳过排除列表中的目录
+      if (excludeItems.includes(item.name)) {
+        continue;
+      }
+
+      const srcPath = path.join(neomofoxDir, item.name);
+      const destPath = path.join(destDir, item.name);
       
       try {
-        const stats = await fsPromises.stat(srcPath);
-        if (stats.isDirectory()) {
+        if (item.isDirectory()) {
           await this._copyDirRecursive(srcPath, destPath);
         } else {
           await fsPromises.copyFile(srcPath, destPath);
         }
       } catch (err) {
-        // 文件不存在，跳过
+        console.warn(`[ExportService] 复制失败，跳过 ${item.name}: ${err.message}`);
       }
       
       // 让出事件循环，防止阻塞

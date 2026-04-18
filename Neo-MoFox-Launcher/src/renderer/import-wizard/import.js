@@ -160,19 +160,26 @@ function bindEvents() {
   el.btnToggleLog?.addEventListener('click', toggleLog);
   
   // 监听导入进度事件
-  window.mofoxAPI.onImportProgress?.(({ percent, message }) => {
+  window.mofoxAPI.onImportProgress?.((data) => {
+    console.log('[ImportWizard] 收到进度事件:', data);
+    const { percent, message } = data || {};
     updateProgress(percent, message);
   });
   
   window.mofoxAPI.onImportOutput?.((message) => {
+    console.log('[ImportWizard] 收到输出日志:', message);
     appendLog(message);
   });
   
-  window.mofoxAPI.onImportStepChange?.(({ step, status }) => {
+  window.mofoxAPI.onImportStepChange?.((data) => {
+    console.log('[ImportWizard] 收到步骤变化:', data);
+    const { step, status } = data || {};
     updateStepIndicator(step, status);
   });
   
-  window.mofoxAPI.onImportComplete?.(({ success, instanceId, error }) => {
+  window.mofoxAPI.onImportComplete?.((data) => {
+    console.log('[ImportWizard] 收到完成事件:', data);
+    const { success, instanceId, error } = data || {};
     onInstallComplete(success, instanceId, error);
   });
 }
@@ -216,10 +223,18 @@ function goToStep(step) {
   
   // 步骤 5 开始安装
   if (step === 5) {
+    console.log('[ImportWizard] 进入步骤 5，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
-    el.installSteps.classList.remove('hidden');
-    startImport();
+    // 确保步骤指示器可见
+    if (el.installSteps) {
+      el.installSteps.classList.remove('hidden');
+      console.log('[ImportWizard] 步骤指示器已显示');
+    } else {
+      console.error('[ImportWizard] 步骤指示器元素未找到！');
+    }
+    // 稍微延迟启动导入，确保UI更新完成
+    setTimeout(() => startImport(), 100);
   }
 }
 
@@ -229,7 +244,7 @@ async function goNext() {
   // 步骤 1: 选择整合包
   if (state.currentStep === 1) {
     if (!state.packPath || !state.packManifest) {
-      showError('请先选择整合包文件');
+      await showError('请先选择整合包文件');
       return;
     }
   }
@@ -237,7 +252,7 @@ async function goNext() {
   // 步骤 2: 环境检测
   if (state.currentStep === 2) {
     if (!state.envCheckPassed) {
-      showError('环境检测未通过，请先安装缺失的依赖');
+      await showError('环境检测未通过，请先安装缺失的依赖');
       return;
     }
   }
@@ -295,7 +310,7 @@ async function selectPack() {
     }
   } catch (error) {
     console.error('[ImportWizard] 选择整合包失败:', error);
-    showError('选择整合包失败: ' + error.message);
+    await showError('选择整合包失败: ' + error.message);
   }
 }
 
@@ -446,16 +461,18 @@ function generateContentItems(content) {
 
 async function runEnvCheck() {
   try {
-    const result = await window.mofoxAPI.checkEnvironment();
+    // 使用后端现有的 envCheckAll API
+    const result = await window.mofoxAPI.envCheckAll();
     
-    updateCheckItem(el.checkPython, result.python.installed, result.python.version);
-    updateCheckItem(el.checkUv, result.uv.installed, result.uv.version);
-    updateCheckItem(el.checkGit, result.git.installed, result.git.version);
+    // 适配后端返回格式: { passed, checks: { python, uv, git }, platform, platformLabel }
+    updateCheckItem(el.checkPython, result.checks.python.valid, result.checks.python.version);
+    updateCheckItem(el.checkUv, result.checks.uv.valid, result.checks.uv.version);
+    updateCheckItem(el.checkGit, result.checks.git.valid, result.checks.git.version);
     
-    state.envCheckPassed = result.allPassed;
-    state.pythonCmd = result.python.command;
+    state.envCheckPassed = result.passed;
+    state.pythonCmd = result.checks.python.command;
     
-    if (!result.allPassed) {
+    if (!result.passed) {
       el.envCheckResult.classList.remove('hidden');
       el.envCheckResult.innerHTML = `
         <div class="result-error">
@@ -468,7 +485,7 @@ async function runEnvCheck() {
     }
   } catch (error) {
     console.error('[ImportWizard] 环境检测失败:', error);
-    showError('环境检测失败: ' + error.message);
+    await showError('环境检测失败: ' + error.message);
   }
 }
 
@@ -497,10 +514,11 @@ function updateCheckItem(itemEl, passed, version = '') {
 
 async function setDefaultInstallDir() {
   try {
-    const result = await window.mofoxAPI.getDefaultInstallPath();
-    if (result.success && result.path) {
-      el.inputInstallDir.value = result.path;
-      state.inputs.installDir = result.path;
+    // 从设置中读取默认安装路径（学习 install wizard 的方式）
+    const settings = await window.mofoxAPI.settingsRead();
+    if (settings?.defaultInstallDir) {
+      el.inputInstallDir.value = settings.defaultInstallDir;
+      state.inputs.installDir = settings.defaultInstallDir;
     }
   } catch (error) {
     console.error('[ImportWizard] 获取默认安装路径失败:', error);
@@ -509,14 +527,15 @@ async function setDefaultInstallDir() {
 
 async function browseInstallDir() {
   try {
-    const result = await window.mofoxAPI.selectDirectory();
-    if (result.success && result.path) {
-      el.inputInstallDir.value = result.path;
-      state.inputs.installDir = result.path;
+    // 使用和安装向导相同的 API
+    const path = await window.mofoxAPI.selectProjectPath();
+    if (path) {
+      el.inputInstallDir.value = path;
+      state.inputs.installDir = path;
     }
   } catch (error) {
     console.error('[ImportWizard] 选择目录失败:', error);
-    showError('选择目录失败: ' + error.message);
+    await showError('选择目录失败: ' + error.message);
   }
 }
 
@@ -743,20 +762,34 @@ function getStepDescription(step) {
 // ─── 步骤 5: 安装执行 ─────────────────────────────────────────────────
 
 async function startImport() {
-  if (state.installing) return;
+  if (state.installing) {
+    console.warn('[ImportWizard] 导入已在进行中');
+    return;
+  }
   
+  console.log('[ImportWizard] 开始导入整合包...');
   state.installing = true;
   
   try {
     el.btnBack.classList.add('hidden');
     el.btnCancel.classList.add('hidden');
     
+    // 重置进度
+    updateProgress(0, '准备导入...');
+    
+    console.log('[ImportWizard] 调用后端导入 API，参数:', {
+      packPath: state.packPath,
+      instanceName: state.inputs.instanceName,
+      installDir: state.inputs.installDir,
+    });
+    
     const result = await window.mofoxAPI.importIntegrationPack({
       packPath: state.packPath,
-      manifest: state.packManifest,
-      inputs: state.inputs,
+      ...state.inputs,
       pythonCmd: state.pythonCmd,
     });
+    
+    console.log('[ImportWizard] 后端返回结果:', result);
     
     if (!result.success) {
       throw new Error(result.error || '导入失败');
@@ -769,9 +802,22 @@ async function startImport() {
 }
 
 function updateProgress(percent, message) {
-  el.progressFill.style.width = `${percent}%`;
-  el.progressPercent.textContent = `${Math.round(percent)}%`;
-  el.progressStep.textContent = message;
+  console.log('[ImportWizard] 更新进度:', { percent, message });
+  
+  // 确保 percent 是有效数字
+  const validPercent = typeof percent === 'number' && !isNaN(percent) ? percent : 0;
+  
+  if (el.progressFill) {
+    el.progressFill.style.width = `${validPercent}%`;
+  }
+  
+  if (el.progressPercent) {
+    el.progressPercent.textContent = `${Math.round(validPercent)}%`;
+  }
+  
+  if (el.progressStep && message) {
+    el.progressStep.textContent = message;
+  }
 }
 
 function appendLog(message) {
@@ -793,12 +839,26 @@ function toggleLog() {
 }
 
 function updateStepIndicator(step, status) {
+  console.log('[ImportWizard] 更新步骤指示器:', { step, status });
+  
+  if (!step) {
+    console.warn('[ImportWizard] 步骤名称为空');
+    return;
+  }
+  
   const stepEl = document.querySelector(`.install-step-item[data-step="${step}"]`);
-  if (!stepEl) return;
+  if (!stepEl) {
+    console.warn(`[ImportWizard] 未找到步骤元素: ${step}`);
+    return;
+  }
   
   stepEl.classList.remove('running', 'completed', 'failed');
   
   const iconEl = stepEl.querySelector('.step-icon');
+  if (!iconEl) {
+    console.warn(`[ImportWizard] 未找到步骤图标元素: ${step}`);
+    return;
+  }
   
   if (status === 'running') {
     stepEl.classList.add('running');
@@ -813,8 +873,11 @@ function updateStepIndicator(step, status) {
 }
 
 function onInstallComplete(success, instanceId, error) {
+  console.log('[ImportWizard] 安装完成:', { success, instanceId, error });
   state.installing = false;
-  el.installSteps.classList.add('hidden');
+  
+  // 不要隐藏步骤指示器，让用户看到完整的安装过程
+  // el.installSteps.classList.add('hidden');
   
   if (success) {
     el.installResult.classList.remove('hidden');
@@ -906,9 +969,8 @@ function clearAllErrors() {
   });
 }
 
-function showError(message) {
-  // 可以使用 toast 或 alert
-  alert(message);
+async function showError(message) {
+  await window.customDialog.alert(message, '错误');
 }
 
 function handleEnterKey(currentInput, event) {

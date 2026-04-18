@@ -778,7 +778,8 @@ class InstallStepExecutor {
   async executeRegister(context, inputs, options = {}) {
     context.emitProgress('register', 0, '正在注册实例...');
 
-    const instanceId = `bot-${inputs.qqNumber}`;
+    // 使用传入的 instanceId，如果没有则生成默认的 bot-{qqNumber} 格式
+    const instanceId = options.instanceId || `bot-${inputs.qqNumber}`;
     const { neoMofoxDir, napcatDir, installSteps, napcatVersion } = options;
 
     const neomofoxVersion = await this._getGitCommitId(neoMofoxDir);
@@ -787,7 +788,7 @@ class InstallStepExecutor {
       context.emitOutput(`NapCat 版本: ${napcatVersion}`);
     }
 
-    const hasNapcat = installSteps.includes('napcat') || installSteps.includes('napcat-config');
+    const hasNapcat = installSteps ? (installSteps.includes('napcat') || installSteps.includes('napcat-config')) : false;
 
     const updates = {
       qqNumber: inputs.qqNumber,

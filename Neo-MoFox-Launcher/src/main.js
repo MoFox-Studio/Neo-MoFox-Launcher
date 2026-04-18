@@ -2735,11 +2735,13 @@ ipcMain.handle('export-integration-pack', async (event, instanceId, options, des
     
     // 进度回调
     const onProgress = (percent, message) => {
+      console.log(`[IPC] 发送进度事件: ${percent}%, ${message}`);
       event.sender.send('export-progress', { percent, message });
     };
     
     // 输出回调
     const onOutput = (message) => {
+      console.log('[IPC] 发送输出事件:', message);
       event.sender.send('export-output', message);
     };
     
@@ -2806,37 +2808,6 @@ ipcMain.handle('parse-integration-pack', async (event, packPath) => {
   } catch (error) {
     console.error('[IPC] parseIntegrationPack 失败:', error);
     return { success: false, manifest: null, error: error.message };
-  }
-});
-
-// get-default-install-path: 获取默认安装路径
-ipcMain.handle('get-default-install-path', () => {
-  try {
-    const { installWizardService } = require('./services/install/InstallWizardService');
-    const defaultPath = installWizardService.getDefaultInstallPath();
-    return { success: true, path: defaultPath };
-  } catch (error) {
-    console.error('[IPC] getDefaultInstallPath 失败:', error);
-    return { success: false, path: null, error: error.message };
-  }
-});
-
-// select-directory: 选择目录
-ipcMain.handle('select-directory', async () => {
-  try {
-    const result = await dialog.showOpenDialog({
-      title: '选择安装目录',
-      properties: ['openDirectory', 'createDirectory']
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-      return { success: false, path: null };
-    }
-
-    return { success: true, path: result.filePaths[0] };
-  } catch (error) {
-    console.error('[IPC] selectDirectory 失败:', error);
-    return { success: false, path: null, error: error.message };
   }
 });
 
