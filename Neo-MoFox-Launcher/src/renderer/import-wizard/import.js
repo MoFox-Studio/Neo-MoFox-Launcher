@@ -151,9 +151,9 @@ function bindEvents() {
     });
   });
   
-  // 输入框失焦清除错误
+  // 输入时清除错误（而非聚焦时，保持错误提示可见）
   [el.inputInstanceName, el.inputQqNumber, el.inputQqNickname, el.inputOwnerQq, el.inputApiKey, el.inputWsPort, el.inputWebuiApiKey, el.inputInstallDir].forEach(input => {
-    input?.addEventListener('focus', () => clearFieldError(input));
+    input?.addEventListener('input', () => clearFieldError(input));
   });
   
   // 步骤 5: 安装日志折叠
@@ -616,60 +616,62 @@ function evaluatePasswordStrength() {
 }
 
 function validateInputs() {
-  let isValid = true;
+  // 一次只显示一个错误，按顺序验证
   
-  // 实例名称
+  // 1. 实例名称
   if (!el.inputInstanceName.value.trim()) {
     showFieldError(el.inputInstanceName, '请输入实例名称');
-    isValid = false;
+    return false;
   }
   
-  // Bot QQ 号
+  // 2. Bot QQ 号
   const qqNumber = el.inputQqNumber.value.trim();
   if (!qqNumber) {
     showFieldError(el.inputQqNumber, '请输入 Bot QQ 号');
-    isValid = false;
-  } else if (!/^\d{5,12}$/.test(qqNumber)) {
+    return false;
+  }
+  if (!/^\d{5,12}$/.test(qqNumber)) {
     showFieldError(el.inputQqNumber, 'QQ 号必须为 5-12 位数字');
-    isValid = false;
+    return false;
   }
   
-  // Bot 昵称
+  // 3. Bot 昵称
   if (!el.inputQqNickname.value.trim()) {
     showFieldError(el.inputQqNickname, '请输入 Bot QQ 昵称');
-    isValid = false;
+    return false;
   }
   
-  // 管理员 QQ
+  // 4. 管理员 QQ
   const ownerQq = el.inputOwnerQq.value.trim();
   if (!ownerQq) {
     showFieldError(el.inputOwnerQq, '请输入管理员 QQ 号');
-    isValid = false;
-  } else if (!/^\d{5,12}$/.test(ownerQq)) {
-    showFieldError(el.inputOwnerQq, '管理员QQ 号必须为 5-12 位数字');
-    isValid = false;
+    return false;
+  }
+  if (!/^\d{5,12}$/.test(ownerQq)) {
+    showFieldError(el.inputOwnerQq, '管理员 QQ 号必须为 5-12 位数字');
+    return false;
   }
   
-  // API Key
+  // 5. API Key
   if (!el.inputApiKey.value.trim()) {
     showFieldError(el.inputApiKey, '请输入 SiliconFlow API Key');
-    isValid = false;
+    return false;
   }
   
-  // WebSocket 端口
+  // 6. WebSocket 端口
   const wsPort = parseInt(el.inputWsPort.value);
   if (!wsPort || wsPort < 1024 || wsPort > 65535) {
     showFieldError(el.inputWsPort, '端口号必须在 1024-65535 之间');
-    isValid = false;
+    return false;
   }
   
-  // 安装路径
+  // 7. 安装路径
   if (!el.inputInstallDir.value.trim()) {
     showFieldError(el.inputInstallDir, '请选择安装路径');
-    isValid = false;
+    return false;
   }
   
-  return isValid;
+  return true;
 }
 
 function collectInputs() {
@@ -984,7 +986,11 @@ function showFieldError(input, message) {
     hint.textContent = message;
     hint.style.color = 'var(--md-sys-color-error)';
   }
-  input.focus();
+  
+  // 只在输入框不是当前焦点时才聚焦
+  if (document.activeElement !== input) {
+    input.focus();
+  }
 }
 
 function clearFieldError(input) {

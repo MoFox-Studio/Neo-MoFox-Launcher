@@ -414,15 +414,14 @@
 }
 
 /* ===== 增强错误提示 ===== */
-.form-group.error input,
-.form-group.error select {
+.form-group.error .md3-input {
   border: 2px solid var(--md-sys-color-error) !important;
-  background: rgba(var(--md-sys-color-error-rgb, 211, 47, 47), 0.05) !important;
+  background: rgba(var(--md-sys-color-error-rgb, 211, 47, 47), 0.08) !important;
   animation: errorShake 0.4s;
 }
 
 .form-group.error label {
-  color: var(--md-sys-color-error) !important;
+  color: var(--md-sys-color-error);
   font-weight: 600;
 }
 
@@ -431,12 +430,18 @@
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(var(--md-sys-color-error-rgb, 211, 47, 47), 0.1);
+  border-left: 3px solid var(--md-sys-color-error);
+  border-radius: 4px;
+  margin-top: 4px;
 }
 
 .form-group.error .form-hint::before {
   content: '⚠';
-  font-size: 14px;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 @keyframes errorShake {

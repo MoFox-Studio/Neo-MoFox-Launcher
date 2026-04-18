@@ -42,6 +42,7 @@
     "adm-zip": "^0.5.17",
     "archiver": "^7.0.1",
     "extract-zip": "^2.0.1",
+    "material-symbols": "^0.44.2",
     "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
   }
