@@ -433,7 +433,7 @@ class ExportService {
     await fsPromises.mkdir(destDir, { recursive: true });
 
     // 排除列表（这些目录会在 extra 目录中单独处理）
-    const excludeItems = ['data', 'config', 'plugins'];
+    const excludeItems = ['data', 'config', 'plugins','.venv','venv'];
 
     // 读取 Neo-MoFox 目录下的所有项
     let allItems;
