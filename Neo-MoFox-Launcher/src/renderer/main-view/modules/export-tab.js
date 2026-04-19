@@ -7,6 +7,11 @@
 
 import { state } from './instances.js';
 
+// ─── Constants ────────────────────────────────────────────────────────
+
+// 系统原生插件列表（必须导出以保证正常运行）
+const SYSTEM_PLUGINS = ['default_chatter', 'napcat_adapter', 'booku_memory', 'emoji_sender', 'perm_plugin'];
+
 // ─── State ────────────────────────────────────────────────────────────
 
 let currentPlugins = [];
@@ -268,10 +273,22 @@ function togglePackNapcatOption() {
 /**
  * 切换插件选择器显示/隐藏
  */
-function togglePluginSelector() {
+async function togglePluginSelector() {
   if (exportElements.includePlugins?.checked) {
     exportElements.pluginSelector.style.display = 'block';
   } else {
+    // 取消勾选时显示警告
+    const confirmResult = await window.customConfirm(
+      '警告：不导出插件可能导致整合包无法正常运行！\n\n系统需要以下核心插件才能正常工作：\n' +
+      SYSTEM_PLUGINS.map(p => `• ${p}`).join('\n') +
+      '\n\n确定要取消勾选"包含插件"吗？',
+      '警告'
+    );
+    if (!confirmResult) {
+      // 用户取消，恢复勾选状态
+      exportElements.includePlugins.checked = true;
+      return;
+    }
     exportElements.pluginSelector.style.display = 'none';
   }
 }
@@ -279,12 +296,54 @@ function togglePluginSelector() {
 /**
  * 全选/取消全选插件
  */
-function toggleSelectAllPlugins() {
+async function toggleSelectAllPlugins() {
   const isChecked = exportElements.selectAllPlugins.checked;
+  
+  // 如果是取消全选，检查是否包含系统核心插件
+  if (!isChecked) {
+    const checkboxes = exportElements.pluginList.querySelectorAll('input[type="checkbox"]');
+    const checkedSystemPlugins = [];
+    
+    checkboxes.forEach(cb => {
+      if (cb.checked && SYSTEM_PLUGINS.includes(cb.value)) {
+        checkedSystemPlugins.push(cb.value);
+      }
+    });
+    
+    if (checkedSystemPlugins.length > 0) {
+      const confirmResult = await window.customConfirm(
+        '警告：取消全选将会取消勾选以下核心插件，可能导致整合包无法正常运行：\n' +
+        checkedSystemPlugins.map(p => `• ${p}`).join('\n') +
+        '\n\n确定要取消全选吗？',
+        '警告'
+      );
+      if (!confirmResult) {
+        // 用户取消，恢复全选状态
+        exportElements.selectAllPlugins.checked = true;
+        return;
+      }
+    }
+  }
+  
   const checkboxes = exportElements.pluginList.querySelectorAll('input[type="checkbox"]');
   checkboxes.forEach(cb => {
     cb.checked = isChecked;
   });
+}
+
+/**
+ * 检查并更新全选按钮状态
+ */
+function updateSelectAllCheckbox() {
+  const checkboxes = exportElements.pluginList.querySelectorAll('input[type="checkbox"]');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+  
+  if (exportElements.selectAllPlugins) {
+    exportElements.selectAllPlugins.checked = allChecked;
+    // 设置半选状态（如果支持的话）
+    exportElements.selectAllPlugins.indeterminate = !allChecked && anyChecked;
+  }
 }
 
 /**
@@ -335,6 +394,34 @@ async function scanPlugins(instanceId) {
       checkbox.value = plugin.name;
       checkbox.dataset.pluginName = plugin.name;
       
+      const isSystemPlugin = SYSTEM_PLUGINS.includes(plugin.name);
+      
+      // 默认选中系统原生插件
+      if (isSystemPlugin) {
+        checkbox.checked = true;
+        
+        // 为系统插件添加取消勾选警告
+        checkbox.addEventListener('change', async (e) => {
+          if (!e.target.checked) {
+            const confirmResult = await window.customConfirm(
+              `警告："${plugin.name}" 是系统核心插件，取消导出可能导致整合包无法正常运行！\n\n确定要取消勾选吗？`,
+              '警告'
+            );
+            if (!confirmResult) {
+              // 用户取消，恢复勾选状态
+              e.target.checked = true;
+            }
+          }
+          // 更新全选按钮状态
+          updateSelectAllCheckbox();
+        });
+      } else {
+        // 为非系统插件也添加 change 事件以更新全选按钮
+        checkbox.addEventListener('change', () => {
+          updateSelectAllCheckbox();
+        });
+      }
+      
       const iconSpan = document.createElement('span');
       iconSpan.className = 'material-symbols-rounded plugin-item-icon';
       iconSpan.textContent = plugin.type === 'folder' ? 'folder' : 'description';
@@ -342,6 +429,15 @@ async function scanPlugins(instanceId) {
       const nameSpan = document.createElement('span');
       nameSpan.className = 'plugin-item-name';
       nameSpan.textContent = plugin.name;
+      
+      // 为系统插件添加标识
+      if (isSystemPlugin) {
+        const badge = document.createElement('span');
+        badge.className = 'plugin-system-badge';
+        badge.textContent = '核心';
+        badge.style.cssText = 'margin-left: 8px; padding: 2px 6px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-radius: 4px; font-size: 10px;';
+        nameSpan.appendChild(badge);
+      }
       
       const typeSpan = document.createElement('span');
       typeSpan.className = 'plugin-item-type';
@@ -354,6 +450,9 @@ async function scanPlugins(instanceId) {
       
       exportElements.pluginList.appendChild(item);
     });
+    
+    // 扫描完成后更新全选按钮状态
+    updateSelectAllCheckbox();
 
     console.log(`[ExportTab] 已扫描到 ${plugins.length} 个插件`);
   } catch (error) {
@@ -479,6 +578,20 @@ async function startExport() {
     if (options.selectedPlugins.length === 0) {
       await window.customAlert('请至少选择一个插件，或取消"包含插件"选项', '提示');
       return;
+    }
+    
+    // 检查是否缺少核心插件
+    const missingSystemPlugins = SYSTEM_PLUGINS.filter(sp => !options.selectedPlugins.includes(sp));
+    if (missingSystemPlugins.length > 0) {
+      const confirmResult = await window.customConfirm(
+        '警告：以下核心插件未被选中，可能导致整合包无法正常运行：\n' +
+        missingSystemPlugins.map(p => `• ${p}`).join('\n') +
+        '\n\n确定要继续导出吗？',
+        '警告'
+      );
+      if (!confirmResult) {
+        return;
+      }
     }
   }
 
@@ -660,7 +773,10 @@ function resetExportState() {
     exportElements.napcatOptionItem.style.pointerEvents = 'auto';
   }
   if (exportElements.includeConfig) exportElements.includeConfig.checked = false;
-  if (exportElements.includePlugins) exportElements.includePlugins.checked = false;
+  if (exportElements.includePlugins) {
+    exportElements.includePlugins.checked = true; // 默认勾选导出插件
+    exportElements.pluginSelector.style.display = 'block'; // 默认显示插件选择器
+  }
   if (exportElements.includePluginConfigs) exportElements.includePluginConfigs.checked = false;
   if (exportElements.includeData) exportElements.includeData.checked = false;
   if (exportElements.installNapcatOnImport) {
@@ -674,7 +790,8 @@ function resetExportState() {
   if (exportElements.selectAllPlugins) exportElements.selectAllPlugins.checked = false;
   if (exportElements.selectAllPluginConfigs) exportElements.selectAllPluginConfigs.checked = false;
   
-  if (exportElements.pluginSelector) exportElements.pluginSelector.style.display = 'none';
+  // 注意：不在这里重置 pluginSelector 的显示状态，因为上面已经根据 includePlugins 的状态设置了
+  // if (exportElements.pluginSelector) exportElements.pluginSelector.style.display = 'none';
   if (exportElements.pluginConfigSelector) exportElements.pluginConfigSelector.style.display = 'none';
   if (exportElements.progressContainer) exportElements.progressContainer.style.display = 'none';
   if (exportElements.pluginList) exportElements.pluginList.innerHTML = '';
