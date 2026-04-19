@@ -28,7 +28,7 @@ const STEPS = [
   {
     id: 'welcome',
     title: '欢迎',
-    svg: '../../../assets/oobe/undraw_setup-wizard_wzp9.svg',
+    svg: '../../../assets/images/oobe/undraw_setup-wizard_wzp9.svg',
     render: renderWelcomeStep,
     validate: null,
     canSkip: false,
@@ -36,7 +36,7 @@ const STEPS = [
   {
     id: 'env-check',
     title: '环境检测',
-    svg: '../../../assets/oobe/undraw_download_sa8g.svg',
+    svg: '../../../assets/images/oobe/undraw_download_sa8g.svg',
     render: renderEnvCheckStep,
     validate: async () => {
       if (stepManager.validators['env-check']) {
@@ -49,7 +49,7 @@ const STEPS = [
   {
     id: 'install-path',
     title: '安装路径',
-    svg: '../../../assets/oobe/undraw_preferences_2bda.svg',
+    svg: '../../../assets/images/oobe/undraw_preferences_2bda.svg',
     render: renderInstallPathStep,
     validate: async () => {
       if (stepManager.validators['install-path']) {
@@ -62,7 +62,7 @@ const STEPS = [
   {
     id: 'theme',
     title: '主题设置',
-    svg: '../../../assets/oobe/undraw_preferences_2bda.svg',
+    svg: '../../../assets/images/oobe/undraw_preferences_2bda.svg',
     render: renderThemeStep,
     validate: null,
     canSkip: true,
@@ -70,7 +70,7 @@ const STEPS = [
   {
     id: 'preferences',
     title: '偏好设置',
-    svg: '../../../assets/oobe/undraw_preferences_2bda.svg',
+    svg: '../../../assets/images/oobe/undraw_preferences_2bda.svg',
     render: renderPreferencesStep,
     validate: null,
     canSkip: true,
@@ -78,7 +78,7 @@ const STEPS = [
   {
     id: 'finish',
     title: '完成',
-    svg: '../../../assets/oobe/undraw_success_288d.svg',
+    svg: '../../../assets/images/oobe/undraw_success_288d.svg',
     render: renderFinishStep,
     validate: null,
     canSkip: false,

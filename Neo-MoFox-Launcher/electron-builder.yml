@@ -2,7 +2,8 @@ appId: com.mofox-studio.neo-mofox-launcher
 productName: Neo-MoFox Launcher
 
 directories:
-  buildResources: assets
+  buildResources: assets/images
+  output: dist
 
 files:
   - "**/*"
@@ -11,12 +12,13 @@ files:
   - "!**/logs/**"
   - "!**/{.git,.idea}/**"
   - "!dist/**"
-
-asar: true
+  - "!build-resources/**"
+  # 明确包含 assets 目录（包括 material-symbols）
+  - "assets/material-symbols/**"
 
 win:
   executableName: neo-mofox-launcher
-  icon: assets/icon.ico
+  icon: assets/images/icon.ico
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
   target:
     - target: nsis
@@ -37,7 +39,7 @@ portable:
 
 linux:
   executableName: neo-mofox-launcher
-  icon: assets/icon.png
+  icon: assets/images/icon.png
   artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - target: AppImage
