@@ -161,9 +161,9 @@ jobs:
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Build Linux deb ${{ matrix.arch }}
+      - name: Build Linux deb and AppImage ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
-        run: npx electron-builder --linux deb --${{ matrix.arch }}
+        run: npx electron-builder --linux deb appimage --${{ matrix.arch }}
 
       - name: Rename artifacts
         working-directory: Neo-MoFox-Launcher
