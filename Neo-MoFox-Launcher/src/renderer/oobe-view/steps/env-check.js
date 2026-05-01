@@ -849,12 +849,45 @@ async function performInstall() {
     
     if (!installResult.success) {
       if (installLog) installLog.textContent += `\n⚠️ 安装未完全成功，请查看上方日志或手动安装。\n`;
+      // 不需要重启，直接重新检测环境
+      await runEnvCheck(true);
     } else {
       if (installLog) installLog.textContent += `\n✨ 所有依赖项已安装完成。\n`;
+      
+      // 如果需要重启，弹出对话框询问
+      if (installResult.needRestart) {
+        if (installLog) {
+          installLog.textContent += `\n⚠️ 依赖安装完成后需要重新启动启动器才能检测到。\n`;
+        }
+        
+        // 等待一下让用户看到完成消息
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 弹出对话框询问是否重启
+        const shouldRestart = await window.customDialog.confirm(
+          '依赖项已成功安装。\n\n为了让启动器检测到新安装的依赖项，需要重新启动应用。\n\n是否现在重启？',
+          '需要重新启动'
+        );
+        
+        if (shouldRestart) {
+          // 用户选择重启
+          try {
+            await window.mofoxAPI.appRestart();
+          } catch (err) {
+            console.error('重启失败:', err);
+            await window.customDialog.alert('重启失败: ' + err.message, '错误');
+            // 重启失败，还是重新检测一下
+            await runEnvCheck(true);
+          }
+        } else {
+          // 用户选择稍后重启，重新检测环境
+          await runEnvCheck(true);
+        }
+      } else {
+        // 不需要重启，直接重新检测环境
+        await runEnvCheck(true);
+      }
     }
-
-    // 重新检测环境，并保留进度和日志显示
-    await runEnvCheck(true);
     
   } catch (err) {
     console.error('自动安装失败:', err);

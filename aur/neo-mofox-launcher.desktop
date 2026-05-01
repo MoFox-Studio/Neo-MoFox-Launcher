@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Neo-MoFox Launcher
+Comment=一个优雅的 Neo-MoFox QQ 机器人实例管理启动器
+Exec=neo-mofox-launcher
+Icon=neo-mofox-launcher
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+StartupWMClass=neo-mofox-launcher
+Keywords=neo-mofox;launcher;qq;bot;

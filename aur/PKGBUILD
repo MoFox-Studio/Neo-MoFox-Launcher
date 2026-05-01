@@ -1,0 +1,74 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=neo-mofox-launcher
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="一个优雅的 Neo-MoFox QQ 机器人实例管理启动器"
+arch=('x86_64')
+url="https://github.com/MoFox-Studio/Neo-MoFox-Launcher"
+license=('AGPL3')
+depends=('electron33' 'nodejs' 'python' 'git')
+makedepends=('npm' 'git')
+optdepends=(
+    'uv: Python 包管理器'
+)
+source=(
+    "$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
+)
+sha256sums=('SKIP')  # 请在首次构建后更新为实际的 SHA256 值
+
+prepare() {
+    cd "$srcdir/$pkgname-$pkgver/Neo-MoFox-Launcher"
+    
+    # 安装 npm 依赖
+    npm install --cache "${srcdir}/npm-cache"
+}
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver/Neo-MoFox-Launcher"
+    
+    # 设置 Electron 版本
+    export ELECTRON_SKIP_BINARY_DOWNLOAD=1
+    
+    # 不需要构建，因为我们使用系统的 electron
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver/Neo-MoFox-Launcher"
+    
+    # 安装应用文件
+    install -dm755 "$pkgdir/usr/lib/$pkgname"
+    cp -r --no-preserve=ownership \
+        src assets package.json \
+        "$pkgdir/usr/lib/$pkgname/"
+    
+    # 安装 node_modules（排除 electron）
+    install -dm755 "$pkgdir/usr/lib/$pkgname/node_modules"
+    cp -r --no-preserve=ownership node_modules/* "$pkgdir/usr/lib/$pkgname/node_modules/"
+    rm -rf "$pkgdir/usr/lib/$pkgname/node_modules/electron"
+    
+    # 创建启动脚本
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/$pkgname" << EOF
+#!/bin/sh
+exec electron33 /usr/lib/$pkgname "\$@"
+EOF
+    chmod +x "$pkgdir/usr/bin/$pkgname"
+    
+    # 安装桌面文件
+    install -Dm644 "$srcdir/$pkgname.desktop" \
+        "$pkgdir/usr/share/applications/$pkgname.desktop"
+    
+    # 安装图标
+    if [ -f "assets/images/icon.png" ]; then
+        install -Dm644 "assets/images/icon.png" \
+            "$pkgdir/usr/share/pixmaps/$pkgname.png"
+    fi
+    
+    # 安装许可证
+    install -Dm644 "$srcdir/$pkgname-$pkgver/LICENSE" \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    
+    # 安装文档
+    install -Dm644 "$srcdir/$pkgname-$pkgver/README.md" \
+        "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

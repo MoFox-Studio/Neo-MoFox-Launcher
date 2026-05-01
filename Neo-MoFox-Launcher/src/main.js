@@ -726,6 +726,13 @@ ipcMain.handle('sudo-has-password', () => {
 // OOBE 相关 handlers 已移除（未被使用）
 // 实际使用 settingsWrite 来保存 OOBE 完成状态
 
+// ─── 应用重启 ────────────────────────────────────────────────────────────
+ipcMain.handle('app-restart', () => {
+  console.log('[Main] 重启应用');
+  app.relaunch();
+  app.exit(0);
+});
+
 // 窗口控制 - 使用 event.sender 获取当前窗口
 ipcMain.handle('window-minimize', (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);

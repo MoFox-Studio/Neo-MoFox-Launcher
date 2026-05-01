@@ -278,7 +278,7 @@ class OobeService {
 
   async checkUv() {
     const result = await this.checkCommandVersion(platformHelper.uvBin.replace(/\.exe$/, ''), ['--version']);
-    result.valid          = result.installed;
+    result.valid          = false;
     result.requirement    = DOWNLOAD_META.uv.requirement;
     result.canAutoInstall = true;
     result.platform       = platformHelper.platform;
@@ -893,7 +893,7 @@ class OobeService {
    * 一键安装所有缺失的依赖
    * @param {object} checks - checkAll() 返回的 checks 对象
    * @param {(event: {type: string, depName?: string, message?: string, percent?: number}) => void} onProgress
-   * @returns {Promise<{success: boolean, results: object, needRecheck: boolean}>}
+   * @returns {Promise<{success: boolean, results: object, needRecheck: boolean, needRestart: boolean}>}
    */
   async installAllMissing(checks, onProgress = () => {}) {
     const missing = [];
@@ -902,11 +902,12 @@ class OobeService {
     if (!checks.git.valid)    missing.push('git');
 
     if (missing.length === 0) {
-      return { success: true, results: {}, needRecheck: false };
+      return { success: true, results: {}, needRecheck: false, needRestart: false };
     }
 
     const results = {};
     let allSuccess = true;
+    let needRestart = false;
 
     for (const depName of missing) {
       onProgress({
@@ -923,12 +924,17 @@ class OobeService {
       if (!result.success) {
         allSuccess = false;
       }
+      // 如果任一依赖安装成功，标记需要重启
+      if (result.success) {
+        needRestart = true;
+      }
     }
 
     return {
       success: allSuccess,
       results,
       needRecheck: true,
+      needRestart, // 添加重启标志
     };
   }
 

@@ -212,6 +212,9 @@ const api = {
   // ─── OOBE 完成处理 ──────────────────────────────────────────────────────
   oobeComplete: () => ipcRenderer.invoke('oobe-complete'),
 
+  // ─── 应用重启 ───────────────────────────────────────────────────────────
+  appRestart: () => ipcRenderer.invoke('app-restart'),
+
   // ─── 主题系统 ───────────────────────────────────────────────────────────
   /** 更新主题（根据设置重新计算并保存） */
   themeUpdate: (settings) => ipcRenderer.invoke('theme-update', settings),
