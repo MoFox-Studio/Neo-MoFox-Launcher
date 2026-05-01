@@ -2,7 +2,7 @@ appId: com.mofox-studio.neo-mofox-launcher
 productName: Neo-MoFox Launcher
 
 directories:
-  buildResources: assets/images
+  buildResources: assets/images/icon
   output: dist
 
 files:

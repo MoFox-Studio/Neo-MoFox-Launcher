@@ -57,7 +57,7 @@ function createWindow(isOobe = false) {
     minWidth: 960,
     minHeight: 640,
     titleBarStyle: 'hidden', // 隐藏默认标题栏，保留窗口边框以支持 Snap
-    icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
+    icon: path.join(__dirname, '..', 'assets', 'images','icon', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
