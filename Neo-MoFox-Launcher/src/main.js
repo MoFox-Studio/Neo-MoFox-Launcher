@@ -57,7 +57,7 @@ function createWindow(isOobe = false) {
     minWidth: 960,
     minHeight: 640,
     titleBarStyle: 'hidden', // 隐藏默认标题栏，保留窗口边框以支持 Snap
-     title: 'Neo-MoFox Launcher',
+     title: 'neo-mofox-launcher', // 设置窗口标题（Linux 桌面环境使用）
     icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
