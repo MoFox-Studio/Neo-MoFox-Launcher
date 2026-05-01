@@ -27,6 +27,7 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 s.txt
+/Neo-MoFox-Launcher/nul
 /aur
 !/aur/PKGBUILD
 !/aur/neo-mofox-launcher.desktop
@@ -39,3 +40,5 @@ s.txt
 [Nn][Uu][Ll]
 [Cc][Oo][Mm][0-9]
 [Ll][Pp][Tt][0-9]
+
+Neo-MoFox-Launcher/nul

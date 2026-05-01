@@ -5,7 +5,7 @@
   "description": "Neo-MoFox Launcher - Material Design 3 Style",
   "main": "src/main.js",
   "scripts": {
-    "start": "chcp 65001 >nul 2>&1 & electron .",
+    "start": "chcp 65001 & electron .",
     "start:win": "chcp 65001 >nul 2>&1 & electron .",
     "start:linux": "electron .",
     "dev": "chcp 65001 >nul 2>&1 & electron . --dev",

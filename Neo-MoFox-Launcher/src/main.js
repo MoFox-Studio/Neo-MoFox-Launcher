@@ -14,6 +14,7 @@ if (process.platform === 'linux') {
 // ─── Windows 终端 UTF-8 修复 ────────────────────────────────────────
 // 在任何 console.log 之前，将 Windows 控制台代码页切换为 UTF-8 (65001)
 // 否则中文字符会因 GBK/CP936 默认编码而显示为乱码
+// wtttttttttttfffffffffffffff
 if (process.platform === 'win32') {
   try {
     execSync('chcp 65001', { stdio: 'ignore' });
