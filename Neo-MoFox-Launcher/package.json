@@ -1,5 +1,6 @@
 {
   "name": "neo-mofox-launcher",
+  "productName": "Neo-MoFox Launcher",
   "version": "1.0.0",
   "description": "Neo-MoFox Launcher - Material Design 3 Style",
   "main": "src/main.js",

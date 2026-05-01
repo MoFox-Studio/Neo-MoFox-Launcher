@@ -2,6 +2,8 @@
 
 本文档说明如何将 Neo-MoFox Launcher 上传到 AUR（Arch User Repository）。
 
+**注意：** 本项目使用 Git 包（`neo-mofox-launcher-git`），直接从 GitHub 仓库构建最新代码，**不需要创建 release tags**。
+
 ## 准备工作
 
 ### 1. 注册 AUR 账户
@@ -26,50 +28,34 @@ cat ~/.ssh/id_ed25519.pub
 
 ## 发布前准备
 
-### 1. 创建 Git Tag
-在发布到 AUR 之前，需要在 GitHub 上创建一个版本标签：
+### 1. 更新 PKGBUILD Maintainer 信息
+编辑 `/home/yishan/developer/Neo-MoFox-Launcher/aur/PKGBUILD`：
 
 ```bash
-# 在项目目录下
-git tag -a v1.0.0 -m "Release version 1.0.0"
-git push origin v1.0.0
+# Maintainer: Your Name <your.email@example.com>
 ```
 
-或者在 GitHub 网页上创建 Release。
+**注意：Git 包不需要：**
+- ❌ 创建 release tags（直接从 git 主分支构建）
+- ❌ 手动更新版本号（`pkgver()` 函数自动获取）
+- ❌ 计算 SHA256 校验和（git 包使用 `sha256sums=('SKIP')`）
 
 ### 2. 测试 PKGBUILD
 在上传前，先在本地测试构建：
 
 ```bash
-cd /home/yishan/developer/Neo-MoFox-Launcher
+cd /home/yishan/developer/Neo-MoFox-Launcher/aur
 
 # 生成 .SRCINFO 文件
 makepkg --printsrcinfo > .SRCINFO
 
 # 测试构建（不安装）
-makepkg -s
+# 注意：git 包会自动运行 pkgver() 函数获取版本号
+makepkg -sf
 
 # 如果构建成功，测试安装
-makepkg -si
+makepkg -sfi
 ```
-
-### 3. 更新 PKGBUILD
-在 PKGBUILD 中更新以下内容：
-
-1. **Maintainer 信息**：
-   ```bash
-   # Maintainer: Your Name <your.email@example.com>
-   ```
-
-2. **SHA256 校验和**：
-   ```bash
-   # 下载源码包并计算 SHA256
-   wget https://github.com/MoFox-Studio/Neo-MoFox-Launcher/archive/refs/tags/v1.0.0.tar.gz
-   sha256sum v1.0.0.tar.gz
-   
-   # 在 PKGBUILD 中替换 'SKIP' 为实际的 SHA256 值
-   sha256sums=('实际的sha256值')
-   ```
 
 ## 上传到 AUR
 
@@ -80,8 +66,9 @@ mkdir -p ~/aur
 cd ~/aur
 
 # 克隆你的 AUR 包仓库（首次上传时是空的）
-git clone ssh://aur@aur.archlinux.org/neo-mofox-launcher.git
-cd neo-mofox-launcher
+# 注意：包名为 neo-mofox-launcher-git
+git clone ssh://aur@aur.archlinux.org/neo-mofox-launcher-git.git
+cd neo-mofox-launcher-git
 ```
 
 ### 2. 复制文件
@@ -89,8 +76,8 @@ cd neo-mofox-launcher
 
 ```bash
 # 从项目目录复制文件
-cp /home/yishan/developer/Neo-MoFox-Launcher/PKGBUILD .
-cp /home/yishan/developer/Neo-MoFox-Launcher/neo-mofox-launcher.desktop .
+cp /home/yishan/developer/Neo-MoFox-Launcher/aur/PKGBUILD .
+cp /home/yishan/developer/Neo-MoFox-Launcher/aur/neo-mofox-launcher.desktop .
 
 # 生成 .SRCINFO 文件
 makepkg --printsrcinfo > .SRCINFO
@@ -101,28 +88,29 @@ makepkg --printsrcinfo > .SRCINFO
 # 添加文件到 Git
 git add PKGBUILD .SRCINFO neo-mofox-launcher.desktop
 
-# 提交更改
-git commit -m "Initial upload: neo-mofox-launcher 1.0.0"
+# 提交更改（git 包不需要写具体版本号）
+git commit -m "Initial upload: neo-mofox-launcher-git"
 
 # 推送到 AUR
 git push origin master
 ```
 
 ## 更新包
+**Git 包的优势：** 通常不需要手动更新！用户执行 `yay -Syu` 或 `makepkg -sf` 时会自动获取最新代码。
 
-当发布新版本时：
-
-1. 更新 PKGBUILD 中的 `pkgver` 和 `pkgrel`
-2. 更新 `sha256sums`
-3. 测试构建
-4. 生成新的 .SRCINFO
-5. 提交并推送更改
+**仅在以下情况需要更新 AUR 仓库：**
+1. 修改依赖关系（`depends`、`makedepends`）
+2. 修改构建流程（`prepare()`、`build()`、`package()` 函数）
+3. 修改包描述或其他元数据
 
 ```bash
-cd ~/aur/neo-mofox-launcher
+cd ~/aur/neo-mofox-launcher-git
 
-# 编辑 PKGBUILD（更新版本号等）
+# 编辑 PKGBUILD（修改依赖或构建脚本）
 vim PKGBUILD
+
+# 重置 pkgrel（仅在修改 PKGBUILD 时增加）
+# pkgrel=1 -> pkgrel=2
 
 # 测试构建
 makepkg -sf
@@ -132,7 +120,7 @@ makepkg --printsrcinfo > .SRCINFO
 
 # 提交更改
 git add PKGBUILD .SRCINFO
-git commit -m "Update to version 1.1.0"
+git commit -m "Update dependencies / build script"
 git push origin master
 ```
 
@@ -141,17 +129,29 @@ git push origin master
 ### 响应用户评论和问题
 - 定期检查 AUR 页面上的评论
 - 及时回复用户的问题
+Git 包很少会被标记为过期，因为它总是跟踪最新代码。如果被标记：
 - 修复报告的 bug
 
 ### 处理过期标记
-如果有用户标记你的包为过期（out-of-date）：
-1. 检查是否有新版本
-2. 更新 PKGBUILD
-3. 推送更改
-4. 在 AUR 网页上取消过期标记
+Git 包很少会被标记为过期，因为它总是跟踪最新代码。如果被标记：
+1. 检查是否有构建问题
+2. 测试是否能正常构建
+3. 如果没问题，在 AUR 网页上取消过期标记
 
 ### 孤儿包（Orphan）
 如果你不再维护这个包，可以在 AUR 网页上将其标记为"orphan"，允许其他人接手维护。
+
+## 
+| 特性 | Git 包 (`-git` 后缀) | 稳定版包 |
+|------|---------------------|---------|
+| 版本来源 | Git 主分支最新代码 | GitHub Release tags |
+| 版本号 | 自动生成（如 `r123.abc1234`） | 手动指定（如 `1.0.0`） |
+| 更新频率 | 用户自行决定 | 跟随上游 release |
+| SHA256 | `SKIP` | 必须计算 |
+| 维护成本 | 低（很少需要更新 AUR） | 高（每次 release 都要更新） |
+| 适用场景 | 快速迭代、每夜构建 | 稳定发布 |
+
+**本项目目前使用 Git 包，未来如果发布稳定版本，可以同时维护两个 AUR 包。**
 
 ## 常见问题
 
@@ -161,10 +161,14 @@ git push origin master
 
 ### 构建失败
 - 确保所有依赖都正确列出
-- 检查文件路径是否正确
+- 检查文件路径是否正确（Git 包的路径与 tar.gz 包不同）
 - 查看 makepkg 的详细输出
 
-### 网络问题
+### pkgver() 函数失败
+- 确保 `git` 在 `makedepends` 中
+- 检查 source 目录是否是有效的 git 仓库
+
+### 网络问题clone 和 npm install 问题
 - 某些依赖可能需要配置代理
 - 考虑使用 `--nocheck` 跳过测试（如果测试失败）
 

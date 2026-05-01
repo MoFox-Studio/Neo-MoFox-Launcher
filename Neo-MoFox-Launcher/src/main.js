@@ -4,6 +4,13 @@ const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 
+// ─── 设置应用名称和 WM_CLASS ────────────────────────────────────────
+// 这对于系统 electron 正确显示应用图标和名称至关重要
+app.setName('neo-mofox-launcher');
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('class', 'neo-mofox-launcher');
+}
+
 // ─── Windows 终端 UTF-8 修复 ────────────────────────────────────────
 // 在任何 console.log 之前，将 Windows 控制台代码页切换为 UTF-8 (65001)
 // 否则中文字符会因 GBK/CP936 默认编码而显示为乱码

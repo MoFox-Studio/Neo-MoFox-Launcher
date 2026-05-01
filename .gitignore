@@ -1,1 +1,32 @@
-Neo-MoFox-Launcher/out
+# Dependencies
+/node_modules
+/dist
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+
+# IDEs and editors
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-project
+*.sublime-workspace
+
+# Operating system files
+.DS_Store
+Thumbs.db
+s.txt
+/aur
+!/aur/PKGBUILD
+!/aur/neo-mofox-launcher.desktop
