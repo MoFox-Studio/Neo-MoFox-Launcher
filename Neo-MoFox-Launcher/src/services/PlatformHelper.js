@@ -364,12 +364,37 @@ class PlatformHelper {
    * @returns {Object}
    */
   buildSpawnEnv(extraEnv = {}) {
-    return {
+    const env = {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
       PYTHONUNBUFFERED: '1',
       ...extraEnv,
     };
+
+    // 在 Linux/macOS 上，从桌面启动时 PATH 可能缺少用户 bin 目录
+    // 添加常见的用户 bin 目录以确保能找到 uv 等工具
+    if (this.isLinux || this.isDarwin) {
+      const homeDir = os.homedir();
+      const userBinPaths = [
+        path.join(homeDir, '.cargo', 'bin'),    // Rust/Cargo 工具 (uv 默认安装位置)
+        path.join(homeDir, '.local', 'bin'),    // Python 用户安装
+        path.join(homeDir, 'bin'),               // 通用用户 bin
+      ];
+
+      // 将这些路径添加到 PATH 前面（如果尚不存在）
+      const existingPath = env.PATH || '';
+      const pathParts = existingPath.split(path.delimiter);
+      
+      for (const binPath of userBinPaths) {
+        if (fs.existsSync(binPath) && !pathParts.includes(binPath)) {
+          pathParts.unshift(binPath);
+        }
+      }
+      
+      env.PATH = pathParts.join(path.delimiter);
+    }
+
+    return env;
   }
 
   /**
