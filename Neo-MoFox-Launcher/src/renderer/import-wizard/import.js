@@ -108,6 +108,15 @@ const el = {
 async function init() {
   console.log('[ImportWizard] 导入向导初始化');
   
+  // 获取系统平台信息
+  try {
+    const platformInfo = await window.mofoxAPI.getPlatformInfo();
+    state.isLinux = platformInfo.platform === 'linux';
+  } catch (err) {
+    console.error('[ImportWizard] 获取系统平台信息失败:', err);
+    state.isLinux = false; // 降级处理
+  }
+
   // 绑定事件
   bindEvents();
   
@@ -392,17 +401,30 @@ function generateContentItems(content) {
   }
   
   if (content.napcat?.included) {
-    items.push(`
-      <div class="content-item">
-        <span class="material-symbols-rounded">chat</span>
-        <div class="content-item-text">
-          <div class="content-item-name">NapCat</div>
-          <div class="content-item-detail">${content.napcat.version ? `版本: ${content.napcat.version}` : ''}</div>
+    if (state.isLinux) {
+      items.push(`
+        <div class="content-item" style="opacity: 0.5;">
+          <span class="material-symbols-rounded">chat</span>
+          <div class="content-item-text">
+            <div class="content-item-name">NapCat (Linux 不支持)</div>
+            <div class="content-item-detail">${content.napcat.version ? `版本: ${content.napcat.version}` : ''}</div>
+          </div>
+          <span class="content-item-badge" style="background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-outline);">忽略安装</span>
         </div>
-        <span class="content-item-badge">已内置</span>
-      </div>
-    `);
-  } else if (content.napcat?.installOnImport) {
+      `);
+    } else {
+      items.push(`
+        <div class="content-item">
+          <span class="material-symbols-rounded">chat</span>
+          <div class="content-item-text">
+            <div class="content-item-name">NapCat</div>
+            <div class="content-item-detail">${content.napcat.version ? `版本: ${content.napcat.version}` : ''}</div>
+          </div>
+          <span class="content-item-badge">已内置</span>
+        </div>
+      `);
+    }
+  } else if (content.napcat?.installOnImport && !state.isLinux) {
     items.push(`
       <div class="content-item">
         <span class="material-symbols-rounded">download</span>
@@ -703,7 +725,17 @@ function updateSummary() {
   // 包含内容
   const contentTags = [];
   if (content.neoMofox?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">widgets</span>Neo-MoFox</div>');
-  if (content.napcat?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">chat</span>NapCat</div>');
+  
+  if (content.napcat?.included) {
+    if (state.isLinux) {
+      contentTags.push('<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">chat</span>NapCat (已忽略)</div>');
+    } else {
+      contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">chat</span>NapCat</div>');
+    }
+  } else if (content.napcat?.installOnImport && !state.isLinux) {
+    contentTags.push('<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 NapCat</div>');
+  }
+
   if (content.config?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">settings</span>配置文件</div>');
   if (content.plugins?.included) contentTags.push(`<div class="content-tag"><span class="material-symbols-rounded">extension</span>${content.plugins.list.length} 个插件</div>`);
   if (content.data?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">database</span>数据文件</div>');
@@ -745,13 +777,16 @@ function generateInstallSteps(content) {
   
   steps.push('write-model', 'write-adapter');
   
-  if (!content.napcat?.included) {
-    if (content.napcat?.installOnImport) {
-      steps.push('napcat');
+  if (!state.isLinux) {
+    if (!content.napcat?.included) {
+      if (content.napcat?.installOnImport) {
+        steps.push('napcat');
+      }
     }
+    steps.push('napcat-config');
   }
   
-  steps.push('napcat-config', 'register');
+  steps.push('register');
   
   return steps;
 }
@@ -968,7 +1003,7 @@ async function retryInstall() {
 }
 
 function finishAndClose() {
-  window.close();
+  window.location.href = '../index.html';
 }
 
 // ─── 工具函数 ──────────────────────────────────────────────────────────
