@@ -278,6 +278,7 @@ class OobeService {
 
   async checkUv() {
     const result = await this.checkCommandVersion(platformHelper.uvBin.replace(/\.exe$/, ''), ['--version']);
+    console.log(`[OobeService] uv 检测结果: installed=${result.installed}, version=${result.version}, error=${result.error || '无'}`);
     result.valid          = result.installed; 
     result.requirement    = DOWNLOAD_META.uv.requirement;
     result.canAutoInstall = true;
