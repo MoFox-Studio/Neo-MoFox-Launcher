@@ -2934,6 +2934,8 @@ ipcMain.handle('import-integration-pack', async (event, options) => {
       wsPort: options.wsPort,
       installDir: options.installDir,
       pythonCmd: options.pythonCmd,
+      installNapcat: options.installNapcat,
+      installWebui: options.installWebui,
     });
     
     // 发送完成事件

@@ -53,10 +53,14 @@
         </div>
         <div class="step-item" data-step="4">
           <div class="step-indicator">4</div>
-          <div class="step-content"><span class="step-title">安装确认</span></div>
+          <div class="step-content"><span class="step-title">组件配置</span></div>
         </div>
         <div class="step-item" data-step="5">
           <div class="step-indicator">5</div>
+          <div class="step-content"><span class="step-title">安装确认</span></div>
+        </div>
+        <div class="step-item" data-step="6">
+          <div class="step-indicator">6</div>
           <div class="step-content"><span class="step-title">安装执行</span></div>
         </div>
       </nav>
@@ -267,8 +271,46 @@
           </div>
         </section>
         
-        <!-- Step 4: 安装确认 -->
+        <!-- Step 4: 组件配置 -->
         <section class="wizard-step hidden" id="step-4">
+          <div class="step-header">
+            <h1>选择安装组件</h1>
+            <p>请选择需要安装的附加组件</p>
+          </div>
+          
+          <div class="config-form">
+            <div class="component-card" id="card-webui">
+              <div class="component-header">
+                <div class="component-title">
+                  <span class="material-symbols-rounded">dashboard</span>
+                  <h3>WebUI 管理界面</h3>
+                </div>
+                <label class="switch-container">
+                  <input type="checkbox" id="check-install-webui" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <div class="component-desc">可视化配置面板，支持在线管理实例状态。强烈建议安装以便日常维护。</div>
+            </div>
+
+            <div class="component-card" id="card-napcat">
+              <div class="component-header">
+                <div class="component-title">
+                  <span class="material-symbols-rounded">chat</span>
+                  <h3>NapCat 通信框架</h3>
+                </div>
+                <label class="switch-container">
+                  <input type="checkbox" id="check-install-napcat" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <div class="component-desc" id="desc-napcat">基于 NTQQ 的底层协议实现框架，用于连接 QQ 服务。Windows 系统推荐安装。</div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 5: 安装确认 -->
+        <section class="wizard-step hidden" id="step-5">
           <div class="step-header">
             <h1>确认安装信息</h1>
             <p>请检查以下配置是否正确</p>
@@ -343,8 +385,8 @@
           </div>
         </section>
         
-        <!-- Step 5: 安装执行 -->
-        <section class="wizard-step hidden" id="step-5">
+        <!-- Step 6: 安装执行 -->
+        <section class="wizard-step hidden" id="step-6">
           <div class="step-header">
             <h1>正在安装</h1>
             <p>请稍候，正在导入整合包...</p>

@@ -7,7 +7,7 @@
 
 const state = {
   currentStep: 1,
-  totalSteps: 5,
+  totalSteps: 6,
   
   // 整合包信息
   packPath: null,
@@ -27,6 +27,8 @@ const state = {
     wsPort: 8095,
     webuiApiKey: '',
     installDir: '',
+    installNapcat: true,
+    installWebui: true,
   },
   
   // 安装状态
@@ -79,7 +81,13 @@ const el = {
   inputInstallDir: document.getElementById('input-install-dir'),
   btnBrowseDir: document.getElementById('btn-browse-dir'),
   
-  // 步骤 4: 安装确认
+  // 步骤 4: 组件配置
+  checkInstallWebui: document.getElementById('check-install-webui'),
+  checkInstallNapcat: document.getElementById('check-install-napcat'),
+  cardNapcat: document.getElementById('card-napcat'),
+  descNapcat: document.getElementById('desc-napcat'),
+  
+  // 步骤 5: 安装确认
   summaryPackName: document.getElementById('summary-pack-name'),
   summaryPackVersion: document.getElementById('summary-pack-version'),
   summaryPackAuthor: document.getElementById('summary-pack-author'),
@@ -216,8 +224,8 @@ function goToStep(step) {
   });
   
   // 更新按钮状态
-  el.btnBack.classList.toggle('hidden', step === 1 || step === 5);
-  el.btnNext.classList.toggle('hidden', step === 5);
+  el.btnBack.classList.toggle('hidden', step === 1 || step === 6);
+  el.btnNext.classList.toggle('hidden', step === 6);
   el.btnCancel.classList.toggle('hidden', step !== 1);
   
   // 步骤 2 自动运行环境检测
@@ -225,14 +233,19 @@ function goToStep(step) {
     runEnvCheck();
   }
   
-  // 步骤 4 显示摘要
+  // 步骤 4 组件配置处理
   if (step === 4) {
+    initComponentSelection();
+  }
+
+  // 步骤 5 显示摘要
+  if (step === 5) {
     updateSummary();
   }
   
-  // 步骤 5 开始安装
-  if (step === 5) {
-    console.log('[ImportWizard] 进入步骤 5，准备开始导入');
+  // 步骤 6 开始安装
+  if (step === 6) {
+    console.log('[ImportWizard] 进入步骤 6，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
     
@@ -275,7 +288,27 @@ async function goNext() {
     if (!validateInputs()) {
       return;
     }
+    
+    // 检查实例是否已存在
+    const instanceName = el.inputInstanceName.value.trim();
+    try {
+      const instances = await window.mofoxAPI.getInstances();
+      const exists = instances.some(i => i.name === instanceName);
+      if (exists) {
+        showFieldError(el.inputInstanceName, '已存在同名实例，请更换实例名称');
+        return;
+      }
+    } catch (err) {
+      console.warn('[ImportWizard] 检查实例名称失败:', err);
+    }
+    
     collectInputs();
+  }
+  
+  // 步骤 4: 组件配置
+  if (state.currentStep === 4) {
+    state.inputs.installWebui = el.checkInstallWebui?.checked ?? true;
+    state.inputs.installNapcat = el.checkInstallNapcat?.checked ?? true;
   }
   
   goToStep(state.currentStep + 1);
@@ -709,7 +742,33 @@ function collectInputs() {
   };
 }
 
-// ─── 步骤 4: 安装确认 ─────────────────────────────────────────────────
+// ─── 步骤 4: 组件配置 ─────────────────────────────────────────────────
+
+function initComponentSelection() {
+  if (!state.packManifest) return;
+  const content = state.packManifest.content || {};
+
+  // 根据整合包和系统属性处理 NapCat
+  if (state.isLinux) {
+    el.cardNapcat.style.opacity = '0.5';
+    el.checkInstallNapcat.disabled = true;
+    el.checkInstallNapcat.checked = false;
+    el.descNapcat.textContent = 'Linux 不支持自动安装 NapCat';
+  } else if (content.napcat?.included || content.napcat?.installOnImport) {
+    el.cardNapcat.style.opacity = '1';
+    el.checkInstallNapcat.disabled = false;
+    el.checkInstallNapcat.checked = true;
+    if (content.napcat?.included) {
+      el.descNapcat.textContent = '整合包内置 NapCat，可选择是否安装。';
+    } else {
+      el.descNapcat.textContent = '整合包提供自动下载，可选择是否安装。Windows 系统强烈推荐安装。';
+    }
+  } else {
+    el.cardNapcat.style.display = 'none'; // 整合包既不内置也不自动下载
+  }
+}
+
+// ─── 步骤 5: 安装确认 ─────────────────────────────────────────────────
 
 function updateSummary() {
   const manifest = state.packManifest;
@@ -733,7 +792,15 @@ function updateSummary() {
       contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">chat</span>NapCat</div>');
     }
   } else if (content.napcat?.installOnImport && !state.isLinux) {
-    contentTags.push('<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 NapCat</div>');
+    if (inputs.installNapcat) {
+      contentTags.push('<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 NapCat</div>');
+    } else {
+      contentTags.push('<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">chat</span>NapCat (已忽略)</div>');
+    }
+  }
+
+  if (inputs.installWebui) {
+    contentTags.push('<div class="content-tag" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);"><span class="material-symbols-rounded">dashboard</span>WebUI</div>');
   }
 
   if (content.config?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">settings</span>配置文件</div>');
@@ -779,11 +846,17 @@ function generateInstallSteps(content) {
   
   if (!state.isLinux) {
     if (!content.napcat?.included) {
-      if (content.napcat?.installOnImport) {
+      if (content.napcat?.installOnImport && state.inputs.installNapcat) {
         steps.push('napcat');
       }
     }
-    steps.push('napcat-config');
+    if (content.napcat?.included || (content.napcat?.installOnImport && state.inputs.installNapcat)) {
+      steps.push('napcat-config');
+    }
+  }
+
+  if (state.inputs.installWebui) {
+    steps.push('webui');
   }
   
   steps.push('register');
@@ -803,6 +876,7 @@ function getStepDescription(step) {
     'write-adapter': '写入适配器配置',
     'napcat': '安装 NapCat',
     'napcat-config': '配置 NapCat',
+    'webui': '安装 WebUI',
     'register': '注册实例',
   };
   

@@ -116,8 +116,8 @@ class ImportService {
       this._emitOutput(`整合包已解压到: ${tempDir}`);
       this._emitStepChange('extract-pack', 'completed');
 
-      // 3. 生成实例 ID
-      instanceId = `instance_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // 3. 生成实例 ID（使用与 InstallWizardService 相同的格式）
+      instanceId = `bot-${userInputs.qqNumber}`;
       if (!userInputs.installDir) {
         throw new Error('安装目录 (installDir) 未设置');
       }
@@ -211,7 +211,7 @@ class ImportService {
           // 如果实例未注册，手动删除实例目录（仅删除目录）
           try {
             // 安全检查：确保 instanceId 格式正确
-            if (instanceId.startsWith('instance_')) {
+            if (instanceId.startsWith('bot-')) {
               const instanceRootDir = path.join(userInputs.installDir, instanceId);
               
               // 检查目录是否存在
@@ -591,19 +591,21 @@ class ImportService {
     } else {
       if (!manifest.content.napcat.included) {
         // 未包含 NapCat，检查是否需要导入时安装
-        if (manifest.content.napcat.installOnImport) {
+        if (manifest.content.napcat.installOnImport && userInputs.installNapcat !== false) {
           steps.push('napcat');
         }
       }
 
       // NapCat 配置（如果包含 NapCat 或需要安装）
-      if (manifest.content.napcat.included || manifest.content.napcat.installOnImport) {
+      if ((manifest.content.napcat.included && userInputs.installNapcat !== false) || (manifest.content.napcat.installOnImport && userInputs.installNapcat !== false)) {
         steps.push('napcat-config');
       }
     }
 
-    // WebUI（可选，暂不包含在整合包流程中）
-    // steps.push('webui');
+    // WebUI
+    if (userInputs.installWebui !== false) {
+      steps.push('webui');
+    }
 
     // 注册实例（始终需要）
     steps.push('register');
