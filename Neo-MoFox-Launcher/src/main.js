@@ -2204,11 +2204,21 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
     if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {
       // 即使没有进程引用，也确保状态重置为 stopped
       if (instanceData) {
+        instanceData.status = 'stopped';
         instanceData.mofoxStatus = 'stopped';
         instanceData.napcatStatus = 'stopped';
         updateInstanceStatus(instanceId);
+      } else {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('instance-status-change', { 
+            instanceId, 
+            status: 'stopped',
+            mofoxStatus: 'stopped',
+            napcatStatus: 'stopped'
+          });
+        }
       }
-      throw new Error('实例未在运行');
+      return { success: true, message: '进程未在运行' };
     }
     
     // 停止所有运行中的进程
@@ -2368,7 +2378,11 @@ ipcMain.handle('instance-stop-mofox-only', async (event, instanceId) => {
   try {
     const instanceData = instanceProcesses.get(instanceId);
     if (!instanceData || !instanceData.mofoxProcess) {
-      throw new Error('MoFox 未在运行');
+      if (instanceData) {
+        instanceData.mofoxStatus = 'stopped';
+        updateInstanceStatus(instanceId);
+      }
+      return { success: true, message: 'MoFox 未在运行' };
     }
     
     await stopMoFoxProcess(instanceId);
@@ -2382,7 +2396,11 @@ ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => {
   try {
     const instanceData = instanceProcesses.get(instanceId);
     if (!instanceData || !instanceData.napcatProcess) {
-      throw new Error('NapCat 未在运行');
+      if (instanceData) {
+        instanceData.napcatStatus = 'stopped';
+        updateInstanceStatus(instanceId);
+      }
+      return { success: true, message: 'NapCat 未在运行' };
     }
     
     await stopNapcatProcess(instanceId);

@@ -459,6 +459,7 @@ async function handleStart() {
 }
 
 async function handleStop() {
+  if (state.instanceStatus === 'stopped') return;
   try {
     updateStatus('stopping');
     
@@ -467,9 +468,13 @@ async function handleStop() {
     if (!result.success) {
       throw new Error(result.error || '未知错误');
     }
+    
+    // 如果停止成功（包括实际上已停止但处于错误状态的补偿），强制更新 UI 为 stopped
+    updateStatus('stopped');
   } catch (error) {
     console.error('停止失败:', error);
     addLog('mofox', { level: 'error', message: '停止失败: ' + error.message });
+    // 不要强制切到 error 状态，可能保持现状更好，不过原版有，我们也就保留
     updateStatus('error');
     showError('停止失败: ' + error.message);
   }
@@ -512,6 +517,7 @@ async function handleStartMofox() {
 }
 
 async function handleStopMofox() {
+  if (state.mofoxStatus === 'stopped') return;
   try {
     updateMofoxStatus('stopping');
     
@@ -520,6 +526,7 @@ async function handleStopMofox() {
     if (!result.success) {
       throw new Error(result.error || '未知错误');
     }
+    updateMofoxStatus('stopped');
   } catch (error) {
     console.error('停止 MoFox 失败:', error);
     addLog('mofox', { level: 'error', message: '停止失败: ' + error.message });
@@ -563,6 +570,7 @@ async function handleStartNapcat() {
 }
 
 async function handleStopNapcat() {
+  if (state.napcatStatus === 'stopped') return;
   try {
     updateNapcatStatus('stopping');
     
@@ -571,6 +579,7 @@ async function handleStopNapcat() {
     if (!result.success) {
       throw new Error(result.error || '未知错误');
     }
+    updateNapcatStatus('stopped');
   } catch (error) {
     console.error('停止 NapCat 失败:', error);
     addLog('napcat', { level: 'error', message: '停止失败: ' + error.message });
@@ -760,8 +769,8 @@ function updateStatus(status) {
   // 启动按钮：只有在完全停止时才能启动
   el.btnStart.disabled = !isStopped;
   
-  // 停止按钮：只在正常运行时可以停止
-  el.btnStop.disabled = !isRunning;
+  // 停止按钮：只在正常运行时可以停止，或者在 error 状态下也能强制停止
+  el.btnStop.disabled = !isRunning && status !== 'error';
   
   // 重启按钮：只在正常运行时可用
   el.btnRestart.disabled = !isRunning;
@@ -801,7 +810,7 @@ function updateSeparatedButtonStates() {
     el.btnStopMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
   }
   if (el.btnRestartMofox) {
-    el.btnRestartMofox.disabled = !mofoxRunning;
+    el.btnRestartMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
   }
   
   // 更新 NapCat 按钮状态
@@ -815,7 +824,7 @@ function updateSeparatedButtonStates() {
     el.btnStopNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
   }
   if (el.btnRestartNapcat) {
-    el.btnRestartNapcat.disabled = !napcatRunning;
+    el.btnRestartNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
   }
   
   // 更新整体状态（使用优先级最高的状态）

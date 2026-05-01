@@ -290,7 +290,7 @@ async function goNext() {
     
     // 检查实例名称是否已存在
     try {
-      const instances = await window.mofoxAPI.instanceList();
+      const instances = await window.mofoxAPI.getInstances();
       const exists = instances.some(inst => inst.name === name);
       if (exists) {
         showFieldError(el.inputInstanceName, '❌ 该实例名称已存在，请使用其他名称');
@@ -974,6 +974,30 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  
+  // 检查系统类型并根据情况禁用 NapCat
+  try {
+    const platformInfo = await window.mofoxAPI.getPlatformInfo();
+    console.log('平台信息:', platformInfo);
+    if (platformInfo && platformInfo.platform === 'linux') {
+      const checkbox = document.getElementById('input-install-napcat');
+      if (checkbox) {
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        const formGroup = checkbox.closest('.form-group');
+        if (formGroup) {
+          formGroup.style.opacity = '0.5';
+          formGroup.style.pointerEvents = 'none';
+          const textSpan = formGroup.querySelector('.checkbox-label');
+          if (textSpan) {
+            textSpan.textContent += ' (Linux 系统暂不支持通过本向导安装)';
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取系统信息失败:', error);
+  }
   
   // 检查是否为续装模式
   const urlParams = parseUrlParams();

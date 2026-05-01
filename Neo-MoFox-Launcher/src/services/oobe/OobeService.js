@@ -461,8 +461,9 @@ class OobeService {
 
     return new Promise((resolve) => {
       const proc = spawn('bash', ['-c', `echo "${password}" | sudo -S -v 2>&1`], {
-        shell: false,
+        shell: platformHelper.config.shell,
         timeout: 10000,
+        env: platformHelper.buildSpawnEnv(),
       });
 
       let output = '';
@@ -639,9 +640,10 @@ class OobeService {
       onOutput(`[安装] 正在运行: ${path.basename(installerPath)} ${args.join(' ')}\n`);
 
       const proc = spawn(installerPath, args, {
-        shell: false,
+        shell: platformHelper.config.shell,
         detached: false,
         windowsHide: true,
+        env: platformHelper.buildSpawnEnv(),
       });
 
       proc.stdout?.on('data', (d) => {
@@ -699,13 +701,11 @@ class OobeService {
       onOutput(`[安装] 运行脚本: ${cmd} ${args.join(' ')}\n`);
 
       const proc = spawn(cmd, args, {
-        shell: false,
-        env: { 
-          ...process.env,
-          PYTHONIOENCODING: 'utf-8',
+        shell: platformHelper.config.shell,
+        env: platformHelper.buildSpawnEnv({
           LANG: 'en_US.UTF-8',
           LC_ALL: 'en_US.UTF-8'
-        },
+        }),
         windowsHide: true,
         encoding: 'utf-8',
       });

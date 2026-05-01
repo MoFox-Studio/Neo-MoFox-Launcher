@@ -340,9 +340,9 @@ class InstallStepExecutor {
 
       const proc = spawn('uv', ['run', 'python', 'main.py'], {
         cwd: inputs.neoMofoxDir,
-        shell: true,
+        shell: platformHelper.config.shell,
         detached: false,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+        env: platformHelper.buildSpawnEnv({ PYTHONUNBUFFERED: '1' }),
       });
 
       context.emitOutput(`[gen-config] 进程 PID: ${proc.pid}`);

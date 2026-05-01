@@ -220,8 +220,9 @@ function createInstanceCard(instance) {
     });
     
   } else {
-    const isRunning = isActiveStatus(liveStatus);
-    const isStopped = liveStatus === 'stopped' || liveStatus === 'error';
+    // 如果是出错状态，用户希望能有一个停止按钮来强制重置状态
+    const isRunning = isActiveStatus(liveStatus) || liveStatus === 'error';
+    const isStopped = liveStatus === 'stopped';
     const statusLabel = STATUS_TEXT[liveStatus] || liveStatus;
     
     // 运行中的卡片加上特殊 class
@@ -262,7 +263,7 @@ function createInstanceCard(instance) {
           管理
         </button>
         ${isRunning ? `
-          <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${liveStatus !== 'running' ? 'disabled' : ''}>
+          <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${(liveStatus !== 'running' && liveStatus !== 'error') ? 'disabled' : ''}>
             <span class="material-symbols-rounded">stop</span>
             停止
           </button>
@@ -364,10 +365,15 @@ async function stopInstanceFromCard(instanceId) {
     if (!result.success) {
       console.error('停止失败:', result.error);
       await window.customAlert('停止失败: ' + result.error, '错误');
+      updateCardStatus(instanceId, 'error');
+    } else {
+      // 成功停止时，确保UI状态更新为未运行
+      updateCardStatus(instanceId, 'stopped');
     }
   } catch (error) {
     console.error('停止异常:', error);
     await window.customAlert('停止异常: ' + error.message, '错误');
+    updateCardStatus(instanceId, 'error');
   }
 }
 
@@ -391,8 +397,9 @@ function updateCardStatus(instanceId, status) {
 // ─── 轻量级更新单个卡片 DOM ──────────────────────────────────────────
 
 function updateCardDOM(card, instance, status) {
-  const isRunning = isActiveStatus(status);
-  const isStopped = status === 'stopped' || status === 'error';
+  // 如果是出错状态，用户希望能有一个停止按钮来强制重置状态
+  const isRunning = isActiveStatus(status) || status === 'error';
+  const isStopped = status === 'stopped';
   const statusLabel = STATUS_TEXT[status] || status;
   
   // 更新卡片样式类
@@ -456,7 +463,7 @@ function updateCardDOM(card, instance, status) {
         管理
       </button>
       ${isRunning ? `
-        <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${status !== 'running' ? 'disabled' : ''}>
+        <button class="md3-btn md3-btn-danger md3-btn-sm btn-stop-instance" title="停止实例" ${(status !== 'running' && status !== 'error') ? 'disabled' : ''}>
           <span class="material-symbols-rounded">stop</span>
           停止
         </button>
