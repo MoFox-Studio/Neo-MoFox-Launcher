@@ -6,9 +6,9 @@ const os = require('os');
 
 // ─── 设置应用名称和 WM_CLASS ────────────────────────────────────────
 // 这对于系统 electron 正确显示应用图标和名称至关重要
-app.setName('neo-mofox-launcher');
+app.setName('Neo-MoFox-Launcher');
 if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('class', 'neo-mofox-launcher');
+  app.commandLine.appendSwitch('class', 'Neo-MoFox-Launcher');
 }
 
 // ─── Windows 终端 UTF-8 修复 ────────────────────────────────────────
@@ -57,7 +57,7 @@ function createWindow(isOobe = false) {
     minWidth: 960,
     minHeight: 640,
     titleBarStyle: 'hidden', // 隐藏默认标题栏，保留窗口边框以支持 Snap
-     title: 'neo-mofox-launcher', // 设置窗口标题（Linux 桌面环境使用）
+     title: 'Neo-MoFox-Launcher', // 设置窗口标题（Linux 桌面环境使用）
     icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

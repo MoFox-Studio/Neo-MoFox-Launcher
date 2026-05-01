@@ -6,5 +6,5 @@ Icon=neo-mofox-launcher
 Terminal=false
 Type=Application
 Categories=Utility;Network;
-StartupWMClass=neo-mofox-launcher
+StartupWMClass=Neo-MoFox-Launcher
 Keywords=neo-mofox;launcher;qq;bot;

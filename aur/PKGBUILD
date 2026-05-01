@@ -64,7 +64,7 @@ export ELECTRON_FORCE_IS_PACKAGED=true
 export APP_NAME="Neo-MoFox Launcher"
 export ELECTRON_ENABLE_LOGGING=1
 export ELECTRON_ICON="/$pkgdir/usr/share/pixmaps/$_pkgname.png"
-exec electron /usr/lib/$_pkgname "\$@"
+exec electron --class=Neo-MoFox-Launcher  /usr/lib/$_pkgname "\$@"
 EOF
     chmod +x "$pkgdir/usr/bin/$_pkgname"
     
