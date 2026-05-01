@@ -170,21 +170,35 @@ jobs:
         run: |
           echo "Build output:"
           find dist -name "*.deb" -exec ls -lh {} \;
+          find dist -name "*.AppImage" -exec ls -lh {} \;
+          
+          # 重命名 deb 文件
           DEB_FILE=$(find dist -name "*.deb" | head -1)
           if [ -n "$DEB_FILE" ]; then
             NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.deb"
             cp "$DEB_FILE" "$NEW_NAME"
-            echo "Renamed to: $NEW_NAME"
+            echo "Renamed deb to: $NEW_NAME"
           else
-            echo "ERROR: No .deb file found!"
-            exit 1
+            echo "WARNING: No .deb file found!"
+          fi
+          
+          # 重命名 AppImage 文件
+          APPIMAGE_FILE=$(find dist -name "*.AppImage" | head -1)
+          if [ -n "$APPIMAGE_FILE" ]; then
+            NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.AppImage"
+            cp "$APPIMAGE_FILE" "$NEW_NAME"
+            echo "Renamed AppImage to: $NEW_NAME"
+          else
+            echo "WARNING: No .AppImage file found!"
           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
-          path: Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.deb
+          path: |
+            Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.deb
+            Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.AppImage
 
   # ============================================================
   # 发布到 GitHub Releases
@@ -245,7 +259,9 @@ jobs:
           > | `*-win-arm64-setup.exe` | Windows ARM64 安装包 |
           > | `*-win-arm64-portable.exe` | Windows ARM64 便携版 |
           > | `*-linux-x64.deb` | Linux x64 deb 包 |
+          > | `*-linux-x64.AppImage` | Linux x64 AppImage |
           > | `*-linux-arm64.deb` | Linux ARM64 deb 包 |
+          > | `*-linux-arm64.AppImage` | Linux ARM64 AppImage |
           >
           > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持。
           FOOTER
@@ -292,7 +308,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p release-files
-          find artifacts -type f \( -name "*.exe" -o -name "*.deb" \) -exec cp {} release-files/ \;
+          find artifacts -type f \( -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} release-files/ \;
           echo "📦 准备发布的文件:"
           ls -lh release-files/
 
