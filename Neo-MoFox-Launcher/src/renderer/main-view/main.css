@@ -222,6 +222,123 @@
   pointer-events: none;
 }
 
+/* ─── Linux NapCat Notice ────────────────────────────────────────────── */
+.linux-napcat-notice {
+  width: 100%;
+  max-width: 1200px;
+  margin: -24px 0;
+}
+
+.notice-card {
+  display: flex;
+  gap: 20px;
+  padding: 20px 24px;
+  background: var(--md-sys-color-surface);
+  border-radius: 12px;
+  border: var(--border-whisper);
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.notice-card.warning {
+  border-left: 4px solid var(--md-sys-color-tertiary);
+}
+
+.notice-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-sys-color-tertiary-container);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.notice-icon .material-symbols-rounded {
+  font-size: 28px;
+  color: var(--md-sys-color-tertiary);
+}
+
+.notice-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notice-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.notice-message {
+  font-size: 0.9375rem;
+  color: var(--md-sys-color-on-surface-variant);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.notice-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.notice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.notice-link:hover {
+  filter: brightness(0.95);
+}
+
+[data-theme="dark"] .notice-link:hover {
+  filter: brightness(1.1);
+}
+
+.notice-link .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.notice-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notice-dismiss:hover {
+  background: var(--md-sys-color-surface-variant);
+}
+
+.notice-dismiss .material-symbols-rounded {
+  font-size: 18px;
+}
+
 /* ─── Instances Section ─────────────────────────────────────────────── */
 .instances-section,
 .favorite-instances-section {

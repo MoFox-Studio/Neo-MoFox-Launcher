@@ -55,6 +55,9 @@ async function init() {
   // 启动系统资源监控（CPU / 内存）
   startSystemMonitor();
   
+  // 🔍 检测平台并显示 Linux NapCat 提示
+  checkAndShowLinuxNotice();
+  
   // 🔍 自动检查所有实例的更新（非阻塞）
   // 延迟 2 秒执行，让界面优先完成渲染
   setTimeout(async () => {
@@ -72,6 +75,55 @@ async function init() {
 }
 
 init();
+
+// ─── Linux NapCat Notice ──────────────────────────────────────────────
+
+/**
+ * 检测平台并显示 Linux NapCat 安装提示
+ */
+async function checkAndShowLinuxNotice() {
+  try {
+    // 获取平台信息
+    const platformInfo = await window.mofoxAPI.getPlatformInfo();
+    
+    // 检查是否为 Linux 系统
+    if (platformInfo && platformInfo.platform === 'linux') {
+      // 检查用户是否已经关闭过提示（使用 localStorage）
+      const dismissed = localStorage.getItem('dismissedLinuxNapCatNotice') === 'true';
+      if (dismissed) {
+        console.log('Linux NapCat 提示已被用户关闭');
+        return;
+      }
+      
+      // 显示提示
+      const noticeElement = document.getElementById('linux-napcat-notice');
+      if (noticeElement) {
+        noticeElement.style.display = 'block';
+        
+        // 绑定关闭按钮事件
+        const dismissButton = document.getElementById('dismiss-linux-notice');
+        if (dismissButton) {
+          dismissButton.addEventListener('click', () => {
+            // 保存用户关闭状态到 localStorage
+            localStorage.setItem('dismissedLinuxNapCatNotice', 'true');
+            noticeElement.style.display = 'none';
+          });
+        }
+        
+        // 绑定链接点击事件
+        const noticeLink = noticeElement.querySelector('.notice-link');
+        if (noticeLink) {
+          noticeLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.mofoxAPI.openExternal(noticeLink.href);
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('检测平台失败:', error);
+  }
+}
 
 // ─── Instance Actions ─────────────────────────────────────────────────
 

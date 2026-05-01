@@ -12,6 +12,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const TOML = require('@iarna/toml');
+const { platformHelper } = require('../PlatformHelper');
 const { storageService } = require('../install/StorageService');
 const { installStepExecutor } = require('../install/InstallStepExecutor');
 const { PackValidator } = require('./PackValidator');
@@ -582,17 +583,23 @@ class ImportService {
     // 写入适配器配置
     steps.push('write-adapter');
 
-    // NapCat 处理
-    if (!manifest.content.napcat.included) {
-      // 未包含 NapCat，检查是否需要导入时安装
-      if (manifest.content.napcat.installOnImport) {
-        steps.push('napcat');
+    // NapCat 处理（Linux 系统跳过）
+    const isLinux = platformHelper.isLinux;
+    if (isLinux) {
+      // Linux 系统不支持自动安装 NapCat，需要用户手动安装
+      this._emitOutput('检测到 Linux 系统，跳过 NapCat 自动安装（需手动安装）');
+    } else {
+      if (!manifest.content.napcat.included) {
+        // 未包含 NapCat，检查是否需要导入时安装
+        if (manifest.content.napcat.installOnImport) {
+          steps.push('napcat');
+        }
       }
-    }
 
-    // NapCat 配置（如果包含 NapCat 或需要安装）
-    if (manifest.content.napcat.included || manifest.content.napcat.installOnImport) {
-      steps.push('napcat-config');
+      // NapCat 配置（如果包含 NapCat 或需要安装）
+      if (manifest.content.napcat.included || manifest.content.napcat.installOnImport) {
+        steps.push('napcat-config');
+      }
     }
 
     // WebUI（可选，暂不包含在整合包流程中）

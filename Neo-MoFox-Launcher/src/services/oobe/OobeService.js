@@ -497,7 +497,7 @@ class OobeService {
       onOutput(`[安装] 运行脚本: ${cmd} ${args.join(' ')}\n`);
 
       const proc = spawn(cmd, args, {
-        shell: true,
+        shell: false,
         env: { 
           ...process.env,
           PYTHONIOENCODING: 'utf-8',
@@ -540,6 +540,20 @@ class OobeService {
   }
 
   /**
+   * 检查命令是否存在
+   * @param {string} command
+   * @returns {Promise<boolean>}
+   */
+  async _commandExists(command) {
+    try {
+      const result = await this.checkCommandVersion(command, ['--version']);
+      return result.installed;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * 安装指定依赖 — 下载安装包并静默运行
    * @param {string} depName - 'python' | 'uv' | 'git'
    * @param {(event: {type: string, message?: string, percent?: number}) => void} onProgress
@@ -562,6 +576,30 @@ class OobeService {
       if (platMeta.useScript) {
         onProgress({ type: 'status', message: `正在安装 ${meta.displayName} (${platformHelper.label})...` });
         onProgress({ type: 'log', message: `[信息] 使用${platformHelper.isLinux ? '系统包管理器' : '官方安装脚本'}安装 ${meta.displayName}\n` });
+
+        // Linux 系统且是 uv 安装时，先检查 curl
+        if (platformHelper.isLinux && depName === 'uv') {
+          onProgress({ type: 'log', message: `[检查] 检测 curl 是否可用...\n` });
+          const hasCurl = await this._commandExists('curl');
+          
+          if (!hasCurl) {
+            onProgress({ type: 'log', message: `[检查] curl 未安装，尝试安装 curl...\n` });
+            const installCurlResult = await this._runScript('bash', ['-c', 'sudo apt-get update && sudo apt-get install -y curl'], (line) => {
+              onProgress({ type: 'log', message: line });
+            });
+            
+            if (!installCurlResult.success) {
+              return { 
+                success: false, 
+                error: 'curl 不可用，无法下载安装脚本。请手动安装: sudo apt-get install curl' 
+              };
+            } else {
+              onProgress({ type: 'log', message: `[成功] curl 安装完成\n` });
+            }
+          } else {
+            onProgress({ type: 'log', message: `[检查] curl 可用\n` });
+          }
+        }
 
         const result = await this._runScript(platMeta.scriptCmd, platMeta.scriptArgs, (line) => {
           onProgress({ type: 'log', message: line });
