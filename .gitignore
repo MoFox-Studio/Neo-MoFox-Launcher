@@ -31,3 +31,11 @@ s.txt
 !/aur/PKGBUILD
 !/aur/neo-mofox-launcher.desktop
 !/aur/neo-mofox-launcher.sh
+
+# Windows保留文件名喵
+[Cc][Oo][Nn]
+[Pp][Rr][Nn]
+[Aa][Uu][Xx]
+[Nn][Uu][Ll]
+[Cc][Oo][Mm][0-9]
+[Ll][Pp][Tt][0-9]
