@@ -738,9 +738,44 @@ ipcMain.handle('sudo-has-password', () => {
 
 // ─── 应用重启 ────────────────────────────────────────────────────────────
 ipcMain.handle('app-restart', () => {
-  console.log('[Main] 重启应用');
-  app.relaunch();
-  app.exit(0);
+  console.log('[Main] 重启电脑');
+  
+  // 根据平台执行不同的重启命令
+  const platform = process.platform;
+  let rebootCmd, rebootArgs;
+  
+  if (platform === 'win32') {
+    // Windows: shutdown /r /t 10
+    rebootCmd = 'shutdown';
+    rebootArgs = ['/r', '/t', '10'];
+  } else if (platform === 'darwin') {
+    // macOS: sudo shutdown -r +0 (需要管理员权限，使用 AppleScript 弹出授权)
+    rebootCmd = 'osascript';
+    rebootArgs = ['-e', 'tell app "System Events" to restart'];
+  } else {
+    // Linux: systemctl reboot (需要 sudo，但某些发行版允许普通用户重启)
+    rebootCmd = 'systemctl';
+    rebootArgs = ['reboot'];
+  }
+  
+  try {
+    // 异步执行重启命令
+    const { spawn } = require('child_process');
+    const proc = spawn(rebootCmd, rebootArgs, {
+      detached: true,
+      stdio: 'ignore',
+      shell: false,
+    });
+    proc.unref();
+    
+    // 延迟退出应用，给用户一点时间看到提示
+    setTimeout(() => {
+      app.exit(0);
+    }, 2000);
+  } catch (err) {
+    console.error('[Main] 重启命令执行失败:', err);
+    throw err;
+  }
 });
 
 // 窗口控制 - 使用 event.sender 获取当前窗口

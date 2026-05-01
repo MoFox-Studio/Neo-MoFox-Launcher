@@ -857,25 +857,27 @@ async function performInstall() {
       // 如果需要重启，弹出对话框询问
       if (installResult.needRestart) {
         if (installLog) {
-          installLog.textContent += `\n⚠️ 依赖安装完成后需要重新启动启动器才能检测到。\n`;
+          installLog.textContent += `\n⚠️ 依赖安装完成后需要重新启动系统才能生效。\n`;
         }
         
         // 等待一下让用户看到完成消息
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // 弹出对话框询问是否重启
+        // 弹出对话框询问是否重启电脑
         const shouldRestart = await window.customDialog.confirm(
-          '依赖项已成功安装。\n\n为了让启动器检测到新安装的依赖项，需要重新启动应用。\n\n是否现在重启？',
-          '需要重新启动'
+          '依赖项已成功安装。\n\n为了让系统环境变量生效（如 PATH），需要重新启动电脑。\n\n是否现在重启？',
+          '需要重新启动电脑'
         );
         
         if (shouldRestart) {
-          // 用户选择重启
+          // 用户选择重启电脑
           try {
             await window.mofoxAPI.appRestart();
+            // 重启命令已发送，关闭应用
+            await window.customDialog.alert('系统将在 10 秒后重启。\n\n请保存其他应用中的工作。', '即将重启');
           } catch (err) {
             console.error('重启失败:', err);
-            await window.customDialog.alert('重启失败: ' + err.message, '错误');
+            await window.customDialog.alert('重启失败: ' + err.message + '\n\n请手动重启电脑以使环境变量生效。', '错误');
             // 重启失败，还是重新检测一下
             await runEnvCheck(true);
           }
