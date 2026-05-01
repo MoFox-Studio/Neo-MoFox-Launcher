@@ -699,6 +699,30 @@ ipcMain.handle('oobe-select-path', () => oobeService.selectPath());
 // 验证路径（委托给 OobeService）
 ipcMain.handle('oobe-validate-path', (_event, targetPath) => oobeService.validatePath(targetPath));
 
+// ─── sudo 密码管理 IPC（Linux 平台）────────────────────────────────────
+
+// 验证 sudo 密码（前端调用，返回验证结果）
+ipcMain.handle('sudo-validate-password', async (_event, password) => {
+  return oobeService.validateSudoPassword(password);
+});
+
+// 设置已验证的 sudo 密码（前端验证成功后调用）
+ipcMain.handle('sudo-set-password', (_event, password) => {
+  oobeService.setSudoPassword(password);
+  return { success: true };
+});
+
+// 清除 sudo 密码（安装完成后前端调用）
+ipcMain.handle('sudo-clear-password', () => {
+  oobeService.clearSudoPassword();
+  return { success: true };
+});
+
+// 检查是否已设置 sudo 密码
+ipcMain.handle('sudo-has-password', () => {
+  return { hasPassword: oobeService.hasSudoPassword() };
+});
+
 // OOBE 相关 handlers 已移除（未被使用）
 // 实际使用 settingsWrite 来保存 OOBE 完成状态
 

@@ -188,6 +188,8 @@ class PlatformHelper {
       // Linux 特有
       distro: null,
       distroVersion: null,
+      distroFamily: null,          // 'debian' | 'arch' | 'redhat' | 'suse' | 'unknown'
+      packageManager: null,        // 'apt' | 'pacman' | 'dnf' | 'yum' | 'zypper' | 'unknown'
     };
 
     // Linux 下尝试读取发行版信息
@@ -201,9 +203,31 @@ class PlatformHelper {
           info.distro = idMatch ? idMatch[1].replace(/"/g, '') : 'unknown';
           info.distroVersion = versionMatch ? versionMatch[1] : null;
           info.distroName = nameMatch ? nameMatch[1] : info.distro;
+
+          // 识别发行版家族和包管理器
+          const distroId = info.distro.toLowerCase();
+          if (['ubuntu', 'debian', 'linuxmint', 'pop', 'zorin'].includes(distroId)) {
+            info.distroFamily = 'debian';
+            info.packageManager = 'apt';
+          } else if (['arch', 'manjaro', 'endeavouros', 'garuda'].includes(distroId)) {
+            info.distroFamily = 'arch';
+            info.packageManager = 'pacman';
+          } else if (['fedora', 'rhel', 'centos', 'rocky', 'almalinux'].includes(distroId)) {
+            info.distroFamily = 'redhat';
+            // Fedora 22+ 使用 dnf，较老版本使用 yum
+            info.packageManager = 'dnf';
+          } else if (distroId.includes('suse')) {
+            info.distroFamily = 'suse';
+            info.packageManager = 'zypper';
+          } else {
+            info.distroFamily = 'unknown';
+            info.packageManager = 'unknown';
+          }
         }
       } catch (e) {
         console.warn('[PlatformHelper] 读取 /etc/os-release 失败:', e.message);
+        info.distroFamily = 'unknown';
+        info.packageManager = 'unknown';
       }
     }
 
@@ -361,6 +385,78 @@ class PlatformHelper {
       // 合并后确保 env 包含基础变量
       ...(overrides.env ? { env: this.buildSpawnEnv(overrides.env) } : {}),
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 包管理器相关（Linux）
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * 获取包管理器更新命令
+   * @returns {string|null} 包管理器更新命令，如果不是 Linux 或无法识别则返回 null
+   */
+  getPackageManagerUpdateCmd() {
+    if (!this.isLinux || !this._systemInfo) return null;
+    
+    const { packageManager } = this._systemInfo;
+    
+    switch (packageManager) {
+      case 'apt':
+        return 'sudo apt-get update';
+      case 'pacman':
+        return 'sudo pacman -Sy';
+      case 'dnf':
+        return 'sudo dnf check-update || true'; // dnf check-update 返回 100 如果有更新
+      case 'yum':
+        return 'sudo yum check-update || true';
+      case 'zypper':
+        return 'sudo zypper refresh';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * 获取包管理器安装命令
+   * @param {string[]} packages - 要安装的包列表
+   * @returns {{cmd: string, args: string[]}|null} 安装命令，如果不是 Linux 或无法识别则返回 null
+   */
+  getPackageManagerInstallCmd(packages) {
+    if (!this.isLinux || !this._systemInfo || !packages || packages.length === 0) {
+      return null;
+    }
+    
+    const { packageManager } = this._systemInfo;
+    
+    switch (packageManager) {
+      case 'apt':
+        return {
+          cmd: 'sudo',
+          args: ['apt-get', 'install', '-y', ...packages],
+        };
+      case 'pacman':
+        return {
+          cmd: 'sudo',
+          args: ['pacman', '-S', '--noconfirm', ...packages],
+        };
+      case 'dnf':
+        return {
+          cmd: 'sudo',
+          args: ['dnf', 'install', '-y', ...packages],
+        };
+      case 'yum':
+        return {
+          cmd: 'sudo',
+          args: ['yum', 'install', '-y', ...packages],
+        };
+      case 'zypper':
+        return {
+          cmd: 'sudo',
+          args: ['zypper', 'install', '-y', ...packages],
+        };
+      default:
+        return null;
+    }
   }
 }
 

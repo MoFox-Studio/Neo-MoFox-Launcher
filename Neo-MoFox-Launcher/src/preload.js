@@ -72,6 +72,12 @@ const api = {
   envInstallDep: (depName) => ipcRenderer.invoke('env-install-dep', depName),
   envInstallAllMissing: (checks) => ipcRenderer.invoke('env-install-all-missing', checks),
 
+  // sudo 密码管理（Linux）
+  sudoValidatePassword: (password) => ipcRenderer.invoke('sudo-validate-password', password),
+  sudoSetPassword: (password) => ipcRenderer.invoke('sudo-set-password', password),
+  sudoClearPassword: () => ipcRenderer.invoke('sudo-clear-password'),
+  sudoHasPassword: () => ipcRenderer.invoke('sudo-has-password'),
+
   // ─── 实例管理 ───────────────────────────────────────────────────────────
   getInstances: () => ipcRenderer.invoke('instances-get-all'),
   getInstance: (instanceId) => ipcRenderer.invoke('instances-get', instanceId),

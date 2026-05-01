@@ -30,14 +30,46 @@ const DOWNLOAD_META = {
       silentArgs: ['/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_test=0', 'Include_launcher=1'],
     },
     linux: {
-      // Ubuntu/Debian: 使用 apt 安装
-      useScript: true,
-      scriptType: 'bash',
-      scriptCmd: 'bash',
-      scriptArgs: [
-        '-c',
-        'sudo apt-get update && sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip',
-      ],
+      // 按发行版家族分类
+      debian: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'apt-get',
+        scriptArgs: [
+          'update',
+          '&&',
+          'apt-get',
+          'install',
+          '-y',
+          'python3.11',
+          'python3.11-venv',
+          'python3.11-dev',
+          'python3-pip',
+        ],
+      },
+      arch: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'pacman',
+        scriptArgs: [
+          '-Sy',
+          '--noconfirm',
+          'python',
+          'python-pip',
+        ],
+      },
+      redhat: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'dnf check-update || true; dnf install -y python3.11 python3.11-devel python3-pip',
+        ],
+      },
     },
     darwin: {
       downloadUrl: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg',
@@ -63,10 +95,37 @@ const DOWNLOAD_META = {
       ],
     },
     linux: {
-      useScript: true,
-      scriptType: 'bash',
-      scriptCmd: 'bash',
-      scriptArgs: ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'],
+      // 按发行版家族分类，整合 curl 安装
+      debian: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'apt-get update && apt-get install -y curl && curl -LsSf https://astral.sh/uv/install.sh | sh',
+        ],
+      },
+      arch: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'pacman -Sy --noconfirm curl && curl -LsSf https://astral.sh/uv/install.sh | sh',
+        ],
+      },
+      redhat: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'dnf check-update || true; dnf install -y curl && curl -LsSf https://astral.sh/uv/install.sh | sh',
+        ],
+      },
     },
     darwin: {
       useScript: true,
@@ -85,10 +144,37 @@ const DOWNLOAD_META = {
       silentArgs: ['/VERYSILENT', '/NORESTART', '/SP-', '/SUPPRESSMSGBOXES'],
     },
     linux: {
-      useScript: true,
-      scriptType: 'bash',
-      scriptCmd: 'bash',
-      scriptArgs: ['-c', 'sudo apt-get update && sudo apt-get install -y git'],
+      // 按发行版家族分类
+      debian: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'apt-get update && apt-get install -y git',
+        ],
+      },
+      arch: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'pacman -Sy --noconfirm git',
+        ],
+      },
+      redhat: {
+        useScript: true,
+        needsSudo: true,
+        scriptType: 'bash',
+        scriptCmd: 'sh',
+        scriptArgs: [
+          '-c',
+          'dnf check-update || true; dnf install -y git',
+        ],
+      },
     },
     darwin: {
       useScript: true,
@@ -115,6 +201,9 @@ class OobeService {
     this._mainWindow = null;
     /** @type {Map<string, AbortController>} 正在进行的下载任务 */
     this._downloads = new Map();
+
+    // sudo 密码管理（Linux 平台）- 由前端通过 IPC 设置
+    this._sudoPassword = null;
 
     // 启动时检测系统环境
     this._sysEnv = platformHelper.detectSystemEnv();
@@ -357,6 +446,102 @@ class OobeService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // sudo 密码管理（Linux）
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * 验证 sudo 密码是否正确
+   * @param {string} password
+   * @returns {Promise<{valid: boolean, error?: string}>}
+   */
+  async validateSudoPassword(password) {
+    if (!password) {
+      return { valid: false, error: '密码不能为空' };
+    }
+
+    return new Promise((resolve) => {
+      const proc = spawn('bash', ['-c', `echo "${password}" | sudo -S -v 2>&1`], {
+        shell: false,
+        timeout: 10000,
+      });
+
+      let output = '';
+      proc.stdout?.on('data', (d) => { output += d.toString(); });
+      proc.stderr?.on('data', (d) => { output += d.toString(); });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ valid: true });
+        } else {
+          const error = output.toLowerCase().includes('sorry') || output.toLowerCase().includes('incorrect')
+            ? '密码错误'
+            : '验证失败: ' + output.trim();
+          resolve({ valid: false, error });
+        }
+      });
+
+      proc.on('error', (err) => {
+        resolve({ valid: false, error: err.message });
+      });
+    });
+  }
+
+  /**
+   * 设置已验证的 sudo 密码（由前端在验证成功后调用）
+   * @param {string} password
+   */
+  setSudoPassword(password) {
+    this._sudoPassword = password;
+    console.log('[OobeService] sudo 密码已设置');
+  }
+
+  /**
+   * 获取当前是否已设置 sudo 密码
+   * @returns {boolean}
+   */
+  hasSudoPassword() {
+    return !!this._sudoPassword;
+  }
+
+  /**
+   * 将 sudo 密码注入到命令中
+   * @param {string} cmd - 原始命令
+   * @param {string[]} args - 原始参数
+   * @returns {{cmd: string, args: string[]}} 包装后的命令
+   */
+  _injectSudoPassword(cmd, args) {
+    if (!this._sudoPassword) {
+      throw new Error('sudo 密码未设置，请先调用 setSudoPassword()');
+    }
+
+    // 构建参数列表，每个参数都用单引号包裹并正确转义
+    const escapedArgs = args.map(arg => {
+      // 使用单引号包裹，内部的单引号转义为 '\''
+      return `'${arg.replace(/'/g, "'\\''")}'`;
+    }).join(' ');
+
+    // 构建完整的命令
+    const fullCmd = escapedArgs ? `${cmd} ${escapedArgs}` : cmd;
+    
+    // 使用 echo + sudo -S 的方式传递密码
+    // -S 参数让 sudo 从 stdin 读取密码
+    const wrappedCmd = `echo "${this._sudoPassword}" | sudo -S ${fullCmd} 2>&1`;
+
+    return {
+      cmd: 'bash',
+      args: ['-c', wrappedCmd],
+    };
+  }
+
+  /**
+   * 清除缓存的 sudo 密码
+   */
+  clearSudoPassword() {
+    this._sudoPassword = null;
+    console.log('[OobeService] sudo 密码已清除');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // 下载 & 静默安装
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -490,9 +675,26 @@ class OobeService {
    * @param {string} cmd
    * @param {string[]} args
    * @param {(line: string) => void} onOutput
+   * @param {boolean} needsSudo - 是否需要 sudo 权限（仅 Linux）
    * @returns {Promise<{success: boolean, error?: string}>}
    */
-  _runScript(cmd, args, onOutput = () => {}) {
+  async _runScript(cmd, args, onOutput = () => {}, needsSudo = false) {
+    // 如果需要 sudo 且在 Linux 平台
+    if (needsSudo && platformHelper.isLinux) {
+      // 检查是否已设置密码
+      if (!this._sudoPassword) {
+        return { 
+          success: false, 
+          error: 'sudo 密码未设置。请先在前端验证并设置密码。' 
+        };
+      }
+
+      // 包装命令，注入 sudo 密码
+      const wrapped = this._injectSudoPassword(cmd, args);
+      cmd = wrapped.cmd;
+      args = wrapped.args;
+    }
+
     return new Promise((resolve) => {
       onOutput(`[安装] 运行脚本: ${cmd} ${args.join(' ')}\n`);
 
@@ -566,44 +768,54 @@ class OobeService {
     }
 
     // 获取当前平台的安装配置
-    const platMeta = meta[platformHelper.platform] || meta.linux;
+    let platMeta = meta[platformHelper.platform];
+
+    // Linux 平台需要根据发行版家族选择配置
+    if (platformHelper.isLinux && platMeta && typeof platMeta === 'object') {
+      const distroFamily = this._sysEnv.distroFamily || 'debian'; // 默认回退到 debian
+      
+      // 如果 platMeta 有 debian/arch/redhat 等子配置，选择对应的
+      if (platMeta.debian || platMeta.arch || platMeta.redhat) {
+        platMeta = platMeta[distroFamily] || platMeta.debian; // 未知发行版回退到 debian
+        
+        if (!platMeta) {
+          return { 
+            success: false, 
+            error: `${meta.displayName} 不支持当前 Linux 发行版 (${this._sysEnv.distroName || 'unknown'})` 
+          };
+        }
+        
+        onProgress({ 
+          type: 'log', 
+          message: `[信息] 检测到 ${this._sysEnv.distroName || 'Linux'}，使用 ${this._sysEnv.packageManager || 'apt'} 包管理器\n` 
+        });
+      }
+    }
+
+    // 回退逻辑：如果没有找到配置，尝试使用 linux 或默认配置
+    if (!platMeta) {
+      platMeta = meta.linux || meta[platformHelper.platform];
+    }
+
     if (!platMeta) {
       return { success: false, error: `${meta.displayName} 不支持当前平台 (${platformHelper.label})` };
     }
 
     try {
-      // ─ 脚本安装方式 (uv / Linux apt 等) ─
+      // ─ 脚本安装方式 (uv / Linux 系统包管理器等) ─
       if (platMeta.useScript) {
         onProgress({ type: 'status', message: `正在安装 ${meta.displayName} (${platformHelper.label})...` });
         onProgress({ type: 'log', message: `[信息] 使用${platformHelper.isLinux ? '系统包管理器' : '官方安装脚本'}安装 ${meta.displayName}\n` });
 
-        // Linux 系统且是 uv 安装时，先检查 curl
-        if (platformHelper.isLinux && depName === 'uv') {
-          onProgress({ type: 'log', message: `[检查] 检测 curl 是否可用...\n` });
-          const hasCurl = await this._commandExists('curl');
-          
-          if (!hasCurl) {
-            onProgress({ type: 'log', message: `[检查] curl 未安装，尝试安装 curl...\n` });
-            const installCurlResult = await this._runScript('bash', ['-c', 'sudo apt-get update && sudo apt-get install -y curl'], (line) => {
-              onProgress({ type: 'log', message: line });
-            });
-            
-            if (!installCurlResult.success) {
-              return { 
-                success: false, 
-                error: 'curl 不可用，无法下载安装脚本。请手动安装: sudo apt-get install curl' 
-              };
-            } else {
-              onProgress({ type: 'log', message: `[成功] curl 安装完成\n` });
-            }
-          } else {
-            onProgress({ type: 'log', message: `[检查] curl 可用\n` });
-          }
-        }
-
-        const result = await this._runScript(platMeta.scriptCmd, platMeta.scriptArgs, (line) => {
-          onProgress({ type: 'log', message: line });
-        });
+        // 调用 _runScript，传递 needsSudo 参数
+        const result = await this._runScript(
+          platMeta.scriptCmd, 
+          platMeta.scriptArgs, 
+          (line) => {
+            onProgress({ type: 'log', message: line });
+          },
+          platMeta.needsSudo || false
+        );
 
         if (result.success) {
           onProgress({ type: 'status', message: `${meta.displayName} 安装成功！` });
