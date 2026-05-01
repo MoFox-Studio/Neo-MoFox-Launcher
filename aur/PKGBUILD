@@ -1,7 +1,7 @@
 # Maintainer: Your Name <your.email@example.com>
 pkgname=neo-mofox-launcher-git
 _pkgname=neo-mofox-launcher
-pkgver=r136.b9a0195
+pkgver=r138.badc058
 pkgrel=1
 pkgdesc="An elegant instance management launcher for Neo-MoFox QQ Bot. - 一个优雅的 Neo-MoFox QQ 机器人实例管理启动器"
 arch=('x86_64') 

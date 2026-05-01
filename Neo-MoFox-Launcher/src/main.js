@@ -57,7 +57,7 @@ function createWindow(isOobe = false) {
     minWidth: 960,
     minHeight: 640,
     titleBarStyle: 'hidden', // 隐藏默认标题栏，保留窗口边框以支持 Snap
-     title: 'Neo-MoFox-Launcher', // 设置窗口标题（Linux 桌面环境使用）
+    vmclass: 'Neo-MoFox-Launcher', // 设置 WM_CLASS（Linux 桌面环境使用）
     icon: path.join(__dirname, '..', 'assets', 'images', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -70,6 +70,8 @@ function createWindow(isOobe = false) {
   Menu.setApplicationMenu(null);
   mainWindow.setMenuBarVisibility(false); // 确保菜单栏也不显示
   
+console.log(app.getName());
+
   // 根据 OOBE 状态加载不同的页面
   if (isOobe) {
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'oobe-view', 'index.html'));
