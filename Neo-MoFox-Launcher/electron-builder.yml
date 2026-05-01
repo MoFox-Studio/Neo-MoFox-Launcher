@@ -20,7 +20,7 @@ files:
 
 win:
   executableName: neo-mofox-launcher
-  icon: assets/images/icon.ico
+  icon: assets/images/icon/icon.ico
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
   target:
     - target: nsis
@@ -41,7 +41,7 @@ portable:
 
 linux:
   executableName: neo-mofox-launcher
-  icon: assets/images/icon.png
+  icon: assets/images/icon/icon.png
   artifactName: ${productName}-${version}-${arch}.${ext}
   target:
     - target: AppImage

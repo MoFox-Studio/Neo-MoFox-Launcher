@@ -1,10 +1,10 @@
 # Dependencies
-/node_modules
-/dist
+/Neo-MoFox-Launcher/node_modules
+/Neo-MoFox-Launcher/dist
 
 # Logs
-logs
-*.log
+/Neo-MoFox-Launcher/logs
+/Neo-MoFox-Launcher/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -30,3 +30,4 @@ s.txt
 /aur
 !/aur/PKGBUILD
 !/aur/neo-mofox-launcher.desktop
+!/aur/neo-mofox-launcher.sh
