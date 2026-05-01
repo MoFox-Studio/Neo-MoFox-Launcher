@@ -1,7 +1,7 @@
 # Maintainer: Your Name <your.email@example.com>
 pkgname=neo-mofox-launcher-git
 _pkgname=neo-mofox-launcher
-pkgver=r134.aa60785
+pkgver=r135.4af0150
 pkgrel=1
 pkgdesc="An elegant instance management launcher for Neo-MoFox QQ Bot. - 一个优雅的 Neo-MoFox QQ 机器人实例管理启动器"
 arch=('x86_64') 
@@ -59,6 +59,10 @@ package() {
     cat > "$pkgdir/usr/bin/$_pkgname" << EOF
 #!/bin/sh
 export ELECTRON_IS_DEV=0
+# 设置 Electron 应用名称
+export ELECTRON_FORCE_IS_PACKAGED=true
+export APP_NAME="Neo-MoFox Launcher"
+export ELECTRON_ICON="/usr/lib/$_pkgname/assets/images/icon.png"
 exec electron /usr/lib/$_pkgname "\$@"
 EOF
     chmod +x "$pkgdir/usr/bin/$_pkgname"
