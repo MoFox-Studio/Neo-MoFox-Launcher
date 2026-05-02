@@ -360,6 +360,7 @@ jobs:
         with:
           gpg_private_key: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          trust_level: 5
 
       - name: Export GPG fingerprint for packaging
         run: |
@@ -382,22 +383,22 @@ jobs:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
           path: ppa/artifacts/*
 
-      - name: Configure dput for HTTPS
+      - name: Configure dput for SCP
         run: |
           cat > ~/.dput.cf << 'EOF'
-          [launchpad-https]
+          [launchpad-scp]
           fqdn = ppa.launchpadcontent.net
           incoming = ~ikun114/ubuntu/neo-mofox-launcher/
-          method = https
+          method = scp
           allow_unsigned_uploads = 0
           run_lintian = 0
           EOF
           chmod 600 ~/.dput.cf
-          echo "dput profile configured: launchpad-https"
+          echo "dput profile configured: launchpad-scp"
 
       - name: Publish to Launchpad PPA
         run: |
           CHANGES_FILE="ppa/artifacts/neo-mofox-launcher_${{ needs.check-commits.outputs.version }}-1_source.changes"
           test -f "${CHANGES_FILE}"
-          dput launchpad-https "${CHANGES_FILE}"
+          dput launchpad-scp "${CHANGES_FILE}"
           echo "PPA upload submitted: ${CHANGES_FILE}"
