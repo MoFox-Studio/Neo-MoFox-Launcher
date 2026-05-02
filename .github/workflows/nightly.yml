@@ -391,7 +391,7 @@ jobs:
           chmod 600 ~/.ssh/launchpad_id_rsa
           # 写入 SSH 客户端配置，指定 Launchpad 使用该私钥
           cat >> ~/.ssh/config << 'EOF'
-          Host ppa.launchpadcontent.net
+          Host ppa.launchpad.net
             IdentityFile ~/.ssh/launchpad_id_rsa
             StrictHostKeyChecking no
             User ikun114
@@ -403,7 +403,7 @@ jobs:
         run: |
           cat > ~/.dput.cf << 'EOF'
           [launchpad-scp]
-          fqdn = ppa.launchpadcontent.net
+          fqdn = ppa.launchpad.net
           incoming = ~ikun114/ubuntu/neo-mofox-launcher/
           method = scp
           allow_unsigned_uploads = 0
