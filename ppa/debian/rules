@@ -1,0 +1,57 @@
+#!/usr/bin/make -f
+# debian/rules — Build rules for neo-mofox-launcher
+
+export DH_VERBOSE = 1
+
+# Electron binary 由 prepare-source.sh 预先解压到 electron-dist/
+# 跳过 electron-builder 自动下载 electron
+export ELECTRON_SKIP_BINARY_DOWNLOAD = 1
+export NODE_ENV = production
+export NPM_CONFIG_CACHE = $(CURDIR)/.npm_cache
+
+%:
+	dh $@
+
+# 依赖已经由 prepare-source.sh 预先安装，无需 npm install
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cd Neo-MoFox-Launcher && \
+	npm exec -c "electron-builder --linux dir --x64 \
+		-c.electronDist=$(CURDIR)/electron-dist \
+		-c.linux.target=dir"
+
+override_dh_auto_install:
+	# 安装 Electron 运行时（从 electronDist 拷贝）
+	install -dm755 debian/neo-mofox-launcher/usr/lib/neo-mofox-launcher
+	cp -a electron-dist/. debian/neo-mofox-launcher/usr/lib/neo-mofox-launcher/
+	chmod 755 debian/neo-mofox-launcher/usr/lib/neo-mofox-launcher/electron
+
+	# 安装应用资源（覆盖 default_app.asar）
+	install -dm755 debian/neo-mofox-launcher/usr/lib/neo-mofox-launcher/resources
+	cp -a Neo-MoFox-Launcher/dist/linux-unpacked/resources/. \
+		debian/neo-mofox-launcher/usr/lib/neo-mofox-launcher/resources/
+
+	# 安装启动器包装脚本
+	install -Dm755 debian/neo-mofox-launcher.sh \
+		debian/neo-mofox-launcher/usr/bin/neo-mofox-launcher
+
+	# 安装桌面快捷方式
+	install -Dm644 aur/neo-mofox-launcher.desktop \
+		debian/neo-mofox-launcher/usr/share/applications/neo-mofox-launcher.desktop
+
+	# 安装图标
+	if [ -f Neo-MoFox-Launcher/assets/images/icon.png ]; then \
+		install -Dm644 Neo-MoFox-Launcher/assets/images/icon.png \
+			debian/neo-mofox-launcher/usr/share/pixmaps/neo-mofox-launcher.png; \
+	fi
+
+	# 安装许可证
+	install -Dm644 LICENSE \
+		debian/neo-mofox-launcher/usr/share/doc/neo-mofox-launcher/copyright
+
+# Electron 二进制已预编译，无需 strip
+override_dh_strip:
+
+# Electron 内部已打包依赖库，跳过 shlibdeps 自动检测
+override_dh_shlibdeps:
