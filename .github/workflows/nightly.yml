@@ -383,38 +383,22 @@ jobs:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
           path: ppa/artifacts/*
 
-      - name: Configure SSH key for Launchpad SCP
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LAUNCHPAD_SSH_KEY }}" > ~/.ssh/launchpad_id_rsa
-          chmod 600 ~/.ssh/launchpad_id_rsa
-          # 写入 SSH 客户端配置，指定 Launchpad 使用该私钥
-          cat >> ~/.ssh/config << 'EOF'
-          Host ppa.launchpad.net
-            IdentityFile ~/.ssh/launchpad_id_rsa
-            StrictHostKeyChecking no
-            User ikun114
-          EOF
-          chmod 600 ~/.ssh/config
-          echo "SSH key configured for Launchpad."
-
-      - name: Configure dput for SCP
+      - name: Configure dput for HTTPS
         run: |
           cat > ~/.dput.cf << 'EOF'
-          [launchpad-scp]
+          [launchpad-https]
           fqdn = ppa.launchpad.net
           incoming = ~ikun114/ubuntu/neo-mofox-launcher/
-          method = scp
+          method = https
           allow_unsigned_uploads = 0
           run_lintian = 0
           EOF
           chmod 600 ~/.dput.cf
-          echo "dput profile configured: launchpad-scp"
+          echo "dput profile configured: launchpad-https"
 
       - name: Publish to Launchpad PPA
         run: |
           CHANGES_FILE="ppa/artifacts/neo-mofox-launcher_${{ needs.check-commits.outputs.version }}-1_source.changes"
           test -f "${CHANGES_FILE}"
-          dput launchpad-scp "${CHANGES_FILE}"
+          dput launchpad-https "${CHANGES_FILE}"
           echo "PPA upload submitted: ${CHANGES_FILE}"
