@@ -385,7 +385,7 @@ jobs:
 
       - name: Configure SSH key for Launchpad SCP
         run: |
-          mkdir -p ~/.ssh
+          mkdir -p ~/.ssh ~/bin
           chmod 700 ~/.ssh
           echo "${{ secrets.LAUNCHPAD_SSH_KEY }}" > ~/.ssh/launchpad_id_rsa
           chmod 600 ~/.ssh/launchpad_id_rsa
@@ -397,6 +397,13 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
           echo "SSH key configured for Launchpad."
+
+          # OpenSSH >= 9.0 的 scp 默认走 SFTP 模式，Launchpad 不支持 expand-path 扩展。
+          # 在 PATH 前置注入包装脚本，强制 scp 使用旧 SCP 协议（-O 标志）。
+          printf '#!/bin/sh\nexec /usr/bin/scp -O "$@"\n' > ~/bin/scp
+          chmod +x ~/bin/scp
+          echo "$HOME/bin" >> $GITHUB_PATH
+          echo "scp wrapper installed: $(cat ~/bin/scp)"
 
       - name: Configure dput for SCP
         run: |
