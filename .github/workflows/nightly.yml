@@ -17,6 +17,8 @@ jobs:
     outputs:
       has_new_commits: ${{ steps.check.outputs.has_new_commits }}
       build_date: ${{ steps.check.outputs.build_date }}
+      short_sha: ${{ steps.check.outputs.short_sha }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +28,13 @@ jobs:
       - name: Check for new commits in last 24 hours
         id: check
         run: |
-          BUILD_DATE=$(date +'%Y%m%d')
+          BUILD_DATE=$(date -u +'%Y%m%d')
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          VERSION="${BUILD_DATE}+${SHORT_SHA}"
+
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "has_new_commits=true" >> $GITHUB_OUTPUT
@@ -171,8 +178,7 @@ jobs:
           echo "Build output:"
           find dist -name "*.deb" -exec ls -lh {} \;
           find dist -name "*.AppImage" -exec ls -lh {} \;
-          
-          # 重命名 deb 文件
+
           DEB_FILE=$(find dist -name "*.deb" | head -1)
           if [ -n "$DEB_FILE" ]; then
             NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.deb"
@@ -181,8 +187,7 @@ jobs:
           else
             echo "WARNING: No .deb file found!"
           fi
-          
-          # 重命名 AppImage 文件
+
           APPIMAGE_FILE=$(find dist -name "*.AppImage" | head -1)
           if [ -n "$APPIMAGE_FILE" ]; then
             NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.AppImage"
@@ -263,7 +268,7 @@ jobs:
           > | `*-linux-arm64.deb` | Linux ARM64 deb 包 |
           > | `*-linux-arm64.AppImage` | Linux ARM64 AppImage |
           >
-          > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持。
+          > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持 。
           FOOTER
 
       - name: Delete existing nightly release (if any)
@@ -277,32 +282,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🧹 清理旧的每夜构建版本，保留最新的 6 个..."
-          
-          # 获取所有 nightly 版本的标签（按时间倒序，使用 JSON 格式更可靠）
+
           NIGHTLY_TAGS=$(gh release list --limit 100 --json tagName,isPrerelease,createdAt \
             --jq '.[] | select(.isPrerelease == true and (.tagName | startswith("nightly-"))) | .tagName' | sort -r)
-          
-          # 统计总数
+
           TOTAL_COUNT=$(echo "$NIGHTLY_TAGS" | wc -l)
           echo "📊 找到 $TOTAL_COUNT 个每夜构建版本"
-          
+
           if [ "$TOTAL_COUNT" -le 6 ]; then
             echo "✅ 版本数量 <= 6，无需清理"
             exit 0
           fi
-          
-          # 跳过前 6 个，删除剩余的
+
           TO_DELETE=$(echo "$NIGHTLY_TAGS" | tail -n +7)
           DELETE_COUNT=$(echo "$TO_DELETE" | wc -l)
           echo "🗑️  将删除 $DELETE_COUNT 个旧版本"
-          
+
           echo "$TO_DELETE" | while IFS= read -r tag; do
             if [ -n "$tag" ]; then
               echo "  删除: $tag"
               gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || echo "  ⚠️  删除失败: $tag"
             fi
           done
-          
+
           echo "✅ 清理完成"
 
       - name: Collect release files
@@ -322,3 +324,62 @@ jobs:
             --prerelease \
             release-files/*
           echo "✅ 发布完成: nightly-${{ env.BUILD_DATE }}"
+
+  # ============================================================
+  # 发布到 Launchpad PPA（新增，不影响原 nightly 构建）
+  # ============================================================
+  publish-ppa:
+    needs: check-commits
+    if: needs.check-commits.outputs.has_new_commits == 'true'
+    runs-on: ubuntu-latest
+    env:
+      DIST_TARGET: noble
+      PKG_REV: '1'
+      ARTIFACT_DIR: ppa/artifacts
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
+
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper dput gnupg wget curl unzip
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Build signed source package
+        env:
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          DEBFULLNAME: ikun114
+          DEBEMAIL: 334495606@qq.com
+        run: |
+          chmod +x ppa/prepare-source.sh
+          bash ppa/prepare-source.sh "${{ needs.check-commits.outputs.version }}"
+          ls -lh ppa/artifacts
+
+      - name: Upload ppa artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppa-source-${{ needs.check-commits.outputs.version }}
+          path: ppa/artifacts/*
+
+      - name: Publish to Launchpad PPA
+        run: |
+          CHANGES_FILE="ppa/artifacts/neo-mofox-launcher_${{ needs.check-commits.outputs.version }}-1_source.changes"
+          test -f "${CHANGES_FILE}"
+          dput ppa:ikun114/neo-mofox-launcher "${CHANGES_FILE}"
+          echo "PPA upload submitted: ${CHANGES_FILE}"

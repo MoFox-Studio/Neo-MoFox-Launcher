@@ -9,11 +9,12 @@
 #   5) 将 .changes/.dsc/.tar.* 等产物统一归档到指定目录
 #
 # 用法：
-#   bash ppa/prepare-source.sh <version> [electron_version]
+#   bash ppa/prepare-source.sh [version] [electron_version]
 #
 # 示例：
 #   bash ppa/prepare-source.sh v1.0.0
 #   bash ppa/prepare-source.sh 1.0.0 39.0.0
+#   bash ppa/prepare-source.sh
 
 set -euo pipefail
 
@@ -26,13 +27,14 @@ BUILD_ROOT="${BUILD_ROOT:-ppa/.build}"
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 if [ "${1:-}" = "" ]; then
-    echo "ERROR: 缺少版本号参数。"
-    echo "用法: bash ppa/prepare-source.sh <version> [electron_version]"
-    echo "示例: bash ppa/prepare-source.sh v1.0.0"
-    exit 1
+    BUILD_DATE_UTC="$(date -u +'%Y%m%d')"
+    SHORT_SHA="$(git rev-parse --short=6 HEAD)"
+    RAW_VERSION="${BUILD_DATE_UTC}+${SHORT_SHA}"
+    echo "INFO: 未传版本号，自动使用 nightly 版本: ${RAW_VERSION}"
+else
+    RAW_VERSION="$1"
 fi
 
-RAW_VERSION="$1"
 PKG_VERSION="${RAW_VERSION#v}"
 ELECTRON_VERSION_INPUT="${2:-}"
 
