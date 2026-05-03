@@ -681,6 +681,10 @@ class OobeService {
    * @returns {Promise<{success: boolean, error?: string}>}
    */
   async _runScript(cmd, args, onOutput = () => {}, needsSudo = false) {
+    // 保存原始命令用于日志显示
+    const originalCmd = cmd;
+    const originalArgs = args.slice();
+    
     // 如果需要 sudo 且在 Linux 平台
     if (needsSudo && platformHelper.isLinux) {
       // 检查是否已设置密码
@@ -698,7 +702,8 @@ class OobeService {
     }
 
     return new Promise((resolve) => {
-      onOutput(`[安装] 运行脚本: ${cmd} ${args.join(' ')}\n`);
+      // 使用原始命令进行日志输出，避免暴露密码
+      onOutput(`[安装] 运行脚本: ${needsSudo && platformHelper.isLinux ? 'sudo ' : ''}${originalCmd} ${originalArgs.join(' ')}\n`);
 
       const proc = spawn(cmd, args, {
         shell: platformHelper.config.shell,
