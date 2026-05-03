@@ -352,6 +352,7 @@ jobs:
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
+          # 使用标准 dput（FTP 匿名上传），不用 dput-ng（HTTPS 方法 Launchpad 不支持）
           sudo apt-get install -y devscripts debhelper dput gnupg wget curl unzip
 
       - name: Import GPG key
@@ -383,44 +384,25 @@ jobs:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
           path: ppa/artifacts/*
 
-      - name: Configure SSH key for Launchpad SCP
+      - name: Configure dput for FTP (force IPv4)
         run: |
-          mkdir -p ~/.ssh ~/bin
-          chmod 700 ~/.ssh
-          echo "${{ secrets.LAUNCHPAD_SSH_KEY }}" > ~/.ssh/launchpad_id_rsa
-          chmod 600 ~/.ssh/launchpad_id_rsa
-          cat >> ~/.ssh/config << 'EOF'
-          Host ppa.launchpad.net
-            IdentityFile ~/.ssh/launchpad_id_rsa
-            StrictHostKeyChecking no
-            User ikun114
-          EOF
-          chmod 600 ~/.ssh/config
-          echo "SSH key configured for Launchpad."
-
-          # OpenSSH >= 9.0 的 scp 默认走 SFTP 模式，Launchpad 不支持 expand-path 扩展。
-          # 在 PATH 前置注入包装脚本，强制 scp 使用旧 SCP 协议（-O 标志）。
-          printf '#!/bin/sh\nexec /usr/bin/scp -O "$@"\n' > ~/bin/scp
-          chmod +x ~/bin/scp
-          echo "$HOME/bin" >> $GITHUB_PATH
-          echo "scp wrapper installed: $(cat ~/bin/scp)"
-
-      - name: Configure dput for SCP
-        run: |
+          # GitHub Actions 跑在 Azure 上，IPv6 出方向路由不稳定，强制 IPv4
+          echo 'precedence ::ffff:0:0/96  100' | sudo tee -a /etc/gai.conf
           cat > ~/.dput.cf << 'EOF'
-          [launchpad-scp]
+          [launchpad-ppa]
           fqdn = ppa.launchpad.net
           incoming = ~ikun114/ubuntu/neo-mofox-launcher/
-          method = scp
+          method = ftp
+          login = anonymous
           allow_unsigned_uploads = 0
           run_lintian = 0
           EOF
           chmod 600 ~/.dput.cf
-          echo "dput profile configured: launchpad-scp"
+          echo "dput profile configured: launchpad-ppa (FTP, IPv4)"
 
       - name: Publish to Launchpad PPA
         run: |
           CHANGES_FILE="ppa/artifacts/neo-mofox-launcher_${{ needs.check-commits.outputs.version }}-1_source.changes"
           test -f "${CHANGES_FILE}"
-          dput launchpad-scp "${CHANGES_FILE}"
+          dput launchpad-ppa "${CHANGES_FILE}"
           echo "PPA upload submitted: ${CHANGES_FILE}"
