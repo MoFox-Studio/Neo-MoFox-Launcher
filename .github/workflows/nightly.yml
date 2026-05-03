@@ -389,19 +389,17 @@ jobs:
         run: |
           # upload.launchpad.net 是 Launchpad 官方 HTTPS 上传端点（port 443）
           # ppa.launchpad.net 是 FTP 端点（port 21，GitHub Actions 封锁）
-          mkdir -p ~/.dput.d
-          cat > ~/.dput.d/launchpad-ppa.json << 'EOF'
-          {
-            "launchpad-ppa": {
-              "fqdn": "upload.launchpad.net",
-              "incoming": "~ikun114/ubuntu/neo-mofox-launcher/",
-              "method": "https",
-              "login": "ikun114",
-              "allow_unsigned_uploads": false,
-              "run_lintian": false
-            }
-          }
-          EOF
+          # dput-ng 支持 INI 格式的 ~/.dput.cf，比 ~/.dput.d/*.json 更可靠
+          cat > ~/.dput.cf << 'EOF'
+[launchpad-ppa]
+fqdn = upload.launchpad.net
+incoming = ~ikun114/ubuntu/neo-mofox-launcher/
+method = https
+login = ikun114
+allow_unsigned_uploads = 0
+run_lintian = 0
+EOF
+          chmod 600 ~/.dput.cf
           echo "dput-ng profile configured: launchpad-ppa (HTTPS, upload.launchpad.net)"
 
       - name: Publish to Launchpad PPA
