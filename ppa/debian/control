@@ -1,0 +1,34 @@
+Source: neo-mofox-launcher
+Section: utils
+Priority: optional
+Maintainer: ikun114 <334495606@qq.com>
+Build-Depends: debhelper-compat (= 13),
+               nodejs (>= 18),
+               npm,
+               unzip
+Standards-Version: 4.6.2
+Homepage: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher>
+Vcs-Git: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher.git>
+Vcs-Browser: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher>
+Rules-Requires-Root: no
+
+Package: neo-mofox-launcher
+Architecture: amd64
+Depends: ${misc:Depends},
+         libgtk-3-0,
+         libnotify4,
+         libnss3,
+         libasound2 | libasound2t64,
+         libxss1,
+         libgbm1,
+         python3,
+         git
+Recommends: uv
+Description: An elegant instance management launcher for Neo-MoFox QQ Bot
+ Neo-MoFox Launcher is a Material Design 3 style Electron application
+ for managing Neo-MoFox QQ Bot instances. It provides an intuitive
+ graphical interface for installing, configuring, and running bot
+ instances.
+ .
+ 一个优雅的 Neo-MoFox QQ 机器人实例管理启动器，提供直观的图形界面
+ 用于安装、配置和运行机器人实例。
