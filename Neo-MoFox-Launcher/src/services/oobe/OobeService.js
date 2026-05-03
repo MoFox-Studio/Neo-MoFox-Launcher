@@ -91,7 +91,7 @@ const DOWNLOAD_META = {
       scriptCmd: 'powershell',
       scriptArgs: [
         '-ExecutionPolicy', 'Bypass', '-NoProfile', '-NonInteractive',
-        '-Command', 'irm https://astral.sh/uv/install.ps1 | iex',
+        '-Command', '"irm https://astral.sh/uv/install.ps1 | iex"',
       ],
     },
     linux: {
