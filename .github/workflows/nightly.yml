@@ -326,8 +326,14 @@ jobs:
           echo "✅ 发布完成: nightly-${{ env.BUILD_DATE }}"
 
   # ============================================================
-  # 发布到 Launchpad PPA（新增，不影响原 nightly 构建）
+  # 构建 PPA 源码包产物（供 Launchpad Build Recipe 使用或手动上传）
   # ============================================================
+  # Launchpad PPA 上传只支持 FTP(21)/SSH(22)，两者在 GitHub Actions (Azure) 上均被封锁。
+  # 解决方案：使用 Launchpad Build Recipe，让 Launchpad 主动拉取 GitHub 仓库构建，
+  # 完全不需要从 CI 上传任何东西。
+  # 设置步骤见 ppa/README.md → "Launchpad Build Recipe" 章节。
+  #
+  # 此 job 仅构建并归档签名源码包，供需要手动上传时使用（本地 TUN 模式梯子 + dput）。
   publish-ppa:
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
@@ -352,9 +358,7 @@ jobs:
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
-          # dput-ng 支持 HTTPS（port 443），FTP(21)/SCP(22) 在 GitHub Actions 上均被封锁
-          # HTTPS 上传端点：upload.launchpad.net（非 ppa.launchpad.net）
-          sudo apt-get install -y devscripts debhelper dput-ng gnupg wget curl unzip
+          sudo apt-get install -y devscripts debhelper gnupg wget curl unzip
 
       - name: Import GPG key
         id: import_gpg
@@ -367,7 +371,6 @@ jobs:
       - name: Export GPG fingerprint for packaging
         run: |
           echo "GPG_FINGERPRINT=${{ steps.import_gpg.outputs.fingerprint }}" >> $GITHUB_ENV
-          echo "Using GPG fingerprint: ${{ steps.import_gpg.outputs.fingerprint }}"
 
       - name: Build signed source package
         env:
@@ -384,19 +387,3 @@ jobs:
         with:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
           path: ppa/artifacts/*
-
-      - name: Configure dput for HTTPS
-        run: |
-          # upload.launchpad.net 是 Launchpad 官方 HTTPS 上传端点（port 443）
-          # ppa.launchpad.net 是 FTP 端点（port 21，GitHub Actions 封锁）
-          # 用 printf 避免 heredoc 与 YAML 缩进冲突
-          printf '[launchpad-ppa]\nfqdn = upload.launchpad.net\nincoming = ~ikun114/ubuntu/neo-mofox-launcher/\nmethod = https\nlogin = ikun114\nallow_unsigned_uploads = 0\nrun_lintian = 0\n' > ~/.dput.cf
-          chmod 600 ~/.dput.cf
-          echo "dput-ng profile configured: launchpad-ppa (HTTPS, upload.launchpad.net)"
-
-      - name: Publish to Launchpad PPA
-        run: |
-          CHANGES_FILE="ppa/artifacts/neo-mofox-launcher_${{ needs.check-commits.outputs.version }}-1_source.changes"
-          test -f "${CHANGES_FILE}"
-          dput launchpad-ppa "${CHANGES_FILE}"
-          echo "PPA upload submitted: ${CHANGES_FILE}"

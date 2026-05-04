@@ -120,3 +120,73 @@ bash ppa/prepare-source.sh 39.0.0
 | `/usr/share/applications/neo-mofox-launcher.desktop` | 桌面快捷方式 |
 | `/usr/share/pixmaps/neo-mofox-launcher.png` | 应用图标 |
 | `/usr/share/doc/neo-mofox-launcher/copyright` | 许可证文件 |
+
+---
+
+## 为什么 CI 无法自动上传 / 本地梯子无效
+
+Launchpad PPA **只接受 FTP (端口 21) 或 SSH/SCP (端口 22) 上传**，两种协议均存在以下问题：
+
+- **GitHub Actions (Azure)**：Azure 云出方向封锁了端口 21 和 22，CI 无法连接 `ppa.launchpad.net`
+- **国内梯子无效**：Clash / v2ray 等工具默认是 HTTP/SOCKS5 **应用层代理**，FTP 和 SSH 流量不经过代理通道；需要开启 **TUN 模式（透明代理）** 或使用 `proxychains4`
+
+### 本地手动上传（开启 TUN 模式后）
+
+```bash
+# 梯子开启 TUN 模式（Clash: 虚拟网卡模式 / TUN）后执行
+# 从 GitHub Actions Artifacts 下载 .changes 文件后：
+dput ppa:ikun114/neo-mofox-launcher neo-mofox-launcher_VERSION-1_source.changes
+```
+
+---
+
+## Launchpad Build Recipe（推荐的 CI 自动化方案）
+
+此方案让 **Launchpad 主动拉取** GitHub 仓库代码来构建，完全不需要从 CI 端上传任何文件，彻底绕开端口封锁问题。
+
+### 工作原理
+
+```
+GitHub main 分支有新提交
+       ↓
+Launchpad 检测到更新（自动轮询）
+       ↓
+Launchpad 按 Recipe 生成源码包
+       ↓
+Launchpad 构建 .deb 并发布到 PPA
+```
+
+### 配置步骤
+
+**第一步：在 Launchpad 导入 GitHub 仓库**
+
+1. 登录 <https://launchpad.net/~ikun114>
+2. 进入 <https://code.launchpad.net/+new-git-repository>（或通过 Code → Import 创建）
+3. 选择 "Import a Git repository"，填入：
+   - URL: `https://github.com/MoFox-Studio/Neo-MoFox-Launcher`
+   - Target: `~ikun114/neo-mofox-launcher`
+
+**第二步：创建 Build Recipe**
+
+进入 <https://code.launchpad.net/~ikun114/neo-mofox-launcher/+git/main/+new-recipe>，填写：
+
+- **Recipe name**: `neo-mofox-launcher-nightly`
+- **PPA**: `~ikun114/neo-mofox-launcher`
+- **Distribution**: `Ubuntu Noble (24.04)`
+- **Build daily**: 勾选（每天自动检测并构建）
+- **Recipe text**:
+
+```
+# git-build-recipe format 0.4 deb-version {debupstream}+git{date}
+lp:~ikun114/neo-mofox-launcher
+```
+
+**第三步：确认 GPG 密钥已上传至 Launchpad**
+
+Recipe 构建不需要你的 GPG 密钥——Launchpad 使用自己的 build key 签名。
+
+### 注意事项
+
+- Recipe 方案中 `ppa/debian/` 目录需保持在仓库中（Launchpad 会读取它）
+- `debian/rules` 中的 `dh_auto_build` 需能在 Launchpad 构建环境内运行（有网络，但无法访问 GitHub Release 下载 Electron）
+- 如果 Electron 下载依赖网络，需预先将 Electron 打包进 orig.tar.gz 或改为依赖系统 `electron` 包
