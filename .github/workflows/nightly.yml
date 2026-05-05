@@ -421,6 +421,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
+      SHORT_SHA: ${{ needs.check-commits.outputs.short_sha }}
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
@@ -471,7 +472,7 @@ jobs:
         if: steps.check_secrets.outputs.configured == 'true'
         run: |
           chmod +x copr/build-srpm.sh
-          ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" ./copr-srpm
+          ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" "$SHORT_SHA" ./copr-srpm
           ls -lh ./copr-srpm
 
       - name: 配置 copr-cli 凭据

@@ -4,8 +4,8 @@
 #
 # 使用方式：
 #   1) 在 GitHub Actions 中调用（推荐，自动从 release 拉 RPM）：
-#        ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" "$OUTDIR"
-#      其中 BUILD_DATE 为日期字符串（例如 20260506），OUTDIR 是 SRPM 输出目录。
+#        ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" "$SHORT_SHA" "$OUTDIR"
+#      生成的 RPM Version 会是 "${BUILD_DATE}.${SHORT_SHA}" （例如 20260506.a1b2c3）。
 #
 #   2) Copr "Custom" 源构建模式调用：
 #        Copr 会传入 outdir 参数。
@@ -14,10 +14,18 @@
 set -euo pipefail
 
 NIGHTLY_DATE="${1:-${BUILD_DATE:-$(date -u +%Y%m%d)}}"
-OUTDIR="${2:-${RESULTDIR:-./copr-srpm}}"
+SHORT_SHA="${2:-${SHORT_SHA:-}}"
+OUTDIR="${3:-${RESULTDIR:-./copr-srpm}}"
 ARCH="${ARCH:-x86_64}"
 REPO_OWNER="${REPO_OWNER:-MoFox-Studio}"
 REPO_NAME="${REPO_NAME:-Neo-MoFox-Launcher}"
+
+# RPM Version 只允许字母数字 . _ ~ ^，用 "." 拼接
+if [ -n "$SHORT_SHA" ]; then
+    PKG_VERSION="${NIGHTLY_DATE}.${SHORT_SHA}"
+else
+    PKG_VERSION="${NIGHTLY_DATE}"
+fi
 
 case "$ARCH" in
     x86_64) UPSTREAM_ARCH=x64 ;;
@@ -42,13 +50,14 @@ mkdir -p "${RPMBUILD_ROOT}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 cp "${WORKDIR}/Neo-MoFox-Launcher-upstream.rpm" "${RPMBUILD_ROOT}/SOURCES/Neo-MoFox-Launcher-upstream.rpm"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cp "${SCRIPT_DIR}/neo-mofox-launcher.spec" "${RPMBUILD_ROOT}/SPECS/"
+# 把占位符替换为真实版本号，使其永久写入 spec —— 这样 Copr 在重建 SRPM 时也能拿到正确版本
+sed "s/@@PKG_VERSION@@/${PKG_VERSION}/g" \
+    "${SCRIPT_DIR}/neo-mofox-launcher.spec" \
+    > "${RPMBUILD_ROOT}/SPECS/neo-mofox-launcher.spec"
 
-echo "[build-srpm] 正在打包 SRPM..."
+echo "[build-srpm] 正在打包 SRPM（Version=${PKG_VERSION}）..."
 rpmbuild \
     --define "_topdir ${RPMBUILD_ROOT}" \
-    --define "nightly_date ${NIGHTLY_DATE}" \
-    --define "upstream_arch ${ARCH}" \
     -bs "${RPMBUILD_ROOT}/SPECS/neo-mofox-launcher.spec"
 
 cp "${RPMBUILD_ROOT}/SRPMS/"*.src.rpm "$OUTDIR/"
