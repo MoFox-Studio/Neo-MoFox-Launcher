@@ -33,24 +33,28 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 ## ✨ 特性
 
 ### 🎨 安装向导
+
 - **环境自动检测** - 检查 Python、Git、uv 等必备工具（自动安装规划中）
 - **智能配置** - 引导式填写 QQ 号、API Key、端口等信息
 - **一站式部署** - 自动克隆仓库、创建虚拟环境、安装依赖
 - **NapCat 集成** - 自动下载并配置 NapCat QQ 客户端
 
 ### 🎛️ 实例管理
+
 - **实例卡片视图** - 直观展示所有机器人实例
 - **状态实时监控** - 运行中、已停止、安装中等状态一目了然
 - **快速操作** - 启动、停止、重启、编辑、删除实例
 - **自定义描述** - 为每个实例添加备注说明
 
 ### 🔧 进程管理
+
 - **生命周期管理** - 启动、停止、重启机器人进程
 - **崩溃自动恢复** - 进程异常退出时自动重启
 - **日志管理** - 完整的运行日志记录与查看
 - **性能监控** - 实时显示 CPU、内存使用情况
 
 ### 📡 版本管理
+
 - **双分支支持** - main（稳定版）和 dev（开发版）
 - **一键切换** - 轻松在不同版本间切换（规划中）
 - **自动更新检测** - 定期检查并提示可用更新（规划中）
@@ -67,7 +71,7 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
   - Python 3.11+
   - Git
   - uv (Python 包管理器)
-- **硬件**: 
+- **硬件**:
   - 至少 4GB RAM
   - 2GB 可用磁盘空间
 
@@ -79,6 +83,7 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 
 1. 访问 [Node.js 官网](https://nodejs.org/) 下载并安装 **LTS 版本**（推荐 18.x 或更高版本）
 2. 安装完成后，打开命令行验证：
+
    ```bash
    node --version  # 应显示 v18.x.x 或更高
    npm --version   # 应显示 npm 版本号
@@ -115,7 +120,7 @@ npm start
 
 1. **环境检测** - 程序会自动检测必备工具是否安装
    - 如有缺失，请按提示安装相关工具
-   
+
 2. **配置实例** - 填写第一个机器人实例的信息
    - 实例名称
    - QQ 号码
@@ -154,15 +159,18 @@ npm start
 ### 管理实例
 
 #### 查看实例详情
+
 - 点击实例卡片上的 **"启动"** 按钮
 - 进入实例详情页，查看运行状态和日志
 
 #### 编辑实例
+
 - 点击实例卡片上的 **"设置"** 按钮
 - 可修改实例名称和描述
 - **注意**: 核心配置（QQ号、端口等）需手动编辑配置文件
 
 #### 删除实例
+
 - 在编辑窗口中点击 **"删除实例"** 按钮
 - 确认后将删除实例记录及所有文件
 - **警告**: 此操作不可撤销！
@@ -174,9 +182,96 @@ npm start
 - **启动/停止** - 控制机器人的运行状态
 - **重启** - 快速重启机器人进程
 - **查看日志** - 实时查看运行日志和错误信息
+
 ---
 
-## 🛠️ 开发
+## � 命令行模式（Linux 服务器 / 无桌面环境）
+
+启动器内置了纯 Node.js 命令行入口，**不依赖 Electron GUI**，适用于无桌面环境的 Linux 服务器，
+可完整管理实例的**安装、启动、停止与查看**。
+
+### 入口
+
+- 通过 PPA / AUR 安装时：`neo-mofox-cli` 或 `neo-mofox-launcher --cli ...`
+- 从源码运行：`npm run cli -- <command>` 或直接 `node Neo-MoFox-Launcher/src/cli/index.js <command>`
+
+### 常用命令
+
+```bash
+# 检查环境（Python / uv / git）
+neo-mofox-cli env-check
+
+# 安装新实例（交互式）
+neo-mofox-cli install
+
+# 安装新实例（无人值守，从 JSON 配置文件读取）
+neo-mofox-cli install --config ./bot.json --non-interactive
+
+# 列出所有实例
+neo-mofox-cli list
+
+# 查看实例详情
+neo-mofox-cli info <实例ID或名称>
+
+# 前台启动（Ctrl+C 退出即停止）
+neo-mofox-cli start <实例ID或名称>
+
+# 后台守护启动（日志写入文件）
+neo-mofox-cli start <实例ID或名称> --detach
+
+# 停止后台运行的实例
+neo-mofox-cli stop <实例ID或名称>
+
+# 查看运行状态
+neo-mofox-cli status
+
+# 查看 CLI 守护模式日志（仅 --detach 启动时生成）
+neo-mofox-cli logs <实例ID或名称> --follow --lines=500
+
+# 删除实例（连同文件与日志，需要确认）
+neo-mofox-cli delete <实例ID或名称> --yes
+
+# 查看数据目录路径
+neo-mofox-cli data-dir
+```
+
+### 安装配置文件示例（JSON）
+
+```json
+{
+  "instanceName":   "my-bot",
+  "qqNumber":       "123456789",
+  "qqNickname":     "小狐",
+  "ownerQQNumber":  "10000",
+  "apiKey":         "sk-xxxx",
+  "webuiApiKey":    "webui-xxxx",
+  "wsPort":         8095,
+  "installDir":     "/srv/neo-mofox",
+  "channel":        "main",
+  "pythonCmd":      "python3"
+}
+```
+
+> Linux/macOS 不支持自动安装 NapCat，`install` 会自动跳过 `napcat / napcat-config`
+> 步骤；请自行部署 NapCat 并连接到上面的 `wsPort`。
+>
+> 安装失败可重新执行 `install` 进行**断点续装**（实例 ID 由 QQ 号唯一确定）。
+
+### 全局参数
+
+- `--data-dir <path>` 指定数据目录（默认 `~/.config/Neo-MoFox-Launcher`，
+  与 GUI 共用，等价于环境变量 `NEO_MOFOX_LAUNCHER_DATA`）
+- `--json` 让 `list` / `status` / `info` / `env-check` 输出 JSON 便于脚本解析
+
+### 注意事项
+
+- CLI 与 GUI 共用 `instances.json`，运行 PID 文件位于 `<dataDir>/cli/`，
+  互不冲突；同一个实例同一时刻只能由其中一方启动。
+- 通过 CLI 安装的实例可被 GUI 直接识别和管理，反之亦然。
+
+---
+
+## �🛠️ 开发
 
 ### 开发环境搭建
 
@@ -247,17 +342,21 @@ Neo-MoFox-Launcher/
 ### 技术栈
 
 **核心框架**
+
 - [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架
 - Node.js 18+ - JavaScript 运行时
 
 **依赖库**
+
 - [@iarna/toml](https://www.npmjs.com/package/@iarna/toml) - TOML 配置文件读写
 - [tree-kill](https://www.npmjs.com/package/tree-kill) - 进程树管理
 
 **构建工具**
+
 - [electron-builder](https://www.electron.build/) - 应用打包与分发（NSIS 安装器）
 
 **UI 设计**
+
 - Material Design 3 - 设计系统
 - Material Symbols - 图标字体
 - CSS Variables - 动态主题
@@ -286,6 +385,7 @@ npm run build:linux:arm64
 构建产物会输出到 `dist/` 目录。
 
 **Windows 安装包特性：**
+
 - NSIS 安装向导，支持自定义安装路径
 - 自动创建桌面快捷方式
 - 同时生成便携版（portable）
@@ -399,6 +499,7 @@ window.customConfirm(message, title)
 ### 如何备份配置？
 
 备份以下目录即可：
+
 - `%APPDATA%\Neo-MoFox-Launcher\` - 启动器数据
 - 你的实例安装目录 - 机器人配置和数据
 
@@ -430,9 +531,9 @@ by the Free Software Foundation, either version 3 of the License, or
 
 ## 📮 联系我们
 
-- **项目主页**: https://github.com/MoFox-Studio/Neo-MoFox-Launcher
-- **Issue 追踪**: https://github.com/MoFox-Studio/Neo-MoFox-Launcher/issues
-- **讨论区**: https://github.com/MoFox-Studio/Neo-MoFox-Launcher/discussions
+- **项目主页**: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher>
+- **Issue 追踪**: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher/issues>
+- **讨论区**: <https://github.com/MoFox-Studio/Neo-MoFox-Launcher/discussions>
 
 ---
 

@@ -4,10 +4,14 @@
   "version": "1.0.0",
   "description": "Neo-MoFox Launcher - Material Design 3 Style",
   "main": "src/main.js",
+  "bin": {
+    "neo-mofox-cli": "src/cli/index.js"
+  },
   "scripts": {
     "start": "chcp 65001 & electron .",
     "start:win": "chcp 65001 >nul 2>&1 & electron .",
     "start:linux": "electron .",
+    "cli": "node src/cli/index.js",
     "dev": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:linux": "electron . --dev",

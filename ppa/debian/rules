@@ -36,6 +36,10 @@ override_dh_auto_install:
 	install -Dm755 debian/neo-mofox-launcher.sh \
 		debian/neo-mofox-launcher/usr/bin/neo-mofox-launcher
 
+	# 安装 CLI 命令行包装脚本（无桌面环境亦可使用）
+	install -Dm755 debian/neo-mofox-cli.sh \
+		debian/neo-mofox-launcher/usr/bin/neo-mofox-cli
+
 	# 安装桌面快捷方式
 	install -Dm644 aur/neo-mofox-launcher.desktop \
 		debian/neo-mofox-launcher/usr/share/applications/neo-mofox-launcher.desktop

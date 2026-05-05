@@ -1,10 +1,23 @@
 /**
  * StorageService - 数据持久化服务
  * 管理 Launcher 全局状态、实例记录表及 TOML 配置写入
+ *
+ * 兼容性：在 Electron 主进程与纯 Node.js（CLI）环境下均可工作。
+ * 当 electron 不可用时（CLI），使用与 electron 行为一致的 appData 目录解析。
  */
 
-const { app } = require('electron');
+// 在纯 Node 环境（CLI）下 require('electron') 会拿到字符串路径而非对象，
+// 因此延迟解析 app，并在不可用时 fallback。
+let _electronApp = null;
+try {
+  const electron = require('electron');
+  if (electron && typeof electron === 'object' && electron.app && typeof electron.app.getPath === 'function') {
+    _electronApp = electron.app;
+  }
+} catch (_) { /* electron 不可用：CLI 模式 */ }
+
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const TOML = require('@iarna/toml');
 
@@ -12,6 +25,23 @@ const TOML = require('@iarna/toml');
 
 const INSTANCES_VERSION = 2;
 const INSTANCES_FILE = 'instances.json';
+const APP_NAME = 'Neo-MoFox-Launcher';
+
+/**
+ * 在没有 electron.app 时，按平台返回 appData 等价目录
+ */
+function _fallbackAppDataDir() {
+  if (process.platform === 'linux') {
+    const xdg = process.env.XDG_CONFIG_HOME;
+    const base = xdg && xdg.trim() ? xdg : path.join(os.homedir(), '.config');
+    return base;
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support');
+  }
+  // win32
+  return process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+}
 
 // ─── StorageService 类 ──────────────────────────────────────────────────
 
@@ -38,9 +68,10 @@ class StorageService {
     else if (process.env.NEO_MOFOX_LAUNCHER_DATA) {
       this._dataDir = process.env.NEO_MOFOX_LAUNCHER_DATA;
     }
-    // 3. 默认值
+    // 3. 默认值（electron app.getPath / 等价 fallback）
     else {
-      this._dataDir = path.join(app.getPath('appData'), 'Neo-MoFox-Launcher');
+      const appDataBase = _electronApp ? _electronApp.getPath('appData') : _fallbackAppDataDir();
+      this._dataDir = path.join(appDataBase, APP_NAME);
     }
 
     return this._dataDir;

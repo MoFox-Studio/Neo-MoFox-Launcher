@@ -153,6 +153,7 @@ cp ppa/debian/rules               "${BUILD_DIR}/debian/"
 cp ppa/debian/changelog           "${BUILD_DIR}/debian/"
 cp ppa/debian/copyright           "${BUILD_DIR}/debian/"
 cp ppa/debian/neo-mofox-launcher.sh "${BUILD_DIR}/debian/"
+cp ppa/debian/neo-mofox-cli.sh      "${BUILD_DIR}/debian/"
 cp ppa/debian/source/format       "${BUILD_DIR}/debian/source/"
 
 # debian/rules 必须有执行权限
