@@ -195,6 +195,10 @@ npm start
 - 通过 PPA / AUR 安装时：`neo-mofox-cli` 或 `neo-mofox-launcher --cli ...`
 - 从源码运行：`npm run cli -- <command>` 或直接 `node Neo-MoFox-Launcher/src/cli/index.js <command>`
 
+> 在交互式终端下，直接运行 `neo-mofox-cli`（不带任何参数）会进入 **TUI 主菜单**：
+> 使用 ↑/↓ 方向键选择，Enter 确定，Esc 取消，类似 NapCat / whiptail 的体验。
+> 加 `--no-tui` 可强制回退到普通行模式。
+
 ### 常用命令
 
 ```bash

@@ -34,6 +34,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { resolveDataDir } = require('./dataDir');
+const tui = require('./tui');
 
 // ─── 通用工具 ────────────────────────────────────────────────────────────
 
@@ -203,8 +204,11 @@ function cmdHelp() {
   info <id|name>             显示实例详情
   env-check                  检测 Python / uv / git 等环境是否就绪
   install [--config <path>] [--non-interactive]
-                             安装新实例：默认交互式；指定 --config 时
-                             从 JSON 文件读取所有字段（无人值守）
+                             安装新实例：默认交互式（TUI 方向键导航）；
+                             指定 --config 时从 JSON 文件读取所有字段（无人值守）
+                             追加 --no-tui 强制使用普通行模式
+  menu                       打开 TUI 主菜单（直接运行 \`neo-mofox-cli\`，
+                             在交互式终端下也会自动打开）
   start <id|name> [--detach] 启动实例（默认前台；--detach 后台守护）
   stop <id|name>             停止后台运行的实例
   status [id|name]           查看运行状态
@@ -593,12 +597,103 @@ function ask(rl, prompt, { defaultValue, required = false, validator } = {}) {
 }
 
 async function collectInstallInputsInteractive() {
+  // 优先使用 TUI（方向键 + Enter）；终端不支持时退回 readline 行模式
+  if (tui.isTTY() && !hasFlag('--no-tui')) {
+    return collectInstallInputsTUI();
+  }
+  return collectInstallInputsReadline();
+}
+
+async function collectInstallInputsTUI() {
+  const isLinuxLike = process.platform !== 'win32';
+  const fields = [
+    { key: 'instanceName', title: '实例名称', prompt: '为这个实例起个名字（1-32 字符）',
+      validator: (v) => v && v.length >= 1 && v.length <= 32 ? null : '长度应为 1-32 字符' },
+    { key: 'qqNumber', title: 'Bot QQ 号', prompt: '机器人登录使用的 QQ 号',
+      validator: (v) => /^\d{5,12}$/.test(v) ? null : '应为 5-12 位纯数字' },
+    { key: 'qqNickname', title: 'Bot QQ 昵称', prompt: '机器人的昵称',
+      validator: (v) => v && v.trim() ? null : '昵称不能为空' },
+    { key: 'ownerQQNumber', title: '管理员 QQ 号', prompt: '拥有最高权限的管理员 QQ',
+      validator: (v) => /^\d{5,12}$/.test(v) ? null : '应为 5-12 位纯数字' },
+    { key: 'apiKey', title: 'LLM API Key', prompt: '大模型 API Key（必填）', mask: true,
+      validator: (v) => v && v.trim() ? null : 'API Key 不能为空' },
+    { key: 'webuiApiKey', title: 'WebUI API Key', prompt: 'WebUI 访问密钥（可留空）', defaultValue: '' },
+    { key: 'wsPort', title: 'WebSocket 端口', prompt: 'NapCat 反向 WS 端口（1024-65535）',
+      defaultValue: '8095',
+      validator: (v) => {
+        const n = parseInt(v, 10);
+        return (!isNaN(n) && n >= 1024 && n <= 65535) ? null : '端口应在 1024-65535 之间';
+      } },
+    { key: 'installDir', title: '安装路径', prompt: '机器人将被安装到此目录（不要含中文/空格）',
+      defaultValue: isLinuxLike ? '/opt/neo-mofox' : 'C:\\NeoMofox',
+      validator: (v) => {
+        if (!v || !v.trim()) return '路径不能为空';
+        if (/[\u4e00-\u9fa5\s]/.test(v)) return '不应包含中文或空格';
+        return null;
+      } },
+    { key: 'channel', title: '版本分支', prompt: '使用 main（稳定）或 dev（开发）',
+      defaultValue: 'main',
+      validator: (v) => v === 'main' || v === 'dev' ? null : '只能填 main 或 dev' },
+    { key: 'pythonCmd', title: 'Python 命令', prompt: 'PATH 中可调用的 Python 命令',
+      defaultValue: isLinuxLike ? 'python3' : 'python' },
+  ];
+
+  const result = {};
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    // 显示进度提示
+    const value = await tui.inputBox({
+      title: `${f.title}  (${i + 1}/${fields.length})`,
+      prompt: f.prompt,
+      defaultValue: f.defaultValue !== undefined ? f.defaultValue : '',
+      mask: !!f.mask,
+      validator: f.validator,
+    });
+    if (value === null) {
+      // Esc 取消：询问是否真的取消
+      const giveUp = await tui.confirm({
+        title: '取消安装？',
+        message: '已填写的内容将被丢弃。\n确定取消安装吗？',
+        defaultYes: false,
+        yesLabel: '取消安装', noLabel: '继续填写',
+      });
+      if (giveUp) return null;
+      // 不取消：退回上一字段
+      i = i - 1; // for++ 后会重做当前 i
+      continue;
+    }
+    result[f.key] = value;
+  }
+
+  // 二次确认
+  const confirmMsg =
+    `实例名称:    ${result.instanceName}\n` +
+    `Bot QQ:      ${result.qqNumber} (${result.qqNickname})\n` +
+    `管理员 QQ:   ${result.ownerQQNumber}\n` +
+    `WS 端口:     ${result.wsPort}\n` +
+    `安装路径:    ${result.installDir}\n` +
+    `分支:        ${result.channel}\n` +
+    `Python:      ${result.pythonCmd}`;
+  const ok = await tui.confirm({
+    title: '确认安装信息',
+    message: confirmMsg,
+    defaultYes: true,
+    yesLabel: '开始安装', noLabel: '取消',
+  });
+  if (!ok) return null;
+
+  return {
+    ...result,
+    wsPort: parseInt(result.wsPort, 10),
+  };
+}
+
+async function collectInstallInputsReadline() {
   const rl = createReadline();
   console.log('请按提示填写实例信息（带 * 为必填，按回车使用默认值）');
   console.log('');
 
   try {
-    const isDigits = (msg) => (v) => (/^\d+$/.test(v) ? null : msg);
     const inRange = (lo, hi, msg) => (v) => {
       const n = parseInt(v, 10);
       if (isNaN(n) || n < lo || n > hi) return msg;
@@ -670,6 +765,10 @@ async function cmdInstall() {
       process.exit(1);
     }
     inputs = await collectInstallInputsInteractive();
+    if (inputs === null) {
+      console.log('已取消安装。');
+      return;
+    }
   }
 
   // 默认值与 Linux 适配：自动剔除 napcat 步骤（不支持自动安装）
@@ -754,16 +853,21 @@ async function cmdDelete(idOrName) {
       console.error('非交互式终端，请追加 --yes 确认删除。');
       process.exit(1);
     }
-    const rl = createReadline();
-    try {
-      const ans = await new Promise((resolve) =>
-        rl.question(`确认删除实例 "${inst.name || inst.id}" 及其文件？输入 yes 继续: `, resolve));
-      if ((ans || '').trim().toLowerCase() !== 'yes') {
-        console.log('已取消。');
-        return;
-      }
-    } finally {
-      rl.close();
+    const ok = await tui.confirm({
+      title: '删除实例',
+      message: `确认删除实例「${inst.extra?.displayName || inst.name || inst.id}」？\n` +
+               `ID: ${inst.id}\n` +
+               `这将删除以下内容：\n` +
+               `  • neo-mofox 与 napcat 文件夹\n` +
+               `  • 实例日志\n` +
+               `  • instances.json 中的记录\n` +
+               `此操作不可撤销。`,
+      defaultYes: false,
+      yesLabel: '删除', noLabel: '取消',
+    });
+    if (!ok) {
+      console.log('已取消。');
+      return;
     }
   }
 
@@ -772,17 +876,121 @@ async function cmdDelete(idOrName) {
   console.log('[CLI] 实例已删除。');
 }
 
+// ─── 主菜单（TUI 入口） ─────────────────────────────────────────────────
+
+async function cmdMenu() {
+  if (!tui.isTTY()) {
+    console.error('TUI 主菜单需要交互式终端。请使用具体子命令，详见 `neo-mofox-cli help`。');
+    process.exit(1);
+  }
+  // 不退出循环，直到用户选择"退出"
+  while (true) {
+    const action = await tui.selectMenu({
+      title: 'Neo-MoFox Launcher',
+      footer: '↑/↓ 选择   Enter 确定   Esc 退出',
+      items: [
+        { label: '🔍  环境检查 (env-check)',          value: 'env-check' },
+        { label: '✨  安装新实例 (install)',          value: 'install' },
+        { label: '📋  查看实例列表 (list)',           value: 'list' },
+        { label: '▶️   启动实例 (start)',              value: 'start' },
+        { label: '⏹️   停止实例 (stop)',               value: 'stop' },
+        { label: '📄  查看实例日志 (logs)',           value: 'logs' },
+        { label: '🗑️   删除实例 (delete)',             value: 'delete' },
+        { label: '❌  退出',                          value: '__exit__' },
+      ],
+    });
+    if (!action || action === '__exit__') return;
+
+    try {
+      if (action === 'env-check') { await cmdEnvCheck(); }
+      else if (action === 'install') { await cmdInstall(); }
+      else if (action === 'list') { cmdList(); }
+      else if (action === 'start') {
+        const id = await pickInstanceTUI('选择要启动的实例');
+        if (id) {
+          // 守护启动
+          const orig = argv.slice();
+          argv.length = 0; argv.push('start', id, '--detach');
+          cmdStart(id);
+          argv.length = 0; argv.push(...orig);
+        }
+      }
+      else if (action === 'stop') {
+        const id = await pickInstanceTUI('选择要停止的实例', { runningOnly: true });
+        if (id) await cmdStop(id);
+      }
+      else if (action === 'logs') {
+        const id = await pickInstanceTUI('选择要查看日志的实例');
+        if (id) cmdLogs(id);
+      }
+      else if (action === 'delete') {
+        const id = await pickInstanceTUI('选择要删除的实例');
+        if (id) await cmdDelete(id);
+      }
+    } catch (err) {
+      console.error(`[菜单] ${err.message}`);
+    }
+
+    // 在每次操作后等待用户按 Enter 返回菜单
+    if (process.stdin.isTTY && action !== 'install') {
+      process.stdout.write('\n按 Enter 返回主菜单...');
+      await new Promise((resolve) => {
+        const rl = createReadline();
+        rl.question('', () => { rl.close(); resolve(); });
+      });
+    }
+  }
+}
+
+async function pickInstanceTUI(title, { runningOnly = false } = {}) {
+  let list = readInstances();
+  if (runningOnly) {
+    list = list.filter(i => {
+      const pf = readPidFile(i.id);
+      return pf && isProcessAlive(pf.pid);
+    });
+  }
+  if (list.length === 0) {
+    await tui.messageBox({
+      title: '提示',
+      message: runningOnly ? '当前没有正在运行的实例。' : '尚无实例。',
+    });
+    return null;
+  }
+  return tui.selectMenu({
+    title,
+    items: list.map(i => ({
+      label: `${i.extra?.displayName || i.name || i.id}  (${i.id})`,
+      value: i.id,
+      description: i.neomofoxDir,
+    })),
+  });
+}
+
 // ─── 命令分发 ────────────────────────────────────────────────────────────
 
 async function main() {
   const positional = positionalArgs();
-  const command = positional[0] || 'help';
+  let command = positional[0];
+
+  // 无参数 + 交互终端：默认打开 TUI 主菜单
+  if (!command) {
+    if (tui.isTTY()) {
+      command = 'menu';
+    } else {
+      command = 'help';
+    }
+  }
 
   switch (command) {
     case 'help':
     case '--help':
     case '-h':
       cmdHelp();
+      break;
+    case 'menu':
+    case 'tui':
+      await cmdMenu();
       break;
     case 'data-dir':
       console.log(dataDir);
