@@ -122,7 +122,7 @@ jobs:
           path: Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-win-${{ matrix.arch }}-*.exe
 
   # ============================================================
-  # Linux 构建 (deb 包) - x64 / arm64
+  # Linux 构建 (deb / rpm / AppImage) - x64 / arm64
   # 注意: Electron 不再为 Linux 提供 ia32 支持
   # ============================================================
   build-linux:
@@ -164,22 +164,23 @@ jobs:
       - name: 安装打包依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg fakeroot
+          sudo apt-get install -y dpkg fakeroot rpm
 
       - name: 配置 arm64 交叉编译工具链
         if: matrix.arch == 'arm64'
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: 构建 Linux deb 和 AppImage (${{ matrix.arch }})
+      - name: 构建 Linux deb / rpm / AppImage (${{ matrix.arch }})
         working-directory: Neo-MoFox-Launcher
-        run: npx electron-builder --linux deb appimage --${{ matrix.arch }}
+        run: npx electron-builder --linux deb rpm appimage --${{ matrix.arch }}
 
       - name: 重命名产物
         working-directory: Neo-MoFox-Launcher
         run: |
           echo "构建输出："
           find dist -name "*.deb" -exec ls -lh {} \;
+          find dist -name "*.rpm" -exec ls -lh {} \;
           find dist -name "*.AppImage" -exec ls -lh {} \;
 
           DEB_FILE=$(find dist -name "*.deb" | head -1)
@@ -189,6 +190,15 @@ jobs:
             echo "deb 包已重命名为：$NEW_NAME"
           else
             echo "警告：未找到 .deb 文件！"
+          fi
+
+          RPM_FILE=$(find dist -name "*.rpm" | head -1)
+          if [ -n "$RPM_FILE" ]; then
+            NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.rpm"
+            cp "$RPM_FILE" "$NEW_NAME"
+            echo "rpm 包已重命名为：$NEW_NAME"
+          else
+            echo "警告：未找到 .rpm 文件！"
           fi
 
           APPIMAGE_FILE=$(find dist -name "*.AppImage" | head -1)
@@ -206,6 +216,7 @@ jobs:
           name: linux-${{ matrix.arch }}
           path: |
             Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.deb
+            Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.rpm
             Neo-MoFox-Launcher/dist/Neo-MoFox-Launcher-*-nightly-linux-${{ matrix.arch }}.AppImage
 
   # ============================================================
@@ -267,9 +278,11 @@ jobs:
           > | `*-win-ia32-portable.exe` | Windows x86 便携版 |
           > | `*-win-arm64-setup.exe` | Windows ARM64 安装包 |
           > | `*-win-arm64-portable.exe` | Windows ARM64 便携版 |
-          > | `*-linux-x64.deb` | Linux x64 deb 包 |
+          > | `*-linux-x64.deb` | Linux x64 deb 包（Debian / Ubuntu）|
+          > | `*-linux-x64.rpm` | Linux x64 rpm 包（Fedora / RHEL / openSUSE）|
           > | `*-linux-x64.AppImage` | Linux x64 AppImage |
-          > | `*-linux-arm64.deb` | Linux ARM64 deb 包 |
+          > | `*-linux-arm64.deb` | Linux ARM64 deb 包（Debian / Ubuntu）|
+          > | `*-linux-arm64.rpm` | Linux ARM64 rpm 包（Fedora / RHEL / openSUSE）|
           > | `*-linux-arm64.AppImage` | Linux ARM64 AppImage |
           >
           > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持 。
@@ -314,7 +327,7 @@ jobs:
       - name: 收集待发布文件
         run: |
           mkdir -p release-files
-          find artifacts -type f \( -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} release-files/ \;
+          find artifacts -type f \( -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) -exec cp {} release-files/ \;
           echo "📦 准备发布的文件:"
           ls -lh release-files/
 

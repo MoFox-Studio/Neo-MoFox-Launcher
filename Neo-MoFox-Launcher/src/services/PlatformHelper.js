@@ -198,6 +198,7 @@ class PlatformHelper {
         if (fs.existsSync('/etc/os-release')) {
           const content = fs.readFileSync('/etc/os-release', 'utf-8');
           const idMatch = content.match(/^ID=(.+)$/m);
+          const idLikeMatch = content.match(/^ID_LIKE=(.+)$/m);
           const versionMatch = content.match(/^VERSION_ID="?([^"\n]+)"?$/m);
           const nameMatch = content.match(/^PRETTY_NAME="?([^"\n]+)"?$/m);
           info.distro = idMatch ? idMatch[1].replace(/"/g, '') : 'unknown';
@@ -206,17 +207,28 @@ class PlatformHelper {
 
           // 识别发行版家族和包管理器
           const distroId = info.distro.toLowerCase();
-          if (['ubuntu', 'debian', 'linuxmint', 'pop', 'zorin'].includes(distroId)) {
+          // ID_LIKE 可能是空格分隔的多个值，例如 "rhel fedora"、"debian"
+          const idLikeTokens = idLikeMatch
+            ? idLikeMatch[1].replace(/"/g, '').toLowerCase().split(/\s+/).filter(Boolean)
+            : [];
+          const tokens = [distroId, ...idLikeTokens];
+          const matchAny = (list) => tokens.some((t) => list.includes(t));
+
+          if (matchAny(['ubuntu', 'debian', 'linuxmint', 'pop', 'zorin', 'kali', 'deepin', 'raspbian', 'elementary', 'neon'])) {
             info.distroFamily = 'debian';
             info.packageManager = 'apt';
-          } else if (['arch', 'manjaro', 'endeavouros', 'garuda'].includes(distroId)) {
+          } else if (matchAny(['arch', 'manjaro', 'endeavouros', 'garuda', 'artix', 'cachyos'])) {
             info.distroFamily = 'arch';
             info.packageManager = 'pacman';
-          } else if (['fedora', 'rhel', 'centos', 'rocky', 'almalinux'].includes(distroId)) {
+          } else if (matchAny([
+            'fedora', 'rhel', 'centos', 'rocky', 'almalinux',
+            'nobara', 'ol', 'oracle', 'amzn', 'eurolinux', 'openmandriva', 'anolis', 'openeuler', 'circle',
+          ])) {
             info.distroFamily = 'redhat';
-            // Fedora 22+ 使用 dnf，较老版本使用 yum
+            // Fedora 22+ / RHEL 8+ 使用 dnf；老系统(yum)按 dnf 命令行兼容方式调用
             info.packageManager = 'dnf';
-          } else if (distroId.includes('suse')) {
+          } else if (matchAny(['suse', 'opensuse', 'opensuse-leap', 'opensuse-tumbleweed', 'sles', 'sled'])
+                     || distroId.includes('suse')) {
             info.distroFamily = 'suse';
             info.packageManager = 'zypper';
           } else {

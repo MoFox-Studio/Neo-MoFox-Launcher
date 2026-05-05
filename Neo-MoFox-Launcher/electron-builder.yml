@@ -46,6 +46,7 @@ linux:
   target:
     - target: AppImage
     - target: deb
+    - target: rpm
   maintainer: MoFox Studio
   category: Utility
   desktop:
@@ -64,3 +65,16 @@ deb:
     - libatspi2.0-0
     - libuuid1
     - libsecret-1-0
+
+rpm:
+  # Fedora / RHEL / openSUSE 等基于 RPM 的发行版的依赖
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - libXtst
+    - xdg-utils
+    - at-spi2-atk
+    - libuuid
+    - libsecret

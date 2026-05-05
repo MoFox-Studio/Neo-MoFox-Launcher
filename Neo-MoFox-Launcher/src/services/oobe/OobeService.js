@@ -67,7 +67,11 @@ const DOWNLOAD_META = {
         scriptCmd: 'sh',
         scriptArgs: [
           '-c',
-          'dnf check-update || true; dnf install -y python3.11 python3.11-devel python3-pip',
+          // 优先 dnf，回退 yum；优先 python3.11，回退到发行版默认 python3
+          'PM=$(command -v dnf || command -v yum); ' +
+          '$PM check-update || true; ' +
+          '$PM install -y python3.11 python3.11-devel python3-pip ' +
+          '|| $PM install -y python3 python3-devel python3-pip',
         ],
       },
     },
@@ -123,7 +127,9 @@ const DOWNLOAD_META = {
         scriptCmd: 'sh',
         scriptArgs: [
           '-c',
-          'dnf check-update || true; dnf install -y curl && curl -LsSf https://astral.sh/uv/install.sh | sh',
+          'PM=$(command -v dnf || command -v yum); ' +
+          '$PM check-update || true; ' +
+          '$PM install -y curl && curl -LsSf https://astral.sh/uv/install.sh | sh',
         ],
       },
     },
@@ -172,7 +178,9 @@ const DOWNLOAD_META = {
         scriptCmd: 'sh',
         scriptArgs: [
           '-c',
-          'dnf check-update || true; dnf install -y git',
+          'PM=$(command -v dnf || command -v yum); ' +
+          '$PM check-update || true; ' +
+          '$PM install -y git',
         ],
       },
     },

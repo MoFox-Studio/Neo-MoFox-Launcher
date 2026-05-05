@@ -379,7 +379,7 @@ npm run build:win
 # 构建 Windows ARM64 安装包
 npm run build:win:arm64
 
-# 构建 Linux 安装包（AppImage + deb）
+# 构建 Linux 安装包（AppImage + deb + rpm）
 npm run build:linux
 
 # 构建 Linux ARM64 安装包
@@ -498,7 +498,7 @@ window.customConfirm(message, title)
 
 ### 可以在 Linux/Mac 上使用吗？
 
-当前已支持 Windows 和基于 deb 包管理的 Linux 发行版（如 Ubuntu、Debian 等），macOS 支持仍在计划中。
+当前已支持 Windows 以及主流 Linux 发行版（基于 deb 的 Ubuntu / Debian、基于 rpm 的 Fedora / RHEL / openSUSE 等），macOS 支持仍在计划中。
 
 ### 如何备份配置？
 
