@@ -1,4 +1,4 @@
-name: Nightly Build
+name: Nightly构建
 
 on:
   push:
@@ -13,6 +13,7 @@ on:
 jobs:
   # 检查最近 24 小时内是否有新提交
   check-commits:
+    name: 检查提交
     runs-on: ubuntu-latest
     outputs:
       has_new_commits: ${{ steps.check.outputs.has_new_commits }}
@@ -20,12 +21,12 @@ jobs:
       short_sha: ${{ steps.check.outputs.short_sha }}
       version: ${{ steps.check.outputs.version }}
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check for new commits in last 24 hours
+      - name: 检查最近 24 小时是否有新提交
         id: check
         run: |
           BUILD_DATE=$(date -u +'%Y%m%d')
@@ -38,23 +39,24 @@ jobs:
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "has_new_commits=true" >> $GITHUB_OUTPUT
-            echo "Manual trigger, skipping commit check."
+            echo "手动触发，跳过提交检查。"
             exit 0
           fi
 
           COMMITS=$(git log --oneline --since="24 hours ago" | wc -l)
           if [ "$COMMITS" -gt 0 ]; then
             echo "has_new_commits=true" >> $GITHUB_OUTPUT
-            echo "Found $COMMITS new commit(s) in last 24 hours."
+            echo "最近 24 小时内发现 $COMMITS 个新提交。"
           else
             echo "has_new_commits=false" >> $GITHUB_OUTPUT
-            echo "No new commits in last 24 hours, skipping build."
+            echo "最近 24 小时内无新提交，跳过构建。"
           fi
 
   # ============================================================
   # Windows 构建 (NSIS 安装包 + 便携版) - x64 / ia32 / arm64
   # ============================================================
   build-windows:
+    name: 构建 Windows
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
     runs-on: windows-latest
@@ -65,17 +67,17 @@ jobs:
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
-      - name: Cache Electron
+      - name: 缓存 Electron
         uses: actions/cache@v4
         with:
           path: |
@@ -85,35 +87,35 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-${{ matrix.arch }}-
 
-      - name: Install dependencies
+      - name: 安装依赖
         working-directory: Neo-MoFox-Launcher
         run: npm ci
 
-      - name: Build Windows ${{ matrix.arch }}
+      - name: 构建 Windows ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
         run: npx electron-builder --win --${{ matrix.arch }}
 
-      - name: Rename artifacts
+      - name: 重命名产物
         shell: pwsh
         working-directory: Neo-MoFox-Launcher
         run: |
           Get-ChildItem -Path "dist" -Filter "*.exe" | ForEach-Object {
-            Write-Host "Found: $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
+            Write-Host "发现：$($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
           }
           $setup = Get-ChildItem -Path "dist" -Filter "*-setup.exe" | Select-Object -First 1
           $portable = Get-ChildItem -Path "dist" -Filter "*-portable.exe" | Select-Object -First 1
           if ($setup) {
             $newName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win-${{ matrix.arch }}-setup.exe"
             Copy-Item $setup.FullName "dist\$newName"
-            Write-Host "Setup: $newName"
+            Write-Host "安装包：$newName"
           }
           if ($portable) {
             $newName = "Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-win-${{ matrix.arch }}-portable.exe"
             Copy-Item $portable.FullName "dist\$newName"
-            Write-Host "Portable: $newName"
+            Write-Host "便携版：$newName"
           }
 
-      - name: Upload artifacts
+      - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}
@@ -124,6 +126,7 @@ jobs:
   # 注意: Electron 不再为 Linux 提供 ia32 支持
   # ============================================================
   build-linux:
+    name: 构建 Linux
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
     runs-on: ubuntu-latest
@@ -134,17 +137,17 @@ jobs:
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
-      - name: Cache Electron
+      - name: 缓存 Electron
         uses: actions/cache@v4
         with:
           path: |
@@ -154,28 +157,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-${{ matrix.arch }}-
 
-      - name: Install dependencies
+      - name: 安装依赖
         working-directory: Neo-MoFox-Launcher
         run: npm ci
 
-      - name: Install build dependencies
+      - name: 安装打包依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg fakeroot
 
-      - name: Setup cross-compilation for arm64
+      - name: 配置 arm64 交叉编译工具链
         if: matrix.arch == 'arm64'
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Build Linux deb and AppImage ${{ matrix.arch }}
+      - name: 构建 Linux deb 和 AppImage (${{ matrix.arch }})
         working-directory: Neo-MoFox-Launcher
         run: npx electron-builder --linux deb appimage --${{ matrix.arch }}
 
-      - name: Rename artifacts
+      - name: 重命名产物
         working-directory: Neo-MoFox-Launcher
         run: |
-          echo "Build output:"
+          echo "构建输出："
           find dist -name "*.deb" -exec ls -lh {} \;
           find dist -name "*.AppImage" -exec ls -lh {} \;
 
@@ -183,21 +186,21 @@ jobs:
           if [ -n "$DEB_FILE" ]; then
             NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.deb"
             cp "$DEB_FILE" "$NEW_NAME"
-            echo "Renamed deb to: $NEW_NAME"
+            echo "deb 包已重命名为：$NEW_NAME"
           else
-            echo "WARNING: No .deb file found!"
+            echo "警告：未找到 .deb 文件！"
           fi
 
           APPIMAGE_FILE=$(find dist -name "*.AppImage" | head -1)
           if [ -n "$APPIMAGE_FILE" ]; then
             NEW_NAME="dist/Neo-MoFox-Launcher-${{ env.BUILD_DATE }}-nightly-linux-${{ matrix.arch }}.AppImage"
             cp "$APPIMAGE_FILE" "$NEW_NAME"
-            echo "Renamed AppImage to: $NEW_NAME"
+            echo "AppImage 已重命名为：$NEW_NAME"
           else
-            echo "WARNING: No .AppImage file found!"
+            echo "警告：未找到 .AppImage 文件！"
           fi
 
-      - name: Upload artifacts
+      - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
@@ -209,6 +212,7 @@ jobs:
   # 发布到 GitHub Releases
   # ============================================================
   release:
+    name: 发布到 GitHub Releases
     needs: [check-commits, build-windows, build-linux]
     if: |
       always() &&
@@ -220,22 +224,22 @@ jobs:
     env:
       BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v4
         with:
           fetch-depth: 5
 
-      - name: Download all artifacts
+      - name: 下载全部产物
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: List all artifacts
+      - name: 列出全部产物
         run: |
           echo "📦 所有构建产物:"
           find artifacts -type f | sort
 
-      - name: Generate changelog
+      - name: 生成更新日志
         run: |
           cat > changelog.md << 'HEADER'
           ## 🌙 每夜构建版本 - ${{ env.BUILD_DATE }}
@@ -271,13 +275,13 @@ jobs:
           > **注意**: Linux 不再提供 ia32 (32位) 版本，因为 Electron 已停止支持 。
           FOOTER
 
-      - name: Delete existing nightly release (if any)
+      - name: 删除已存在的同日 nightly 发布（若有）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete "nightly-${{ env.BUILD_DATE }}" --yes --cleanup-tag 2>/dev/null || true
 
-      - name: Clean up old nightly releases
+      - name: 清理过旧的 nightly 发布
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -307,14 +311,14 @@ jobs:
 
           echo "✅ 清理完成"
 
-      - name: Collect release files
+      - name: 收集待发布文件
         run: |
           mkdir -p release-files
           find artifacts -type f \( -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} release-files/ \;
           echo "📦 准备发布的文件:"
           ls -lh release-files/
 
-      - name: Create nightly release
+      - name: 创建 nightly 发布
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -335,6 +339,7 @@ jobs:
   #
   # 此 job 仅构建并归档签名源码包，供需要手动上传时使用（本地 TUN 模式梯子 + dput）。
   publish-ppa:
+    name: 构建 PPA 源码包
     needs: check-commits
     if: needs.check-commits.outputs.has_new_commits == 'true'
     runs-on: ubuntu-latest
@@ -343,24 +348,24 @@ jobs:
       PKG_REV: '1'
       ARTIFACT_DIR: ppa/artifacts
     steps:
-      - name: Checkout repository
+      - name: 检出仓库
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: Neo-MoFox-Launcher/package-lock.json
 
-      - name: Install packaging dependencies
+      - name: 安装打包依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y devscripts debhelper gnupg wget curl unzip
 
-      - name: Import GPG key
+      - name: 导入 GPG 密钥
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
@@ -368,11 +373,11 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
           trust_level: 5
 
-      - name: Export GPG fingerprint for packaging
+      - name: 导出 GPG 指纹供打包使用
         run: |
           echo "GPG_FINGERPRINT=${{ steps.import_gpg.outputs.fingerprint }}" >> $GITHUB_ENV
 
-      - name: Build signed source package
+      - name: 构建已签名源码包
         env:
           GPG_FINGERPRINT: ${{ env.GPG_FINGERPRINT }}
           DEBFULLNAME: ikun114
@@ -382,7 +387,7 @@ jobs:
           bash ppa/prepare-source.sh "${{ needs.check-commits.outputs.version }}"
           ls -lh ppa/artifacts
 
-      - name: Upload ppa artifacts
+      - name: 上传 PPA 产物
         uses: actions/upload-artifact@v4
         with:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
