@@ -192,7 +192,7 @@ npm start
 
 ### 入口
 
-- 通过 PPA / AUR 安装时：`neo-mofox-cli` 或 `neo-mofox-launcher --cli ...`
+- 通过 PPA / AUR / Copr 安装时：`neo-mofox-cli` 或 `neo-mofox-launcher --cli ...`
 - 从源码运行：`npm run cli -- <command>` 或直接 `node Neo-MoFox-Launcher/src/cli/index.js <command>`
 
 > 在交互式终端下，直接运行 `neo-mofox-cli`（不带任何参数）会进入 **TUI 主菜单**：

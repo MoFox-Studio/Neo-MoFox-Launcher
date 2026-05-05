@@ -405,3 +405,96 @@ jobs:
         with:
           name: ppa-source-${{ needs.check-commits.outputs.version }}
           path: ppa/artifacts/*
+
+  # ============================================================
+  # 推送 SRPM 到 Fedora Copr，触发 DNF 仓库构建
+  # 仅当 release job 成功 + 配置了 COPR_* secret 时执行
+  # 详细说明见 copr/README.md
+  # ============================================================
+  publish-copr:
+    name: 推送到 Fedora Copr
+    needs: [check-commits, release]
+    if: |
+      always() &&
+      needs.check-commits.outputs.has_new_commits == 'true' &&
+      needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DATE: ${{ needs.check-commits.outputs.build_date }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 检查 Copr 凭据是否已配置
+        id: check_secrets
+        env:
+          COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
+          COPR_USERNAME: ${{ secrets.COPR_USERNAME }}
+          COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
+          COPR_PROJECT: ${{ secrets.COPR_PROJECT }}
+        run: |
+          if [ -n "$COPR_LOGIN" ] && [ -n "$COPR_USERNAME" ] && [ -n "$COPR_TOKEN" ] && [ -n "$COPR_PROJECT" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning::Copr 凭据未配置（COPR_LOGIN / COPR_USERNAME / COPR_TOKEN / COPR_PROJECT），跳过 Copr 推送。"
+          fi
+
+      - name: 安装 SRPM 构建工具
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm cpio python3-pip
+          pip install --user copr-cli
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: 等待 GitHub Release RPM 资产可用
+        if: steps.check_secrets.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # release job 刚刚才上传，给 CDN 一点同步时间
+          for i in 1 2 3 4 5; do
+            if curl -fsLI \
+                "https://github.com/${{ github.repository }}/releases/download/nightly-${BUILD_DATE}/Neo-MoFox-Launcher-${BUILD_DATE}-nightly-linux-x64.rpm" \
+                > /dev/null; then
+              echo "RPM 资产已就绪。"
+              exit 0
+            fi
+            echo "RPM 资产暂未就绪，10 秒后重试 ($i/5)..."
+            sleep 10
+          done
+          echo "::error::无法获取每夜构建 RPM 资产。"
+          exit 1
+
+      - name: 生成 x86_64 SRPM
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          chmod +x copr/build-srpm.sh
+          ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" ./copr-srpm
+          ls -lh ./copr-srpm
+
+      - name: 配置 copr-cli 凭据
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          mkdir -p "$HOME/.config"
+          cat > "$HOME/.config/copr" << EOF
+          [copr-cli]
+          login = ${{ secrets.COPR_LOGIN }}
+          username = ${{ secrets.COPR_USERNAME }}
+          token = ${{ secrets.COPR_TOKEN }}
+          copr_url = https://copr.fedorainfracloud.org
+          EOF
+          chmod 600 "$HOME/.config/copr"
+
+      - name: 推送 SRPM 触发 Copr 构建
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          copr-cli build --nowait "${{ secrets.COPR_PROJECT }}" ./copr-srpm/*.src.rpm
+
+      - name: 上传 SRPM 产物（备查）
+        if: steps.check_secrets.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: copr-srpm-${{ env.BUILD_DATE }}
+          path: copr-srpm/*.src.rpm
