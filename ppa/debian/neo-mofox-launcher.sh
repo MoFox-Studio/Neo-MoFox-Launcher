@@ -7,7 +7,7 @@
 #   neo-mofox-launcher cli ...      同上
 
 INSTALL_DIR="/usr/lib/neo-mofox-launcher"
-CLI_ENTRY="${INSTALL_DIR}/resources/app.asar/src/cli/index.js"
+CLI_ENTRY="${INSTALL_DIR}/resources/app.asar.unpacked/src/cli/index.js"
 
 # ─── CLI 模式分发 ───────────────────────────────────────────────
 # 如果第一个参数是 --cli / cli，则脱去它并通过 node 调用 CLI 入口。

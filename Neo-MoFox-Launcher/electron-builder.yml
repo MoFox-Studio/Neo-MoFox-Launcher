@@ -18,6 +18,13 @@ files:
   # 明确包含 OOBE SVG 插图文件
   - "assets/images/oobe/**"
 
+# CLI 入口需要作为真实文件存在，以便 node 直接执行
+# 同时解包 CLI 的 npm 依赖（@iarna/toml），确保纯 node 运行时可用
+asarUnpack:
+  - "src/cli/**"
+  - "src/services/**"
+  - "node_modules/@iarna/toml/**"
+
 win:
   executableName: neo-mofox-launcher
   icon: assets/images/icon/icon.ico

@@ -70,7 +70,7 @@ cat > %{buildroot}%{_bindir}/neo-mofox-cli << 'EOF'
 #!/usr/bin/env bash
 # /usr/bin/neo-mofox-cli — Neo-MoFox Launcher 命令行入口（无桌面环境亦可用）
 INSTALL_DIR="/opt/Neo-MoFox Launcher"
-CLI_ENTRY="${INSTALL_DIR}/resources/app.asar/src/cli/index.js"
+CLI_ENTRY="${INSTALL_DIR}/resources/app.asar.unpacked/src/cli/index.js"
 
 if [ ! -f "${CLI_ENTRY}" ]; then
     echo "错误: 未找到 CLI 入口: ${CLI_ENTRY}" >&2

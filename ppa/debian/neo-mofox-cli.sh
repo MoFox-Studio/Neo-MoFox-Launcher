@@ -5,7 +5,7 @@
 # 详细命令请运行: neo-mofox-cli help
 
 INSTALL_DIR="/usr/lib/neo-mofox-launcher"
-CLI_ENTRY="${INSTALL_DIR}/resources/app.asar/src/cli/index.js"
+CLI_ENTRY="${INSTALL_DIR}/resources/app.asar.unpacked/src/cli/index.js"
 
 if [ ! -f "${CLI_ENTRY}" ]; then
     echo "错误: 未找到 CLI 入口: ${CLI_ENTRY}" >&2
