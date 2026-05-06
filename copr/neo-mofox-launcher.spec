@@ -6,9 +6,9 @@
 #   本 spec 把这枚 RPM 重新封装成 Copr 可接受的 SRPM。
 # ============================================================================
 
+%define _build_id_links none
 %global debug_package %{nil}
 %global __os_install_post %{nil}
-%global _build_id_links none
 # Electron 应用使用预编译二进制，跳过自动依赖扫描
 AutoReqProv: no
 
@@ -57,9 +57,12 @@ mkdir -p %{buildroot}
 [ -d ./opt ] && cp -a ./opt %{buildroot}/
 [ -d ./usr ] && cp -a ./usr %{buildroot}/
 
+# 清理上游 RPM 遗留的 build-id 链接（防止 %files 报错）
+rm -rf %{buildroot}/usr/lib/.build-id
+
 # electron-builder 的 RPM 不会自动建 /usr/bin 链接，手动补一个
 mkdir -p %{buildroot}%{_bindir}
-ln -sf "/opt/Neo-MoFox Launcher/neo-mofox-launcher" \
+ln -sr "%{buildroot}/opt/Neo-MoFox Launcher/neo-mofox-launcher" \
        %{buildroot}%{_bindir}/neo-mofox-launcher
 
 # 生成 /usr/bin/neo-mofox-cli — TUI 命令行入口，与 GUI 共用同一安装目录
