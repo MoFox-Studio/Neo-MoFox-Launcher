@@ -475,6 +475,12 @@ jobs:
           ARCH=x86_64 ./copr/build-srpm.sh "$BUILD_DATE" "$SHORT_SHA" ./copr-srpm
           ls -lh ./copr-srpm
 
+      - name: 生成 aarch64 SRPM
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          ARCH=aarch64 ./copr/build-srpm.sh "$BUILD_DATE" "$SHORT_SHA" ./copr-srpm-aarch64
+          ls -lh ./copr-srpm-aarch64
+
       - name: 配置 copr-cli 凭据
         if: steps.check_secrets.outputs.configured == 'true'
         run: |
@@ -488,14 +494,21 @@ jobs:
           EOF
           chmod 600 "$HOME/.config/copr"
 
-      - name: 推送 SRPM 触发 Copr 构建
+      - name: 推送 x86_64 SRPM 触发 Copr 构建
         if: steps.check_secrets.outputs.configured == 'true'
         run: |
           copr-cli build --nowait "${{ secrets.COPR_PROJECT }}" ./copr-srpm/*.src.rpm
+
+      - name: 推送 aarch64 SRPM 触发 Copr 构建
+        if: steps.check_secrets.outputs.configured == 'true'
+        run: |
+          copr-cli build --nowait "${{ secrets.COPR_PROJECT }}" ./copr-srpm-aarch64/*.src.rpm
 
       - name: 上传 SRPM 产物（备查）
         if: steps.check_secrets.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: copr-srpm-${{ env.BUILD_DATE }}
-          path: copr-srpm/*.src.rpm
+          path: |
+            copr-srpm/*.src.rpm
+            copr-srpm-aarch64/*.src.rpm
