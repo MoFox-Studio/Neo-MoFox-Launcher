@@ -565,6 +565,268 @@ async function cmdEnvCheck() {
   if (!result.passed) process.exit(1);
 }
 
+// ─── TUI 环境检查与自动安装 ──────────────────────────────────────────────
+
+function execCommandSync(cmd, args = [], options = {}) {
+  const { execSync } = require('child_process');
+  const fullCmd = args.length > 0 ? `${cmd} ${args.join(' ')}` : cmd;
+  try {
+    const stdout = execSync(fullCmd, {
+      shell: true,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 300_000,
+      ...options,
+    });
+    return { success: true, stdout: (stdout || '').trim() };
+  } catch (err) {
+    return { success: false, stdout: '', stderr: (err.stderr || '').trim(), error: err.message };
+  }
+}
+
+function getAutoInstallCommands(tool, sysEnv) {
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const pm = sysEnv.packageManager;
+
+  if (tool === 'python') {
+    if (isWin) {
+      return [
+        { label: 'winget 安装 Python 3.12', cmd: 'winget', args: ['install', 'Python.Python.3.12', '--accept-source-agreements', '--accept-package-agreements'] },
+      ];
+    }
+    if (isMac) {
+      return [
+        { label: 'brew 安装 python@3.12', cmd: 'brew', args: ['install', 'python@3.12'] },
+      ];
+    }
+    switch (pm) {
+      case 'apt':
+        return [
+          { label: 'apt 安装 python3', cmd: 'sudo', args: ['apt-get', 'install', '-y', 'python3', 'python3-pip', 'python3-venv'] },
+        ];
+      case 'pacman':
+        return [
+          { label: 'pacman 安装 python', cmd: 'sudo', args: ['pacman', '-S', '--noconfirm', 'python', 'python-pip'] },
+        ];
+      case 'dnf':
+        return [
+          { label: 'dnf 安装 python3', cmd: 'sudo', args: ['dnf', 'install', '-y', 'python3', 'python3-pip'] },
+        ];
+      case 'zypper':
+        return [
+          { label: 'zypper 安装 python3', cmd: 'sudo', args: ['zypper', 'install', '-y', 'python3', 'python3-pip'] },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  if (tool === 'uv') {
+    if (isWin) {
+      return [
+        { label: 'pip 安装 uv', cmd: 'pip', args: ['install', 'uv'] },
+        { label: '官方脚本安装 uv (PowerShell)', cmd: 'powershell', args: ['-ExecutionPolicy', 'ByPass', '-c', 'irm https://astral.sh/uv/install.ps1 | iex'] },
+      ];
+    }
+    return [
+      { label: 'pip3 安装 uv', cmd: 'pip3', args: ['install', 'uv'] },
+      { label: '官方脚本安装 uv', cmd: 'sh', args: ['-c', 'curl -LsSf https://astral.sh/uv/install.sh | sh'] },
+    ];
+  }
+
+  if (tool === 'git') {
+    if (isWin) {
+      return [
+        { label: 'winget 安装 Git', cmd: 'winget', args: ['install', 'Git.Git', '--accept-source-agreements', '--accept-package-agreements'] },
+      ];
+    }
+    if (isMac) {
+      return [
+        { label: 'xcode-select 安装 Git', cmd: 'xcode-select', args: ['--install'] },
+        { label: 'brew 安装 git', cmd: 'brew', args: ['install', 'git'] },
+      ];
+    }
+    switch (pm) {
+      case 'apt':
+        return [
+          { label: 'apt 安装 git', cmd: 'sudo', args: ['apt-get', 'install', '-y', 'git'] },
+        ];
+      case 'pacman':
+        return [
+          { label: 'pacman 安装 git', cmd: 'sudo', args: ['pacman', '-S', '--noconfirm', 'git'] },
+        ];
+      case 'dnf':
+        return [
+          { label: 'dnf 安装 git', cmd: 'sudo', args: ['dnf', 'install', '-y', 'git'] },
+        ];
+      case 'zypper':
+        return [
+          { label: 'zypper 安装 git', cmd: 'sudo', args: ['zypper', 'install', '-y', 'git'] },
+        ];
+      default:
+        return [];
+    }
+  }
+
+  return [];
+}
+
+async function autoInstallTool(tool, sysEnv) {
+  const commands = getAutoInstallCommands(tool, sysEnv);
+  if (commands.length === 0) {
+    console.log(`  [自动安装] 不支持当前平台自动安装 ${tool}，请手动安装。`);
+    return false;
+  }
+
+  for (const item of commands) {
+    console.log(`  [自动安装] 正在尝试: ${item.label} ...`);
+    const result = execCommandSync(item.cmd, item.args);
+    if (result.success) {
+      console.log(`  [自动安装] ${item.label} 执行成功。`);
+      return true;
+    }
+    console.log(`  [自动安装] ${item.label} 失败: ${result.stderr || result.error}`);
+  }
+  console.log(`  [自动安装] ${tool} 所有安装方式均失败，请手动安装。`);
+  return false;
+}
+
+async function cmdEnvCheckTUI() {
+  const { installWizardService, platformHelper } = loadInstallServices();
+  const sysEnv = platformHelper.detectSystemEnv();
+
+  console.log('[环境检查] 正在检测环境...');
+  const result = await installWizardService.runEnvCheck();
+
+  const c = result.checks;
+  const fmtLine = (name, v) => {
+    if (v.installed === false || v.valid === false) {
+      const ver = v.version ? `${v.version}` : '未安装';
+      const hint = v.installHint ? `\n    建议: ${v.installHint}` : '';
+      return `  ✗ ${name}: ${ver}${hint}`;
+    }
+    return `  ✓ ${name}: ${v.version || 'OK'}`;
+  };
+
+  const envMsg =
+    `系统: ${sysEnv.platformLabel}${sysEnv.distro ? ' (' + sysEnv.distro + ')' : ''}  架构: ${sysEnv.arch}\n` +
+    (sysEnv.packageManager ? `包管理: ${sysEnv.packageManager}\n` : '') +
+    '\n环境检查结果:\n' +
+    fmtLine('Python (>=3.11)', c.python) + '\n' +
+    fmtLine('uv', c.uv) + '\n' +
+    fmtLine('Git', c.git) + '\n' +
+    '\n' + (result.passed ? '✓ 全部通过，可以安装实例。' : '✗ 部分环境缺失。');
+
+  await tui.messageBox({
+    title: result.passed ? '环境检查 - 通过' : '环境检查 - 未通过',
+    message: envMsg,
+  });
+
+  if (result.passed) return true;
+
+  const missing = [];
+  if (!c.python.valid) missing.push('python');
+  if (!c.uv.valid) missing.push('uv');
+  if (!c.git.valid) missing.push('git');
+
+  const missingLabels = missing.map(m => {
+    if (m === 'python') return 'Python (>=3.11)';
+    if (m === 'uv') return 'uv';
+    if (m === 'git') return 'Git';
+    return m;
+  });
+
+  const wantInstall = await tui.confirm({
+    title: '自动安装缺失环境',
+    message: `以下环境缺失:\n${missingLabels.map(l => '  • ' + l).join('\n')}\n\n是否由启动器尝试自动安装？\n（需要管理员权限，安装过程中可能需要联网下载）`,
+    defaultYes: true,
+    yesLabel: '自动安装', noLabel: '跳过',
+  });
+
+  if (!wantInstall) return false;
+
+  let allInstalled = true;
+  for (const tool of missing) {
+    console.log(`\n[自动安装] 正在安装 ${tool}...`);
+    const ok = await autoInstallTool(tool, sysEnv);
+    if (!ok) allInstalled = false;
+  }
+
+  console.log('\n[环境检查] 重新检测环境...');
+  const recheck = await installWizardService.runEnvCheck();
+  const rc = recheck.checks;
+  const reMsg =
+    '重新检测结果:\n' +
+    `  ${rc.python.valid ? '✓' : '✗'} Python: ${rc.python.version || '未安装'}\n` +
+    `  ${rc.uv.valid ? '✓' : '✗'} uv: ${rc.uv.version || '未安装'}\n` +
+    `  ${rc.git.valid ? '✓' : '✗'} Git: ${rc.git.version || '未安装'}\n` +
+    '\n' + (recheck.passed ? '✓ 全部通过！' : '✗ 仍有缺失，请手动安装后重试。');
+
+  await tui.messageBox({
+    title: recheck.passed ? '安装完成 - 通过' : '安装完成 - 仍有缺失',
+    message: reMsg,
+  });
+
+  return recheck.passed;
+}
+
+async function ensureEnvironmentTUI() {
+  const { installWizardService } = loadInstallServices();
+  console.log('[安装] 正在检查环境...');
+  const result = await installWizardService.runEnvCheck();
+
+  if (result.passed) {
+    console.log('[安装] 环境检查通过。');
+    return true;
+  }
+
+  const c = result.checks;
+  const missing = [];
+  if (!c.python.valid) missing.push('Python (>=3.11)');
+  if (!c.uv.valid) missing.push('uv');
+  if (!c.git.valid) missing.push('Git');
+
+  const wantInstall = await tui.confirm({
+    title: '环境缺失',
+    message: `安装实例需要以下环境，当前有缺失:\n${missing.map(l => '  ✗ ' + l).join('\n')}\n\n是否由启动器尝试自动安装？`,
+    defaultYes: true,
+    yesLabel: '自动安装', noLabel: '取消安装',
+  });
+
+  if (!wantInstall) return false;
+
+  const { platformHelper } = loadInstallServices();
+  const sysEnv = platformHelper.detectSystemEnv();
+  const missingTools = [];
+  if (!c.python.valid) missingTools.push('python');
+  if (!c.uv.valid) missingTools.push('uv');
+  if (!c.git.valid) missingTools.push('git');
+
+  for (const tool of missingTools) {
+    console.log(`\n[自动安装] 正在安装 ${tool}...`);
+    await autoInstallTool(tool, sysEnv);
+  }
+
+  console.log('\n[安装] 重新检测环境...');
+  const recheck = await installWizardService.runEnvCheck();
+  if (!recheck.passed) {
+    const rc = recheck.checks;
+    const still = [];
+    if (!rc.python.valid) still.push('Python');
+    if (!rc.uv.valid) still.push('uv');
+    if (!rc.git.valid) still.push('Git');
+    await tui.messageBox({
+      title: '环境仍未就绪',
+      message: `自动安装后仍有缺失:\n${still.map(l => '  ✗ ' + l).join('\n')}\n\n请手动安装后重试。`,
+    });
+    return false;
+  }
+
+  console.log('[安装] 环境检查通过。');
+  return true;
+}
+
 // ─── 交互式输入 ────────────────────────────────────────────────────────
 
 function createReadline() {
@@ -902,8 +1164,15 @@ async function cmdMenu() {
     if (!action || action === '__exit__') return;
 
     try {
-      if (action === 'env-check') { await cmdEnvCheck(); }
-      else if (action === 'install') { await cmdInstall(); }
+      if (action === 'env-check') { await cmdEnvCheckTUI(); }
+      else if (action === 'install') {
+        const envOk = await ensureEnvironmentTUI();
+        if (!envOk) {
+          console.log('[安装] 环境未就绪，安装已取消。');
+        } else {
+          await cmdInstall();
+        }
+      }
       else if (action === 'list') { cmdList(); }
       else if (action === 'start') {
         const id = await pickInstanceTUI('选择要启动的实例');
