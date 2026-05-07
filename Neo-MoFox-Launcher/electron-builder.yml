@@ -60,8 +60,13 @@ linux:
     entry:
       Name: Neo-MoFox Launcher
       StartupWMClass: neo-mofox-launcher
+  extraFiles:
+    - from: scripts/neo-mofox-cli
+      to: neo-mofox-cli
 
 deb:
+  afterInstall: scripts/after-install-linux.sh
+  afterRemove: scripts/after-remove-linux.sh
   depends:
     - libgtk-3-0
     - libnotify4
@@ -74,6 +79,8 @@ deb:
     - libsecret-1-0
 
 rpm:
+  afterInstall: scripts/after-install-linux.sh
+  afterRemove: scripts/after-remove-linux.sh
   # Fedora / RHEL / openSUSE 等基于 RPM 的发行版的依赖
   depends:
     - gtk3
