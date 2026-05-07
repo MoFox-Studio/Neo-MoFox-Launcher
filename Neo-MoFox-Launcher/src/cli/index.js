@@ -827,6 +827,50 @@ async function ensureEnvironmentTUI() {
   return true;
 }
 
+async function cmdListTUI() {
+  const instances = readInstances();
+  if (instances.length === 0) {
+    await tui.messageBox({
+      title: '实例列表',
+      message: '当前没有实例。\n\n使用主菜单的「安装新实例」来创建一个。',
+    });
+    return;
+  }
+
+  const items = instances.map(i => {
+    const pf = readPidFile(i.id);
+    const running = pf && isProcessAlive(pf.pid);
+    const status = running ? '运行中' : '已停止';
+    const installed = i.installCompleted ? '' : ' [未完成安装]';
+    return {
+      label: `${i.name || '(未命名)'}  [${status}]${installed}`,
+      value: i.id,
+      description: i.neomofoxDir || '',
+    };
+  });
+
+  const selected = await tui.selectMenu({
+    title: `实例列表 (${instances.length} 个)`,
+    items,
+    footer: '↑/↓ 选择   Enter 查看详情   Esc 返回',
+  });
+
+  if (selected) {
+    const inst = instances.find(i => i.id === selected);
+    if (inst) {
+      const pf = readPidFile(inst.id);
+      const running = pf && isProcessAlive(pf.pid);
+      const detail =
+        `ID:        ${inst.id}\n` +
+        `名称:      ${inst.name || '(未命名)'}\n` +
+        `目录:      ${inst.neomofoxDir || '(未知)'}\n` +
+        `已安装:    ${inst.installCompleted ? '是' : '否'}\n` +
+        `状态:      ${running ? '运行中 (pid ' + pf.pid + ')' : '已停止'}`;
+      await tui.messageBox({ title: '实例详情', message: detail });
+    }
+  }
+}
+
 // ─── 交互式输入 ────────────────────────────────────────────────────────
 
 function createReadline() {
@@ -1173,7 +1217,7 @@ async function cmdMenu() {
           await cmdInstall();
         }
       }
-      else if (action === 'list') { cmdList(); }
+      else if (action === 'list') { await cmdListTUI(); }
       else if (action === 'start') {
         const id = await pickInstanceTUI('选择要启动的实例');
         if (id) {
