@@ -4,6 +4,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const si = require('systeminformation');
+const { platformHelper } = require('../PlatformHelper');
 
 const execAsync = promisify(exec);
 
@@ -27,7 +28,7 @@ class EnvironmentService {
       const isWindows = os.platform() === 'win32';
       const command = isWindows ? 'code --version' : 'code --version';
       
-      const { stdout } = await execAsync(command, { timeout: 5000 });
+      const { stdout } = await execAsync(command, { timeout: 5000, env: platformHelper.buildSpawnEnv() });
       const lines = stdout.trim().split('\n');
       
       if (lines.length > 0) {
@@ -72,7 +73,7 @@ class EnvironmentService {
       }
     } else {
       try {
-        const { stdout } = await execAsync('which code');
+        const { stdout } = await execAsync('which code', { env: platformHelper.buildSpawnEnv() });
         return stdout.trim();
       } catch (e) {
         return null;
@@ -91,7 +92,7 @@ class EnvironmentService {
     }
 
     try {
-      const { stdout } = await execAsync('code --list-extensions --show-versions', { timeout: 10000 });
+      const { stdout } = await execAsync('code --list-extensions --show-versions', { timeout: 10000, env: platformHelper.buildSpawnEnv() });
       const extensions = stdout
         .trim()
         .split('\n')
@@ -130,7 +131,7 @@ class EnvironmentService {
       // Windows Terminal 特殊处理，使用 where 命令检测
       if (toolName === 'windows-terminal' && os.platform() === 'win32') {
         try {
-          const { stdout } = await execAsync('where wt.exe', { timeout: 3000 });
+          const { stdout } = await execAsync('where wt.exe', { timeout: 3000, env: platformHelper.buildSpawnEnv() });
           if (stdout.trim()) {
             const result = {
               installed: true,
@@ -152,7 +153,7 @@ class EnvironmentService {
         return result;
       }
 
-      const { stdout } = await execAsync(command, { timeout: 5000 });
+      const { stdout } = await execAsync(command, { timeout: 5000, env: platformHelper.buildSpawnEnv() });
       const result = {
         installed: true,
         version: stdout.trim().split('\n')[0],
