@@ -394,9 +394,10 @@ class OobeService {
   }
 
   /**
-   * 验证安装路径是否有效
-   * @param {string} targetPath - 要验证的路径
-   * @returns {Promise<{valid: boolean, error?: string}>}
+   * 验证安装路径是否有效（仅检查，不创建子目录）
+   * @param {string} targetPath - 要验证的路径（父目录）
+   * @returns {Promise<{valid: boolean, resolvedPath?: string, error?: string}>}
+   *   resolvedPath 为实际将使用的安装目录（targetPath/Neo-MoFox）
    */
   async validatePath(targetPath) {
     if (!targetPath || targetPath.trim() === '') {
@@ -411,45 +412,47 @@ class OobeService {
         }
       }
 
-      // 检查路径长度（Windows 限制）
-      if (process.platform === 'win32' && targetPath.length > 240) {
-        return { valid: false, error: '路径过长（Windows 限制为 240 字符）' };
+      // 检查路径长度（Windows 限制，预留 Neo-MoFox 子目录名长度）
+      if (process.platform === 'win32' && targetPath.length > 230) {
+        return { valid: false, error: '路径过长（含安装子目录后将超过 Windows 240 字符限制）' };
       }
 
-      // 检查路径是否存在
-      let pathExists = false;
+      // 确保父目录存在
       try {
-        await fs.promises.access(targetPath, fs.constants.F_OK);
-        pathExists = true;
-      } catch {
-        pathExists = false;
+        await fs.promises.mkdir(targetPath, { recursive: true });
+      } catch (err) {
+        return { valid: false, error: '路径无法创建: ' + err.message };
       }
 
-      if (!pathExists) {
-        try {
-          await fs.promises.mkdir(targetPath, { recursive: true });
-        } catch (err) {
-          return { valid: false, error: '路径不存在且无法自动创建: ' + err.message };
-        }
-      }
-
-      // 路径存在，检查是否可写
+      // 检查父目录是否可写
       try {
         await fs.promises.access(targetPath, fs.constants.W_OK);
       } catch {
         return { valid: false, error: '路径不可写' };
       }
 
-      // 检查目录是否为空
-      const files = await fs.promises.readdir(targetPath);
-      if (files.length > 0) {
-        return { valid: false, error: '目录不为空，请选择空目录' };
-      }
-
-      return { valid: true };
+      // 仅计算子目录路径，不在此处创建（创建在最终确认时进行）
+      const resolvedPath = path.join(targetPath, 'Neo-MoFox');
+      return { valid: true, resolvedPath };
     } catch (error) {
       console.error('[OobeService] 验证路径失败:', error);
       return { valid: false, error: error.message || '验证失败' };
+    }
+  }
+
+  /**
+   * 创建安装目录（在用户确认后调用）
+   * @param {string} targetPath - 父目录路径
+   * @returns {Promise<{success: boolean, resolvedPath?: string, error?: string}>}
+   */
+  async createInstallDir(targetPath) {
+    const resolvedPath = path.join(targetPath, 'Neo-MoFox');
+    try {
+      await fs.promises.mkdir(resolvedPath, { recursive: true });
+      return { success: true, resolvedPath };
+    } catch (err) {
+      console.error('[OobeService] 创建安装目录失败:', err);
+      return { success: false, error: '无法创建安装目录: ' + err.message };
     }
   }
 

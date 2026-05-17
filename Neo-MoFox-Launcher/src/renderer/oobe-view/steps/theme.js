@@ -89,16 +89,19 @@ export async function renderThemeStep(container, stepManager) {
       padding: 16px;
       border-radius: 8px;
       background: var(--md-sys-color-surface-variant);
+      color: var(--md-sys-color-on-surface-variant);
       cursor: pointer;
       transition: all 0.2s ease;
       border: 2px solid transparent;
     }
     .theme-mode-option:hover {
       background: var(--md-sys-color-surface-container-high);
+      color: var(--md-sys-color-on-surface);
     }
     .theme-mode-option.active {
       border-color: var(--md-sys-color-primary);
       background: rgba(var(--md-sys-color-primary-rgb), 0.1);
+      color: var(--md-sys-color-on-surface);
     }
     .theme-mode-option .material-symbols-rounded {
       font-size: 32px;

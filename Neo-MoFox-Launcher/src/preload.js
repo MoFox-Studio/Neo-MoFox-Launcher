@@ -58,6 +58,7 @@ const api = {
   // OOBE 向导
   oobeSelectPath: () => ipcRenderer.invoke('oobe-select-path'),
   oobeValidatePath: (targetPath) => ipcRenderer.invoke('oobe-validate-path', targetPath),
+  oobeCreateInstallDir: (targetPath) => ipcRenderer.invoke('oobe-create-install-dir', targetPath),
   // 注意：oobeGetConfigFiles, oobeSaveConfig, oobeFinish 已删除（未被使用）
 
   // 环境检测

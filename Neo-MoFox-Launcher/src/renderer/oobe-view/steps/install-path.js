@@ -2,7 +2,8 @@
  * OOBE 步骤 3: 安装路径配置
  */
 
-let currentPath = ''; // 默认路径
+let currentPath = ''; // 用户输入的父目录
+let resolvedInstallPath = ''; // 实际安装子目录（currentPath/Neo-MoFox）
 
 export async function renderInstallPathStep(container, stepManager) {
   // 尝试从现有配置读取
@@ -108,10 +109,10 @@ export async function renderInstallPathStep(container, stepManager) {
 
   // 恢复默认路径
   btnDefaultPath.addEventListener('click', () => {
-    const defaultPath = '';
-    inputPath.value = defaultPath;
-    currentPath = defaultPath;
-    validatePath(defaultPath);
+    inputPath.value = '';
+    currentPath = '';
+    resolvedInstallPath = '';
+    validatePath('');
   });
 
   // 输入框变化
@@ -120,21 +121,33 @@ export async function renderInstallPathStep(container, stepManager) {
     await validatePath(currentPath);
   });
 
-  // 初始验证
-  // 设置验证函数
+  // 设置验证函数（用户点击"下一步"时触发）
   stepManager.setValidator('install-path', async () => {
+    // 先做一次验证确保路径仍然有效
     const isValid = await validatePath(currentPath);
-    if (isValid) {
-      stepManager.config.defaultInstallDir = currentPath;
-      return true;
+    if (!isValid) return false;
+
+    // 在此处实际创建安装子目录
+    const result = await window.mofoxAPI.oobeCreateInstallDir(currentPath);
+    if (!result.success) {
+      pathInfo.className = 'path-info invalid';
+      pathInfo.innerHTML = `
+        <span class="material-symbols-rounded">error</span>
+        <span>${result.error || '创建安装目录失败'}</span>
+      `;
+      pathInfo.classList.remove('hidden');
+      return false;
     }
-    return false;
+
+    stepManager.config.defaultInstallDir = result.resolvedPath;
+    return true;
   });
 
   await validatePath(currentPath);
 
   async function validatePath(path) {
     if (!path || path.trim() === '') {
+      resolvedInstallPath = '';
       pathInfo.className = 'path-info invalid';
       pathInfo.innerHTML = `
         <span class="material-symbols-rounded">error</span>
@@ -147,14 +160,16 @@ export async function renderInstallPathStep(container, stepManager) {
     try {
       const validation = await window.mofoxAPI.oobeValidatePath(path);
       if (validation.valid) {
+        resolvedInstallPath = validation.resolvedPath;
         pathInfo.className = 'path-info valid';
         pathInfo.innerHTML = `
           <span class="material-symbols-rounded">check_circle</span>
-          <span>路径有效</span>
+          <span>将安装到：${validation.resolvedPath}</span>
         `;
         pathInfo.classList.remove('hidden');
         return true;
       } else {
+        resolvedInstallPath = '';
         pathInfo.className = 'path-info invalid';
         pathInfo.innerHTML = `
           <span class="material-symbols-rounded">error</span>
@@ -165,6 +180,7 @@ export async function renderInstallPathStep(container, stepManager) {
       }
     } catch (error) {
       console.error('验证路径失败:', error);
+      resolvedInstallPath = '';
       pathInfo.className = 'path-info invalid';
       pathInfo.innerHTML = `
         <span class="material-symbols-rounded">error</span>

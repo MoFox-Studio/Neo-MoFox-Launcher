@@ -710,6 +710,9 @@ ipcMain.handle('oobe-select-path', () => oobeService.selectPath());
 // 验证路径（委托给 OobeService）
 ipcMain.handle('oobe-validate-path', (_event, targetPath) => oobeService.validatePath(targetPath));
 
+// 创建安装目录（用户确认后调用，在父目录下创建 Neo-MoFox 子文件夹）
+ipcMain.handle('oobe-create-install-dir', (_event, targetPath) => oobeService.createInstallDir(targetPath));
+
 // ─── sudo 密码管理 IPC（Linux 平台）────────────────────────────────────
 
 // 验证 sudo 密码（前端调用，返回验证结果）
