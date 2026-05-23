@@ -1,63 +1,31 @@
-// ─── CLI 模式检测（必须在 require('electron') 之前） ─────────────────
-// 当通过 --cli 参数启动时，直接运行 CLI 逻辑并退出，不启动 Electron GUI。
-// 用法：neo-mofox-launcher --cli <command> [options]
-const CLI_COMMANDS = new Set([
-  'list', 'ls', 'info', 'env-check', 'install', 'start', 'stop',
-  'status', 'logs', 'delete', 'remove', 'rm', 'data-dir',
-  'help', '--help', '-h', 'menu', 'tui',
-]);
+// ─── 通用参数检测（必须在 require('electron') 之前） ─────────────────
+// 使用通用参数解析模块检测启动模式（如 --cli、--daemon 等），
+// 如果匹配到 skipGui=true 的模式，则执行对应处理器并退出，不启动 Electron GUI。
+require('./commands/modes'); // 加载所有模式注册
+const { detectMode } = require('./commands/args-parser');
 
-/**
- * 获取用户传入的参数（排除 electron/app 路径）。
- * - 开发模式: electron . --cli list → ['--cli', 'list']
- * - 打包模式: neo-mofox-launcher --cli list → ['--cli', 'list']
- *
- * Electron 打包后 process.defaultApp 为 undefined，
- * 开发模式下 process.defaultApp 为 true。
- */
-function getUserArgs() {
-  // process.defaultApp 在开发模式（electron .）下为 true
-  const startIdx = process.defaultApp ? 2 : 1;
-  return process.argv.slice(startIdx);
-}
-
-function shouldRunCli() {
-  const args = getUserArgs();
-  // 显式 --cli 标志
-  if (args.includes('--cli')) return true;
-  // 第一个非 --flag 位置参数是已知 CLI 命令（兼容直接传命令的场景）
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--data-dir' || arg === '--json') { i++; continue; }
-    if (arg.startsWith('--')) continue;
-    if (CLI_COMMANDS.has(arg)) return true;
-    break;
+// ─── 执行参数检测与分发 ───────────────────────────────────────────────
+const _modeResult = detectMode();
+if (_modeResult) {
+  const { mode, explicit } = _modeResult;
+  // 执行 argv 预处理
+  if (mode.prepareArgv) {
+    mode.prepareArgv({ explicit });
   }
-  return false;
-}
-
-if (shouldRunCli()) {
-  // 从 process.argv 中移除 --cli 标志，使 CLI 模块能正确解析后续参数。
-  // CLI 模块内部使用 process.argv.slice(2)，所以我们需要确保 argv 格式正确。
-  const cliArgIdx = process.argv.indexOf('--cli');
-  if (cliArgIdx !== -1) {
-    process.argv.splice(cliArgIdx, 1);
-  }
-  // 如果是打包模式，CLI 模块期望 argv[0]=node, argv[1]=script, argv[2+]=args
-  // 但打包模式下 argv 是 [executable, ...args]，需要补一个占位使 slice(2) 正确
-  if (!process.defaultApp && process.argv.length >= 1) {
-    process.argv.splice(1, 0, '__cli__');
-  }
-
-  const { main: cliMain } = require('./cli/index');
-  cliMain().then(() => {
-    process.exit(0);
+  // 执行模式处理器
+  mode.handler().then(() => {
+    if (mode.skipGui) {
+      process.exit(0);
+    }
+    // skipGui=false 的模式执行完后继续启动 GUI
   }).catch(err => {
-    console.error(`[CLI] 错误: ${err.message}`);
+    console.error(`[${mode.flag}] 错误: ${err.message}`);
     process.exit(1);
   });
-  // 阻止后续 Electron GUI 代码执行
-  return;
+  // 如果 skipGui=true，阻止后续 Electron GUI 代码执行
+  if (mode.skipGui) {
+    return;
+  }
 }
 
 // ─── 以下为 Electron GUI 模式 ────────────────────────────────────────
