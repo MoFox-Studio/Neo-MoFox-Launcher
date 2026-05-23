@@ -2,7 +2,7 @@
 // 使用通用参数解析模块检测启动模式（如 --cli、--daemon 等），
 // 如果匹配到 skipGui=true 的模式，则执行对应处理器并退出，不启动 Electron GUI。
 require('./commands/modes'); // 加载所有模式注册
-const { detectMode } = require('./commands/args-parser');
+const { detectMode, startupContext } = require('./commands/args-parser');
 
 // ─── 执行参数检测与分发 ───────────────────────────────────────────────
 const _modeResult = detectMode();
@@ -322,6 +322,39 @@ app.whenReady().then(async () => {
     // 首次运行，在主窗口中显示 OOBE
     console.log('[Main] 检测到首次运行，启动 OOBE 向导');
     createWindow(true); // 传入 true 表示加载 OOBE 页面
+  } else if (startupContext.navigateTo === 'instance-view' && startupContext.instanceName) {
+    // --start 模式：直接跳转到指定实例并自动启动
+    const targetName = startupContext.instanceName;
+    const instances = storageService.getInstances();
+    const instance = instances.find(i => i.id === targetName)
+      || instances.find(i => i.name === targetName)
+      || instances.find(i => i.extra?.displayName === targetName)
+      || instances.find(i => i.qqNickname === targetName)
+      || instances.find(i => i.id && i.id.startsWith(targetName))
+      || null;
+
+    if (!instance) {
+      console.error(`[Main] --start 错误: 找不到实例 "${targetName}"`);
+      console.error('[Main] 可用实例列表:');
+      if (instances.length === 0) {
+        console.error('  (无可用实例)');
+      } else {
+        instances.forEach(i => {
+          const name = i.name || i.extra?.displayName || i.qqNickname || i.id;
+          console.error(`  - ${name} (ID: ${i.id})`);
+        });
+      }
+      process.exit(1);
+    } else {
+      const displayName = instance.name || instance.extra?.displayName || instance.qqNickname || instance.id;
+      console.log(`[Main] --start 模式: 直接启动实例 "${displayName}" (${instance.id})`);
+      createWindow(false);
+      loadSettings();
+      // 加载 instance-view 页面并带上 autoStart 参数
+      const instanceViewUrl = path.join(__dirname, 'renderer', 'instance-view', 'index.html');
+      const query = `?instanceId=${encodeURIComponent(instance.id)}&name=${encodeURIComponent(displayName)}&autoStart=true`;
+      mainWindow.loadFile(instanceViewUrl, { search: query });
+    }
   } else {
     // 已完成 OOBE，正常启动主窗口
     console.log('[Main] OOBE 已完成，启动主窗口');
@@ -2420,7 +2453,8 @@ ipcMain.handle('instance-stats', (event, instanceId) => {
 ipcMain.handle('instance-pty-resize', (event, instanceId, source, cols, rows) => {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData) {
-    throw new Error('实例不存在');
+    // 实例进程尚未启动或已停止，静默忽略 resize 请求
+    return;
   }
 
   // 更新存储的尺寸

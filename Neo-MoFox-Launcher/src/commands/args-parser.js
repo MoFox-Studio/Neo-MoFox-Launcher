@@ -18,6 +18,13 @@
 const registeredModes = new Map();
 
 /**
+ * 启动上下文：用于在模式处理器（skipGui=false）和后续 GUI 启动流程之间传递数据。
+ * 各模式可自由写入所需字段，GUI 启动时按需读取。
+ * 例如 --start 模式会写入 { navigateTo, instanceName, autoStart }。
+ */
+const startupContext = {};
+
+/**
  * 获取用户传入的参数（排除 electron/app 路径）。
  * - 开发模式: electron . --cli list → ['--cli', 'list']
  * - 打包模式: neo-mofox-launcher --cli list → ['--cli', 'list']
@@ -131,6 +138,7 @@ function getActiveMode() {
 
 module.exports = {
   getUserArgs,
+  startupContext,
   registerMode,
   detectMode,
   parseAndExecute,

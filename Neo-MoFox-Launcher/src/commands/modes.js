@@ -8,7 +8,7 @@
  */
 'use strict';
 
-const { registerMode } = require('./args-parser');
+const { registerMode, getUserArgs, startupContext } = require('./args-parser');
 
 // ─── CLI 模式 ─────────────────────────────────────────────────────────
 // 面向无桌面环境的命令行模式，执行完毕后退出进程，不启动 Electron GUI。
@@ -39,5 +39,31 @@ registerMode({
     if (!process.defaultApp && process.argv.length >= 1) {
       process.argv.splice(1, 0, '__cli__');
     }
+  },
+});
+
+// ─── Start 模式 ───────────────────────────────────────────────────────
+// 启动 GUI 并直接跳转到指定实例页面，自动启动该实例。
+// 用法: neo-mofox-launcher --start <实例名称或ID>
+registerMode({
+  flag: '--start',
+  commands: null,
+  skipGui: false,
+  handler: async () => {
+    // 解析 --start 后面的实例名称参数
+    const args = getUserArgs();
+    const startIdx = args.indexOf('--start');
+    const instanceName = startIdx !== -1 ? args[startIdx + 1] : null;
+
+    if (!instanceName) {
+      console.error('[--start] 错误: 必须指定实例名称或 ID');
+      console.error('用法: neo-mofox-launcher --start <实例名称>');
+      process.exit(1);
+    }
+
+    // 将启动信息写入 startupContext，供 GUI 启动时读取
+    startupContext.navigateTo = 'instance-view';
+    startupContext.instanceName = instanceName;
+    startupContext.autoStart = true;
   },
 });
