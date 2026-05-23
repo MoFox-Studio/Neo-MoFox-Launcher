@@ -115,15 +115,30 @@ class VersionService {
 
   /**
    * 执行命令（Promise 封装）
+   *
+   * 注意：因为需要在 Windows 下先执行 `chcp 65001 >nul && ...` 来切换 UTF-8 代码页，
+   * 这里通过 shell 字符串方式调用，所以必须自行对参数做 shell 引用，
+   * 否则像 `--format=%H|||%s|||%ci` 中的 `|` 会被 shell 解析为管道符。
    */
   _execCommand(command, args, options = {}) {
     return new Promise((resolve, reject) => {
-      // Windows 下先设置 UTF-8 代码页
       const isWindows = platformHelper.isWindows;
-      const fullCommand = isWindows 
-        ? `chcp 65001 >nul && ${command} ${args.map(a => `"${a}"`).join(' ')}`
-        : `${command} ${args.join(' ')}`;
-      
+
+      // Windows cmd.exe：用双引号包裹，并把参数中的 `"` 转义为 `""`。
+      // POSIX shell：用单引号包裹，并把参数中的 `'` 转义为 `'\''`。
+      const quoteArg = (a) => {
+        const s = String(a);
+        if (isWindows) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return `'${s.replace(/'/g, `'\\''`)}'`;
+      };
+
+      const quotedArgs = args.map(quoteArg).join(' ');
+      const fullCommand = isWindows
+        ? `chcp 65001 >nul && ${command} ${quotedArgs}`
+        : `${command} ${quotedArgs}`;
+
       const proc = spawn(fullCommand, [], {
         shell: platformHelper.config.shell,
         cwd: options.cwd || process.cwd(),
