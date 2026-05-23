@@ -61,7 +61,7 @@ if (shouldRunCli()) {
 }
 
 // ─── 以下为 Electron GUI 模式 ────────────────────────────────────────
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, Tray, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
@@ -117,6 +117,10 @@ const PTY_BUFFER_MAX_SIZE = 100000; // 保留最近 100KB 原始字节用于历�
 
 // ─── 配置编辑器窗口管理 ─────────────────────────────────
 const editorWindows = new Map(); // filePath -> BrowserWindow
+
+// ─── 系统托盘 ─────────────────────────────────────────
+let tray = null;
+let isQuitting = false; // 标记是否真正退出（区分关闭到托盘和真正退出）
 
 // ─── 窗口创建 ───────────────────────────────────────
 function createWindow(isOobe = false) {
@@ -266,6 +270,62 @@ function createEditorWindow(filePath, fileName) {
   return editorWindow;
 }
 
+// ─── 系统托盘创建 ─────────────────────────────────────
+/**
+ * 创建系统托盘图标及右键菜单
+ */
+function createTray() {
+  if (tray) return; // 已存在则不重复创建
+
+  const iconPath = path.join(__dirname, '..', 'assets', 'images', 'icon', 'icon.png');
+  tray = new Tray(iconPath);
+  tray.setToolTip('Neo-MoFox-Launcher');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '显示主窗口',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        } else {
+          createWindow(false);
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: '退出',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  // 双击托盘图标显示主窗口
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow(false);
+    }
+  });
+}
+
+/**
+ * 销毁系统托盘
+ */
+function destroyTray() {
+  if (tray) {
+    tray.destroy();
+    tray = null;
+  }
+}
+
 // ─── 应用生命周期 ───────────────────────────────────
 app.whenReady().then(async () => {
   // 初始化 StorageService（确保数据目录存在）
@@ -311,18 +371,28 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  // 如果启用了关闭到托盘且不是真正退出，则不退出应用
+  const { settingsService } = require('./services/settings/SettingsService');
+  const closeToTray = settingsService.get('closeToTray');
+  if (closeToTray && !isQuitting) {
+    // 窗口已隐藏到托盘，不退出
+    return;
+  }
   killMofoxProcess();
   if (launcherLogger) {
     launcherLogger.close();
   }
+  destroyTray();
   app.quit();
 });
 
 app.on('before-quit', () => {
+  isQuitting = true; // 标记为真正退出
   killMofoxProcess();
   if (launcherLogger) {
     launcherLogger.close();
   }
+  destroyTray();
 });
 
 // ─── 设置持久化 ─────────────────────────────────────
@@ -351,194 +421,8 @@ function saveSettings() {
   }
 }
 
-// ─── Neo-MoFox 进程管理 ─────────────────────────────
-function sendLog(type, message) {
-  const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-  const logEntry = { type, message, timestamp };
-  logBuffer.push(logEntry);
-  if (logBuffer.length > MAX_LOG_LINES) {
-    logBuffer = logBuffer.slice(-MAX_LOG_LINES);
-  }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('log-output', logEntry);
-  }
-}
-
-function updateStatus(status, detail = '') {
-  mofoxStatus = status;
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('status-changed', { status, detail });
-  }
-}
-
-function findPythonExecutable() {
-  // 使用 PlatformHelper 查找虚拟环境 Python
-  return platformHelper.findVenvPython(projectPath);
-}
-
-function startMofox() {
-  if (mofoxProcess) {
-    sendLog('warn', '⚠ Neo-MoFox 已在运行中');
-    return;
-  }
-
-  if (!projectPath || !fs.existsSync(projectPath)) {
-    sendLog('error', '✗ 请先设置有效的 Neo-MoFox 项目路径');
-    updateStatus('error', '项目路径无效');
-    return;
-  }
-
-  const mainPy = path.join(projectPath, 'main.py');
-  if (!fs.existsSync(mainPy)) {
-    sendLog('error', '✗ 未找到 main.py，请检查项目路径是否正确');
-    updateStatus('error', '未找到 main.py');
-    return;
-  }
-
-  updateStatus('starting');
-  sendLog('info', '◉ 正在启动 Neo-MoFox...');
-
-  const pythonExe = findPythonExecutable();
-  let cmd, args;
-
-  if (pythonExe) {
-    cmd = pythonExe;
-    args = [mainPy];
-    sendLog('info', `  使用 Python: ${pythonExe}`);
-  } else {
-    // 使用 uv run
-    cmd = platformHelper.uvBin;
-    args = ['run', 'python', 'main.py'];
-    sendLog('info', '  使用 uv run 启动');
-  }
-
-  try {
-    // 强制使用 UTF-8 编码输出，避免中文乱码
-    mofoxProcess = spawn(cmd, args, {
-      cwd: projectPath,
-      env: platformHelper.buildSpawnEnv(),
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      maxBuffer: 10 * 1024 * 1024, // 10MB 缓冲区，防止日志过多导致阻塞
-    });
-
-    sendLog('info', `  PID: ${mofoxProcess.pid}`);
-
-    mofoxProcess.stdout.on('data', (data) => {
-      const lines = new TextDecoder('utf-8').decode(data).split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          sendLog('stdout', line);
-        }
-      });
-      if (mofoxStatus === 'starting') {
-        updateStatus('running');
-        sendLog('success', '✓ Neo-MoFox 已成功启动');
-      }
-    });
-
-    mofoxProcess.stderr.on('data', (data) => {
-      const lines = new TextDecoder('utf-8').decode(data).split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          sendLog('stderr', line);
-        }
-      });
-      if (mofoxStatus === 'starting') {
-        updateStatus('running');
-      }
-    });
-
-    mofoxProcess.on('close', (code) => {
-      sendLog('info', `◉ Neo-MoFox 进程已退出 (code: ${code})`);
-      mofoxProcess = null;
-      if (mofoxStatus !== 'stopping') {
-        updateStatus(code === 0 ? 'stopped' : 'error', `退出码: ${code}`);
-      } else {
-        updateStatus('stopped');
-      }
-    });
-
-    mofoxProcess.on('error', (err) => {
-      sendLog('error', `✗ 启动失败: ${err.message}`);
-      mofoxProcess = null;
-      updateStatus('error', err.message);
-    });
-
-    // 延迟检测，如果3秒后进程还在就认为启动成功
-    setTimeout(() => {
-      if (mofoxProcess && mofoxStatus === 'starting') {
-        updateStatus('running');
-        sendLog('success', '✓ Neo-MoFox 正在运行');
-      }
-    }, 3000);
-
-  } catch (err) {
-    sendLog('error', `✗ 启动失败: ${err.message}`);
-    updateStatus('error', err.message);
-  }
-}
-
-function stopMofox() {
-  if (!mofoxProcess) {
-    sendLog('warn', '⚠ Neo-MoFox 未在运行');
-    return;
-  }
-
-  updateStatus('stopping');
-  sendLog('info', '◉ 正在停止 Neo-MoFox...');
-
-  try {
-    platformHelper.killProcessTree(mofoxProcess, 'SIGTERM');
-
-    // 超时强杀
-    setTimeout(() => {
-      if (mofoxProcess) {
-        try {
-          mofoxProcess.kill('SIGKILL');
-        } catch (e) { /* ignore */ }
-        mofoxProcess = null;
-        updateStatus('stopped');
-        sendLog('info', '◉ Neo-MoFox 已被强制停止');
-      }
-    }, 5000);
-  } catch (err) {
-    sendLog('error', `✗ 停止失败: ${err.message}`);
-    try { mofoxProcess.kill(); } catch (e) { /* ignore */ }
-    mofoxProcess = null;
-    updateStatus('stopped');
-  }
-}
-
-function restartMofox() {
-  sendLog('info', '◉ 正在重启 Neo-MoFox...');
-  if (mofoxProcess) {
-    updateStatus('stopping');
-    platformHelper.killProcessTree(mofoxProcess, 'SIGTERM');
-    // 等待进程退出后重启
-    setTimeout(() => {
-      mofoxProcess = null;
-      startMofox();
-    }, 1500);
-    setTimeout(() => {
-      if (mofoxProcess) {
-        try { mofoxProcess.kill('SIGKILL'); } catch (e) { /* ignore */ }
-        mofoxProcess = null;
-        setTimeout(() => startMofox(), 500);
-      }
-    }, 5000);
-  } else {
-    startMofox();
-  }
-}
-
 function killMofoxProcess() {
   // 旧的单实例 mofoxProcess 仍是 ChildProcess（被启动器单实例模式使用）
-  if (mofoxProcess) {
-    platformHelper.killProcessTree(mofoxProcess, 'SIGKILL');
-    mofoxProcess = null;
-  }
-
   // 多实例进程都是 node-pty 的 IPty 对象，直接 kill 即可，附带平台命令兜底
   for (const [instanceId, data] of instanceProcesses.entries()) {
     for (const proc of [data.mofoxProcess, data.napcatProcess]) {
@@ -649,18 +533,6 @@ ipcMain.handle('get-resource-usage', () => {
 
 ipcMain.handle('get-platform-info', () => {
   return platformHelper.detectSystemEnv();
-});
-
-ipcMain.handle('start-mofox', () => {
-  startMofox();
-});
-
-ipcMain.handle('stop-mofox', () => {
-  stopMofox();
-});
-
-ipcMain.handle('restart-mofox', () => {
-  restartMofox();
 });
 
 ipcMain.handle('select-project-path', async () => {
@@ -890,8 +762,16 @@ ipcMain.handle('window-maximize', (event) => {
 });
 ipcMain.handle('window-close', (event) => {
   const window = BrowserWindow.fromWebContents(event.sender);
-  // 仅主窗口关闭时杀死 MoFox 进程
+  // 主窗口关闭时检查是否需要最小化到托盘
   if (window === mainWindow) {
+    const { settingsService } = require('./services/settings/SettingsService');
+    const closeToTray = settingsService.get('closeToTray');
+    if (closeToTray && !isQuitting) {
+      // 最小化到托盘：隐藏窗口并创建托盘图标
+      mainWindow.hide();
+      createTray();
+      return;
+    }
     killMofoxProcess();
   }
   if (window) window.close();

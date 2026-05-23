@@ -31,6 +31,9 @@ const DEFAULT_SETTINGS = {
   // 更新
   autoCheckUpdates: true,     // 启动时自动检查实例更新
 
+  // 关闭行为
+  closeToTray: false,         // true: 关闭窗口时最小化到系统托盘 | false: 直接退出
+
   // 配置编辑器
   configEditor: {
     useBuiltIn: true          // true: 使用内置编辑器 | false: 使用系统默认编辑器

@@ -3,12 +3,12 @@
 .floating-nav {
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
   z-index: 1000;
   pointer-events: none;
-  animation: floatingNavSlideIn 0.4s ease both;
-  animation-delay: 0.2s;
 }
 
 .floating-nav-track {
@@ -21,6 +21,8 @@
   border-radius: 12px;
   box-shadow: var(--shadow-deep);
   pointer-events: auto;
+  animation: floatingNavSlideIn 0.4s ease both;
+  animation-delay: 0.2s;
 }
 
 .floating-nav-item {
@@ -80,11 +82,11 @@
 @keyframes floatingNavSlideIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(24px);
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 

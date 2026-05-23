@@ -48,6 +48,7 @@ const el = {
   btnResetAll:        $('btn-reset-all'),
   autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
   autoCheckUpdates:   $('auto-check-updates'),
+  closeToTray:        $('close-to-tray'),
   editorBuiltin:      $('editor-builtin'),
   editorSystem:       $('editor-system'),
 
@@ -101,6 +102,7 @@ function populateUI(settings) {
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
   el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
   el.autoCheckUpdates.checked = settings.autoCheckUpdates ?? true;
+  el.closeToTray.checked = settings.closeToTray ?? false;
   selectEditorOption(settings.configEditor?.useBuiltIn !== false ? 'builtin' : 'system');
 
   // 日志
@@ -260,6 +262,11 @@ function bindEvents() {
   // 自动检查更新
   el.autoCheckUpdates.addEventListener('change', () => {
     savePartial({ autoCheckUpdates: el.autoCheckUpdates.checked });
+  });
+
+  // 关闭到系统托盘
+  el.closeToTray.addEventListener('change', () => {
+    savePartial({ closeToTray: el.closeToTray.checked });
   });
 
   // 配置编辑器

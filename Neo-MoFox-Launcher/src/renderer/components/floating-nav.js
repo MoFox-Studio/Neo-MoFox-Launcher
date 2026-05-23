@@ -1,7 +1,6 @@
 /**
  * floating-nav.js - 全局悬浮底栏导航组件
  * 自动注入悬浮底栏 HTML，并根据当前页面高亮对应导航项
- * 设置页面额外支持 tab 切换（外观/通用/关于）
  */
 (function () {
   const NAV_ITEMS = [
