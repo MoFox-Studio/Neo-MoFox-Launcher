@@ -94,6 +94,16 @@ console.log(app.getName());
     }
   });
 
+  // ─── 所有 window.open 一律走系统浏览器，禁止 Electron 创建内置子窗口 ──
+  // 这覆盖了 xterm WebLinksAddon 默认 handler 走 window.open 的兜底路径，
+  // 确保终端里点链接绝对不会弹出内置 BrowserWindow。
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url && /^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       if (mainWindow.webContents.isDevToolsOpened()) {
@@ -168,6 +178,14 @@ function createEditorWindow(filePath, fileName) {
         editorWindow.webContents.openDevTools();
       }
     }
+  });
+
+  // 编辑器窗口里的外链一律走系统浏览器
+  editorWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url && /^https?:\/\//i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 
   // 监听窗口最大化/还原状态变化

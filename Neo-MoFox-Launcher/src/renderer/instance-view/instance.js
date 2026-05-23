@@ -132,14 +132,23 @@ function createTerminal(source, container) {
     theme: TERMINAL_THEME,
     // 让 xterm 不主动接管渲染前的物理粘贴
     allowProposedApi: true,
+    // OSC 8 超链接（\x1b]8;;url\x1b\\...）走系统浏览器，避免 xterm 内置
+    // OscLinkProvider 调 window.open() 触发 "Opening link blocked..." 警告。
+    linkHandler: {
+      activate: (_event, uri) => {
+        if (uri) window.mofoxAPI?.openExternal?.(uri);
+      },
+      allowNonHttpProtocols: false,
+    },
   });
 
   const fit = new window.FitAddon.FitAddon();
   const search = new window.SearchAddon.SearchAddon();
   const serialize = new window.SerializeAddon.SerializeAddon();
-  const webLinks = new window.WebLinksAddon.WebLinksAddon((event, uri) => {
-    // 拦截链接点击，走主进程打开外部浏览器
-    event.preventDefault();
+  // 拦截链接点击，强制走系统浏览器；即使 mofoxAPI 不可用也只是不响应，
+  // 不会回退到 xterm 默认的 window.open 行为（自定义 handler 已替换默认实现）。
+  const webLinks = new window.WebLinksAddon.WebLinksAddon((_event, uri) => {
+    if (!uri) return;
     window.mofoxAPI?.openExternal?.(uri);
   });
 
