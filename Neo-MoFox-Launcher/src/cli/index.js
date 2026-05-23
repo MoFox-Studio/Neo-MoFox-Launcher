@@ -8,7 +8,7 @@
  * 列出 / 启动 / 停止 / 状态 / 日志 等基础操作，无需 Electron GUI。
  *
  * 用法：
- *   neo-mofox-cli <command> [options]
+ *   neo-mofox-launcher --cli <command> [options]
  *
  * 命令：
  *   list                       列出所有实例
@@ -1345,7 +1345,12 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(`[CLI] 错误: ${err.message}`);
-  process.exit(1);
-});
+// 当直接运行时自动执行；当作为模块被 require 时仅导出
+if (require.main === module) {
+  main().catch(err => {
+    console.error(`[CLI] 错误: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { main };

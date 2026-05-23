@@ -18,8 +18,8 @@ files:
   # 明确包含 OOBE SVG 插图文件
   - "assets/images/oobe/**"
 
-# CLI 入口需要作为真实文件存在，以便 node 直接执行
-# 同时解包 CLI 的 npm 依赖（@iarna/toml），确保纯 node 运行时可用
+# 解包 CLI 和 services 代码，以及相关依赖（@iarna/toml）
+# CLI 现在通过 main.js 内部调用，但仍需解包以确保模块加载正常
 asarUnpack:
   - "src/cli/**"
   - "src/services/**"
@@ -60,13 +60,8 @@ linux:
     entry:
       Name: Neo-MoFox Launcher
       StartupWMClass: neo-mofox-launcher
-  extraFiles:
-    - from: scripts/neo-mofox-cli
-      to: neo-mofox-cli
 
 deb:
-  afterInstall: scripts/after-install-linux.sh
-  afterRemove: scripts/after-remove-linux.sh
   depends:
     - libgtk-3-0
     - libnotify4
@@ -79,8 +74,6 @@ deb:
     - libsecret-1-0
 
 rpm:
-  afterInstall: scripts/after-install-linux.sh
-  afterRemove: scripts/after-remove-linux.sh
   # Fedora / RHEL / openSUSE 等基于 RPM 的发行版的依赖
   depends:
     - gtk3

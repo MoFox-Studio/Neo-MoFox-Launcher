@@ -1,3 +1,66 @@
+// ─── CLI 模式检测（必须在 require('electron') 之前） ─────────────────
+// 当通过 --cli 参数启动时，直接运行 CLI 逻辑并退出，不启动 Electron GUI。
+// 用法：neo-mofox-launcher --cli <command> [options]
+const CLI_COMMANDS = new Set([
+  'list', 'ls', 'info', 'env-check', 'install', 'start', 'stop',
+  'status', 'logs', 'delete', 'remove', 'rm', 'data-dir',
+  'help', '--help', '-h', 'menu', 'tui',
+]);
+
+/**
+ * 获取用户传入的参数（排除 electron/app 路径）。
+ * - 开发模式: electron . --cli list → ['--cli', 'list']
+ * - 打包模式: neo-mofox-launcher --cli list → ['--cli', 'list']
+ *
+ * Electron 打包后 process.defaultApp 为 undefined，
+ * 开发模式下 process.defaultApp 为 true。
+ */
+function getUserArgs() {
+  // process.defaultApp 在开发模式（electron .）下为 true
+  const startIdx = process.defaultApp ? 2 : 1;
+  return process.argv.slice(startIdx);
+}
+
+function shouldRunCli() {
+  const args = getUserArgs();
+  // 显式 --cli 标志
+  if (args.includes('--cli')) return true;
+  // 第一个非 --flag 位置参数是已知 CLI 命令（兼容直接传命令的场景）
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--data-dir' || arg === '--json') { i++; continue; }
+    if (arg.startsWith('--')) continue;
+    if (CLI_COMMANDS.has(arg)) return true;
+    break;
+  }
+  return false;
+}
+
+if (shouldRunCli()) {
+  // 从 process.argv 中移除 --cli 标志，使 CLI 模块能正确解析后续参数。
+  // CLI 模块内部使用 process.argv.slice(2)，所以我们需要确保 argv 格式正确。
+  const cliArgIdx = process.argv.indexOf('--cli');
+  if (cliArgIdx !== -1) {
+    process.argv.splice(cliArgIdx, 1);
+  }
+  // 如果是打包模式，CLI 模块期望 argv[0]=node, argv[1]=script, argv[2+]=args
+  // 但打包模式下 argv 是 [executable, ...args]，需要补一个占位使 slice(2) 正确
+  if (!process.defaultApp && process.argv.length >= 1) {
+    process.argv.splice(1, 0, '__cli__');
+  }
+
+  const { main: cliMain } = require('./cli/index');
+  cliMain().then(() => {
+    process.exit(0);
+  }).catch(err => {
+    console.error(`[CLI] 错误: ${err.message}`);
+    process.exit(1);
+  });
+  // 阻止后续 Electron GUI 代码执行
+  return;
+}
+
+// ─── 以下为 Electron GUI 模式 ────────────────────────────────────────
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn, execSync } = require('child_process');
