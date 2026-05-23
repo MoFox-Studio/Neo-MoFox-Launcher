@@ -15,6 +15,11 @@
     "dev": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:win": "chcp 65001 >nul 2>&1 & electron . --dev",
     "dev:linux": "electron . --dev",
+    "postinstall": "node scripts/rebuild-node-pty.js",
+    "rebuild": "node scripts/rebuild-node-pty.js --force",
+    "rebuild:x64": "node scripts/rebuild-node-pty.js --force --arch=x64",
+    "rebuild:ia32": "node scripts/rebuild-node-pty.js --force --arch=ia32",
+    "rebuild:arm64": "node scripts/rebuild-node-pty.js --force --arch=arm64",
     "build": "electron-builder",
     "build:win": "electron-builder --win --x64",
     "build:win:ia32": "electron-builder --win --ia32",
@@ -30,6 +35,7 @@
   "license": "AGPL-3.0",
   "homepage": "https://github.com/MoFox-Studio/Neo-MoFox-Launcher",
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "electron": "^39.0.0",
     "electron-builder": "^26.0.0"
   },
@@ -44,10 +50,17 @@
     "@iarna/toml": "^2.2.5",
     "@lezer/highlight": "^1.2.3",
     "@material/material-color-utilities": "^0.3.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-search": "^0.15.0",
+    "@xterm/addon-serialize": "^0.13.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
     "adm-zip": "^0.5.17",
     "archiver": "^7.0.1",
     "extract-zip": "^2.0.1",
     "material-symbols": "^0.44.2",
+    "node-pty": "^1.1.0",
+    "strip-ansi": "^7.2.0",
     "systeminformation": "^5.31.1",
     "tree-kill": "^1.2.2"
   }

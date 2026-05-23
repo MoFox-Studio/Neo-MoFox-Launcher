@@ -121,9 +121,17 @@ const api = {
   getSeparatedStatus: (instanceId) => ipcRenderer.invoke('instance-status-separated', instanceId),
   getAllInstanceStatuses: () => ipcRenderer.invoke('instance-status-all'),
   getInstanceStats: (instanceId) => ipcRenderer.invoke('instance-stats', instanceId),
-  getInstanceLogs: (instanceId) => ipcRenderer.invoke('instance-get-logs', instanceId),
-  clearInstanceLogs: (instanceId, type) => ipcRenderer.invoke('instance-clear-logs', instanceId, type),
   exportInstanceLogs: (instanceId, type, logs) => ipcRenderer.invoke('instance-export-logs', instanceId, type, logs),
+
+  // ─── 实例 PTY 终端流 ─────────────────────────────────────────────────────
+  // PTY 模式下，所有日志都是带 ANSI 的原始字节流，由 xterm.js 直接渲染。
+  getInstancePtyBuffer: (instanceId) => ipcRenderer.invoke('instance-pty-buffer', instanceId),
+  resizeInstancePty: (instanceId, source, cols, rows) =>
+    ipcRenderer.invoke('instance-pty-resize', instanceId, source, cols, rows),
+  writeInstancePty: (instanceId, source, data) =>
+    ipcRenderer.invoke('instance-pty-input', instanceId, source, data),
+  clearInstancePty: (instanceId, source) =>
+    ipcRenderer.invoke('instance-pty-clear', instanceId, source),
 
   // 事件监听
   onLogOutput: (callback) => {
@@ -147,8 +155,10 @@ const api = {
   onInstanceStatusChange: (callback) => {
     ipcRenderer.on('instance-status-change', (_event, data) => callback(data));
   },
-  onInstanceLog: (callback) => {
-    ipcRenderer.on('instance-log', (_event, data) => callback(data));
+  onInstancePtyData: (callback) => {
+    const wrapped = (_event, data) => callback(data);
+    ipcRenderer.on('instance-pty-data', wrapped);
+    return () => ipcRenderer.removeListener('instance-pty-data', wrapped);
   },
   onInstanceStatsUpdate: (callback) => {
     ipcRenderer.on('instance-stats-update', (_event, data) => callback(data));

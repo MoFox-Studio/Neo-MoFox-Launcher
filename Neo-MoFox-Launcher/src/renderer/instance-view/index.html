@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; worker-src 'self' blob:;">
   <title>实例管理 - Neo-MoFox Launcher</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../../assets/material-symbols/index.css">
+  <!-- xterm.js 终端样式 -->
+  <link rel="stylesheet" href="../../../node_modules/@xterm/xterm/css/xterm.css">
   <!-- 同步主题注入 -->
   <script src="../theme-init.js"></script>
   <link rel="stylesheet" href="instance.css">
@@ -167,12 +169,8 @@
               </span>
             </div>
           </div>
-          <div class="log-content" id="mofoxLogs">
-            <div class="log-empty">
-              <span class="material-symbols-rounded">inbox</span>
-              <p>暂无日志</p>
-            </div>
-          </div>
+          <!-- xterm 容器：DOM 节点保持空，由 xterm.js 接管 -->
+          <div class="terminal-host" id="mofoxTerminal"></div>
         </div>
 
         <!-- Napcat 日志 -->
@@ -214,12 +212,7 @@
               </span>
             </div>
           </div>
-          <div class="log-content" id="napcatLogs">
-            <div class="log-empty">
-              <span class="material-symbols-rounded">inbox</span>
-              <p>暂无日志</p>
-            </div>
-          </div>
+          <div class="terminal-host" id="napcatTerminal"></div>
         </div>
 
       </div>
@@ -333,6 +326,13 @@
       </div>
     </div>
   </div>
+
+  <!-- xterm.js + addons (UMD) -->
+  <script src="../../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../../../node_modules/@xterm/addon-search/lib/addon-search.js"></script>
+  <script src="../../../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
+  <script src="../../../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
 
   <script src="instance.js"></script>
 </body>

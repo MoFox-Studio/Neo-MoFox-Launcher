@@ -1,65 +1,57 @@
-// ═══ Instance View - Main Entry Point ═══
+// ═══ Instance View - xterm.js Terminal-Driven Edition ═══
+//
+// 设计原则：
+//   1. 子进程统一通过 node-pty 启动，输出原样 ANSI 字节流。
+//   2. 渲染端用 xterm.js 当作真终端，主进程把 PTY chunk 直接 term.write 即可。
+//   3. 渲染端不再维护"日志数组"、不再做 ANSI -> HTML 解析、也不再做虚拟化窗口。
+//   4. 历史回放：进入页面时主动拉一次 ring buffer，把原始字节再 write 一遍。
 
-// ─── 状态管理 ─────────────────────────────────────────────────────────
-
+// ─── 状态 ─────────────────────────────────────────────────────────────
 const state = {
   currentTab: 'mofox',
   autoScroll: true,
-  searchQuery: '',
   instanceId: '',
   instanceName: '',
   instanceStatus: 'stopped',
-  mofoxStatus: 'stopped', // MoFox 分离状态
-  napcatStatus: 'stopped', // NapCat 分离状态
-  hasNapcat: true, // 是否安装了 NapCat，默认 true，从实例数据中加载
-  logs: {
-    mofox: [],
-    napcat: []
-  },
+  mofoxStatus: 'stopped',
+  napcatStatus: 'stopped',
+  hasNapcat: true,
   stats: {
-    mofox: {
-      uptime: 0
-    },
-    napcat: {
-      uptime: 0
-    }
-  }
+    mofox: { uptime: 0 },
+    napcat: { uptime: 0 },
+  },
+  // 搜索框开启状态
+  searchOpen: false,
 };
 
-// ─── 性能配置 ─────────────────────────────────────────────────────────
-const MAX_LOG_BUFFER = 2000;  // 内存中保存的最大日志数
-const MAX_LOG_DISPLAY = 1000; // 页面上显示的最大日志数
-let renderTimeout = null;     // 防抖渲染定时器
+// 终端实例集合：每个 source(mofox/napcat) 对应一个独立 xterm.Terminal
+//   { term, fit, search, serialize, container, attached, scrolledUp }
+const terminals = {
+  mofox: null,
+  napcat: null,
+};
 
-// ─── DOM 元素引用 ─────────────────────────────────────────────────────
-
+// ─── DOM ──────────────────────────────────────────────────────────────
 const el = {
-  // 顶部控制
   btnBack: document.getElementById('btnBack'),
   btnSettings: document.getElementById('btnSettings'),
   btnStart: document.getElementById('btnStart'),
   btnStop: document.getElementById('btnStop'),
   btnRestart: document.getElementById('btnRestart'),
-  
-  // 分离控制按钮
+
   btnStartMofox: document.getElementById('btnStartMofox'),
   btnStopMofox: document.getElementById('btnStopMofox'),
   btnRestartMofox: document.getElementById('btnRestartMofox'),
   btnStartNapcat: document.getElementById('btnStartNapcat'),
   btnStopNapcat: document.getElementById('btnStopNapcat'),
   btnRestartNapcat: document.getElementById('btnRestartNapcat'),
-  
+
   instanceTitle: document.getElementById('instanceTitle'),
   statusDot: document.getElementById('statusDot'),
   statusText: document.getElementById('statusText'),
 
-  // 标签页
   tabButtons: document.querySelectorAll('.tab-button'),
   tabPanes: document.querySelectorAll('.tab-pane'),
-  
-  // 日志计数
-  mofoxLogCount: document.getElementById('mofoxLogCount'),
-  napcatLogCount: document.getElementById('napcatLogCount'),
 
   // 工具栏
   btnSearch: document.getElementById('btnSearch'),
@@ -68,104 +60,193 @@ const el = {
   btnClearLogs: document.getElementById('btnClearLogs'),
   btnExportLogs: document.getElementById('btnExportLogs'),
 
-  // 搜索
   searchBar: document.getElementById('searchBar'),
   searchInput: document.getElementById('searchInput'),
   btnCloseSearch: document.getElementById('btnCloseSearch'),
 
-  // 日志内容
-  mofoxLogs: document.getElementById('mofoxLogs'),
-  napcatLogs: document.getElementById('napcatLogs'),
+  // 终端容器
+  mofoxTerminal: document.getElementById('mofoxTerminal'),
+  napcatTerminal: document.getElementById('napcatTerminal'),
 
-  // 统计信息
   mofoxUptime: document.getElementById('mofoxUptime'),
   napcatUptime: document.getElementById('napcatUptime'),
 
-  // 系统资源监控
+  // 计数（这一版用做"行数"提示，可视情况隐藏）
+  mofoxLogCount: document.getElementById('mofoxLogCount'),
+  napcatLogCount: document.getElementById('napcatLogCount'),
+
+  // 系统资源
   instCpuBar: document.getElementById('inst-cpu-bar'),
   instCpuVal: document.getElementById('inst-cpu-val'),
   instMemBar: document.getElementById('inst-mem-bar'),
   instMemVal: document.getElementById('inst-mem-val'),
   instMemDetail: document.getElementById('inst-mem-detail'),
-  // NapCat 标签页副本（共享同一套系统数据）
   instCpuBarNc: document.querySelector('.inst-cpu-bar-nc'),
   instCpuValNc: document.querySelector('.inst-cpu-val-nc'),
   instMemBarNc: document.querySelector('.inst-mem-bar-nc'),
   instMemValNc: document.querySelector('.inst-mem-val-nc'),
   instMemDetailNc: document.querySelector('.inst-mem-detail-nc'),
 
-  // 设置对话框
   settingsDialog: document.getElementById('settingsDialog'),
   btnCloseSettings: document.getElementById('btnCloseSettings'),
-  btnOpenNapcat: document.getElementById('btnOpenNapcat')
+  btnOpenNapcat: document.getElementById('btnOpenNapcat'),
 };
 
-// ─── 初始化 ───────────────────────────────────────────────────────────
+// ─── xterm 主题：跟暗色面板一致 ───────────────────────────────────────
+const TERMINAL_THEME = {
+  background: '#0d1117',
+  foreground: '#c9d1d9',
+  cursor: '#c9d1d9',
+  cursorAccent: '#0d1117',
+  selectionBackground: 'rgba(88, 166, 255, 0.35)',
+  black: '#484f58',
+  red: '#ff7b72',
+  green: '#56d364',
+  yellow: '#e3b341',
+  blue: '#58a6ff',
+  magenta: '#bc8cff',
+  cyan: '#39c5cf',
+  white: '#b1bac4',
+  brightBlack: '#6e7681',
+  brightRed: '#ffa198',
+  brightGreen: '#7ee787',
+  brightYellow: '#f0883e',
+  brightBlue: '#79c0ff',
+  brightMagenta: '#d2a8ff',
+  brightCyan: '#76e3ea',
+  brightWhite: '#f0f6fc',
+};
 
+// ─── 终端构造 ─────────────────────────────────────────────────────────
+function createTerminal(source, container) {
+  // xterm 的 UMD bundle 把构造函数挂在 window.Terminal / window.FitAddon 上
+  const term = new window.Terminal({
+    fontFamily: '"JetBrains Mono", "Cascadia Code", "Consolas", "Noto Sans Mono CJK SC", monospace',
+    fontSize: 13,
+    lineHeight: 1.2,
+    cursorBlink: false,
+    cursorStyle: 'bar',
+    convertEol: true,
+    scrollback: 10000,
+    allowTransparency: false,
+    theme: TERMINAL_THEME,
+    // 让 xterm 不主动接管渲染前的物理粘贴
+    allowProposedApi: true,
+  });
+
+  const fit = new window.FitAddon.FitAddon();
+  const search = new window.SearchAddon.SearchAddon();
+  const serialize = new window.SerializeAddon.SerializeAddon();
+  const webLinks = new window.WebLinksAddon.WebLinksAddon((event, uri) => {
+    // 拦截链接点击，走主进程打开外部浏览器
+    event.preventDefault();
+    window.mofoxAPI?.openExternal?.(uri);
+  });
+
+  term.loadAddon(fit);
+  term.loadAddon(search);
+  term.loadAddon(serialize);
+  term.loadAddon(webLinks);
+
+  term.open(container);
+
+  // 自动 fit 到容器尺寸，并把列/行同步给后端 PTY
+  const safeFit = () => {
+    try { fit.fit(); } catch (_) { /* 容器尚未可见时会失败，忽略 */ }
+  };
+  requestAnimationFrame(safeFit);
+
+  // 推送终端尺寸到后端（节流）
+  let resizeTimer = null;
+  term.onResize(({ cols, rows }) => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      window.mofoxAPI?.resizeInstancePty?.(state.instanceId, source, cols, rows);
+    }, 80);
+  });
+
+  // 用户在终端内键入：转发到 PTY，让 Loguru/读 stdin 的程序能交互
+  term.onData((data) => {
+    window.mofoxAPI?.writeInstancePty?.(state.instanceId, source, data);
+  });
+
+  // 监测用户是否手动滚动到了上面，停止自动跟随
+  const viewport = container.querySelector('.xterm-viewport');
+  if (viewport) {
+    viewport.addEventListener('scroll', () => {
+      const atBottom = Math.abs(
+        viewport.scrollTop + viewport.clientHeight - viewport.scrollHeight
+      ) < 4;
+      const entry = terminals[source];
+      if (!entry) return;
+      entry.scrolledUp = !atBottom;
+      // 自动滚动按钮跟着同步状态
+      if (state.currentTab === source) {
+        state.autoScroll = atBottom;
+        el.btnAutoScroll.classList.toggle('active', state.autoScroll);
+      }
+    }, { passive: true });
+  }
+
+  return { term, fit, search, serialize, container, scrolledUp: false };
+}
+
+function ensureTerminal(source) {
+  if (terminals[source]) return terminals[source];
+  const container = source === 'mofox' ? el.mofoxTerminal : el.napcatTerminal;
+  if (!container) return null;
+  terminals[source] = createTerminal(source, container);
+  return terminals[source];
+}
+
+function writeToTerminal(source, data) {
+  const entry = ensureTerminal(source);
+  if (!entry || !data) return;
+  entry.term.write(data);
+
+  // 行数计数（粗略指标，等于终端缓冲区已用行）
+  const totalRows = entry.term.buffer.active.length;
+  const countEl = source === 'mofox' ? el.mofoxLogCount : el.napcatLogCount;
+  if (countEl) countEl.textContent = String(totalRows);
+
+  // 自动滚动跟随：如果用户正停在底部，则保持在底部
+  if (state.autoScroll && state.currentTab === source && !entry.scrolledUp) {
+    entry.term.scrollToBottom();
+  }
+}
+
+// ─── 初始化流程 ────────────────────────────────────────────────────────
 async function init() {
   await loadInstanceData();
   setupEventListeners();
   setupIPCListeners();
   setupNavigationGuard();
   startStatsUpdate();
-  
-  // 初始化自动滚动按钮状态（默认开启）
-  if (state.autoScroll) {
-    el.btnAutoScroll.classList.add('active');
-  }
-  
-  // 从主进程加载实例的真实运行状态（而不是默认 stopped）
+
+  // 初始化两个终端实例并先把当前的 ring buffer 灌进去（历史回放）
+  ensureTerminal('mofox');
+  if (state.hasNapcat) ensureTerminal('napcat');
+  await replayPtyBuffers();
+
+  // 自动滚动按钮默认开启
+  el.btnAutoScroll.classList.toggle('active', state.autoScroll);
+
+  // 加载真实运行状态
   try {
-    if (state.instanceId && window.mofoxAPI?.getInstanceStatus) {
-      // 尝试获取分离状态
-      if (window.mofoxAPI?.getSeparatedStatus) {
-        try {
-          const separatedStatus = await window.mofoxAPI.getSeparatedStatus(state.instanceId);
-          if (separatedStatus) {
-            state.mofoxStatus = separatedStatus.mofox || 'stopped';
-            state.napcatStatus = separatedStatus.napcat || 'stopped';
-            console.log(`[Instance] 加载分离状态 - MoFox: ${state.mofoxStatus}, NapCat: ${state.napcatStatus}`);
-            updateSeparatedButtonStates();
-            
-            // 如果任一组件在运行，加载运行时统计信息
-            if (state.mofoxStatus === 'running' || state.napcatStatus === 'running') {
-              const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
-              if (stats) updateStats(stats);
-            }
-          }
-        } catch (e) {
-          console.warn('[Instance] 无法加载分离状态，回退到整体状态:', e);
-          // 回退到整体状态
-          const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
-          if (realStatus && realStatus !== 'stopped') {
-            console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
-            updateStatus(realStatus);
-            
-            // 如果实例已在运行，加载运行时统计信息
-            if (realStatus === 'running') {
-              const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
-              if (stats) updateStats(stats);
-            }
-          } else {
-            updateStatus('stopped');
-          }
-        }
-      } else {
-        // 旧版本不支持分离状态，使用整体状态
-        const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
-        if (realStatus && realStatus !== 'stopped') {
-          console.log(`[Instance] 实例已在运行，状态: ${realStatus}`);
-          updateStatus(realStatus);
-          
-          // 如果实例已在运行，加载运行时统计信息
-          if (realStatus === 'running') {
-            const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
-            if (stats) updateStats(stats);
-          }
-        } else {
-          updateStatus('stopped');
+    if (state.instanceId && window.mofoxAPI?.getSeparatedStatus) {
+      const sep = await window.mofoxAPI.getSeparatedStatus(state.instanceId);
+      if (sep) {
+        state.mofoxStatus = sep.mofox || 'stopped';
+        state.napcatStatus = sep.napcat || 'stopped';
+        updateSeparatedButtonStates();
+        if (state.mofoxStatus === 'running' || state.napcatStatus === 'running') {
+          const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
+          if (stats) updateStats(stats);
         }
       }
+    } else if (state.instanceId && window.mofoxAPI?.getInstanceStatus) {
+      const realStatus = await window.mofoxAPI.getInstanceStatus(state.instanceId);
+      updateStatus(realStatus || 'stopped');
     } else {
       updateStatus(state.instanceStatus);
     }
@@ -174,285 +255,171 @@ async function init() {
     updateStatus(state.instanceStatus);
   }
 
-  // 加载历史日志（即使实例在后台启动，也能看到之前的日志）
-  await loadHistoryLogs();
-
-  // 检查是否需要自动启动
+  // 自动启动开关
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('autoStart') === 'true') {
-    // 只有在实例完全停止时才自动启动
-    if (state.instanceStatus === 'stopped') {
-      console.log('自动启动标志位已设置，正在启动实例...');
-      // 延迟一点点以确保UI加载完成
-      setTimeout(() => {
-        handleStart();
-      }, 500);
-    } else {
-      console.log(`实例已在运行 (${state.instanceStatus})，跳过自动启动`);
-    }
+  if (urlParams.get('autoStart') === 'true' && state.instanceStatus === 'stopped') {
+    setTimeout(() => handleStart(), 500);
   }
+
+  // 窗口尺寸变化时重新 fit
+  window.addEventListener('resize', () => {
+    Object.values(terminals).forEach((entry) => {
+      if (entry) {
+        try { entry.fit.fit(); } catch (_) { /* ignore */ }
+      }
+    });
+  });
 }
 
-// ─── 加载实例数据 ─────────────────────────────────────────────────────
-
 async function loadInstanceData() {
-  // 从 URL 参数获取实例信息
   const urlParams = new URLSearchParams(window.location.search);
-  const instanceId = urlParams.get('instanceId');
-  const instanceName = urlParams.get('name');
-  
-  if (!instanceId) {
-    console.error('缺少实例ID参数');
-    state.instanceName = instanceName || '未知实例';
-  } else {
-    state.instanceId = instanceId;
-    state.instanceName = instanceName || '实例 ' + instanceId;
-  }
-  
+  state.instanceId = urlParams.get('instanceId') || '';
+  state.instanceName = urlParams.get('name') || (state.instanceId ? '实例 ' + state.instanceId : '未知实例');
   el.instanceTitle.textContent = state.instanceName;
-  
-  // 从主进程加载实例详细配置，检测是否安装了 NapCat
+
   try {
     if (window.mofoxAPI?.getInstance) {
       const instanceData = await window.mofoxAPI.getInstance(state.instanceId);
       if (instanceData) {
-        // 通过 napcatDir 是否存在判断是否安装了 NapCat（更简单直接）
         state.hasNapcat = !!(instanceData.napcatDir);
-        
-        console.log('[Instance] 实例数据:', instanceData);
-        console.log('[Instance] NapCat 路径:', instanceData.napcatDir);
-        console.log('[Instance] 是否安装 NapCat:', state.hasNapcat);
-        
-        // 如果没有 NapCat，隐藏相关 UI
-        if (!state.hasNapcat) {
-          hideNapcatUI();
-        }
+        if (!state.hasNapcat) hideNapcatUI();
       }
     }
   } catch (error) {
     console.warn('[Instance] 无法加载实例数据:', error);
-    // 默认保持 hasNapcat = true 以兼容旧数据
   }
 }
 
-// ─── 加载历史日志 ─────────────────────────────────────────────────────
-
-async function loadHistoryLogs() {
-  if (!state.instanceId) {
-    console.warn('[Instance] 无法加载历史日志: 缺少实例ID');
-    return;
-  }
-  
+async function replayPtyBuffers() {
+  if (!state.instanceId || !window.mofoxAPI?.getInstancePtyBuffer) return;
   try {
-    if (window.mofoxAPI?.getInstanceLogs) {
-      console.log('[Instance] 正在加载历史日志...');
-      const historyLogs = await window.mofoxAPI.getInstanceLogs(state.instanceId);
-      
-      if (historyLogs) {
-        // 加载 MoFox 日志
-        if (Array.isArray(historyLogs.mofox)) {
-          state.logs.mofox = historyLogs.mofox;
-          el.mofoxLogCount.textContent = state.logs.mofox.length;
-          console.log(`[Instance] 已加载 ${state.logs.mofox.length} 条 MoFox 日志`);
-        }
-        
-        // 加载 NapCat 日志（如果安装了）
-        if (state.hasNapcat && Array.isArray(historyLogs.napcat)) {
-          state.logs.napcat = historyLogs.napcat;
-          el.napcatLogCount.textContent = state.logs.napcat.length;
-          console.log(`[Instance] 已加载 ${state.logs.napcat.length} 条 NapCat 日志`);
-        }
-        
-        // 渲染当前标签页的日志
-        renderLogs();
-      }
-    }
+    const buffers = await window.mofoxAPI.getInstancePtyBuffer(state.instanceId);
+    if (!buffers) return;
+    if (buffers.mofox) writeToTerminal('mofox', buffers.mofox);
+    if (state.hasNapcat && buffers.napcat) writeToTerminal('napcat', buffers.napcat);
   } catch (error) {
-    console.warn('[Instance] 加载历史日志失败:', error);
+    console.warn('[Instance] 加载 PTY 历史 buffer 失败:', error);
   }
 }
-
-// ─── 隐藏 NapCat UI ──────────────────────────────────────
 
 function hideNapcatUI() {
-  // 隐藏 NapCat 标签页
   const napcatTab = document.querySelector('.tab-button[data-tab="napcat"]');
-  if (napcatTab) {
-    napcatTab.style.display = 'none';
-  }
-  
-  // 如果当前在 napcat 标签，切换到 mofox
-  if (state.currentTab === 'napcat') {
-    switchTab('mofox');
-  }
-  
-  console.log('[Instance] 已隐藏 NapCat UI');
+  if (napcatTab) napcatTab.style.display = 'none';
+  if (state.currentTab === 'napcat') switchTab('mofox');
 }
 
-// ─── 隐藏 NapCat UI ──────────────────────────────────────────────────
-
-function hideNapcatUI() {
-  // 隐藏 NapCat 标签页
-  const napcatTab = document.querySelector('.tab-button[data-tab="napcat"]');
-  if (napcatTab) {
-    napcatTab.style.display = 'none';
-  }
-  
-  // 如果当前在 napcat 标签，切换到 mofox
-  if (state.currentTab === 'napcat') {
-    switchTab('mofox');
-  }
-  
-  console.log('[Instance] 已隐藏 NapCat UI');
-}
-
-// ─── 事件监听器 ───────────────────────────────────────────────────────
-
+// ─── 事件 & IPC ───────────────────────────────────────────────────────
 function setupEventListeners() {
-  // 返回按钮 - 多开模式下始终允许返回，实例在后台继续运行
-  el.btnBack.addEventListener('click', () => {
-    navigateToMain();
-  });
+  el.btnBack.addEventListener('click', navigateToMain);
 
-  // 一键控制按钮
   el.btnStart.addEventListener('click', handleStart);
   el.btnStop.addEventListener('click', handleStop);
   el.btnRestart.addEventListener('click', handleRestart);
   el.btnSettings.addEventListener('click', handleSettings);
 
-  // 分离控制按钮 - MoFox
   el.btnStartMofox?.addEventListener('click', handleStartMofox);
   el.btnStopMofox?.addEventListener('click', handleStopMofox);
   el.btnRestartMofox?.addEventListener('click', handleRestartMofox);
 
-  // 分离控制按钮 - NapCat
   el.btnStartNapcat?.addEventListener('click', handleStartNapcat);
   el.btnStopNapcat?.addEventListener('click', handleStopNapcat);
   el.btnRestartNapcat?.addEventListener('click', handleRestartNapcat);
 
-  // 标签页切换
-  el.tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
+  el.tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
 
-  // 搜索
-  el.btnSearch.addEventListener('click', () => {
-    el.searchBar.classList.remove('hidden');
-    el.searchInput.focus();
-  });
-
-  el.btnCloseSearch.addEventListener('click', () => {
-    el.searchBar.classList.add('hidden');
-    state.searchQuery = '';
-    el.searchInput.value = '';
-    renderLogs();
-  });
-
+  // 工具栏
+  el.btnSearch.addEventListener('click', toggleSearch);
+  el.btnCloseSearch.addEventListener('click', () => toggleSearch(false));
   el.searchInput.addEventListener('input', (e) => {
-    state.searchQuery = e.target.value.toLowerCase();
-    renderLogs();
+    runSearch(e.target.value);
+  });
+  el.searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const entry = currentTerminal();
+      if (!entry) return;
+      if (e.shiftKey) entry.search.findPrevious(el.searchInput.value);
+      else entry.search.findNext(el.searchInput.value);
+    } else if (e.key === 'Escape') {
+      toggleSearch(false);
+    }
   });
 
-  // 复制日志
   el.btnCopyLogs.addEventListener('click', handleCopyLogs);
-
-  // 自动滚动
+  el.btnClearLogs.addEventListener('click', handleClearLogs);
+  el.btnExportLogs.addEventListener('click', handleExportLogs);
   el.btnAutoScroll.addEventListener('click', () => {
     state.autoScroll = !state.autoScroll;
     el.btnAutoScroll.classList.toggle('active', state.autoScroll);
     if (state.autoScroll) {
-      scrollToBottom();
+      const entry = currentTerminal();
+      if (entry) {
+        entry.scrolledUp = false;
+        entry.term.scrollToBottom();
+      }
     }
   });
-
-  // 清空日志
-  el.btnClearLogs.addEventListener('click', handleClearLogs);
-
-  // 导出日志
-  el.btnExportLogs.addEventListener('click', handleExportLogs);
 
   // 设置对话框
   el.btnCloseSettings.addEventListener('click', closeSettings);
   el.settingsDialog.querySelector('.settings-overlay').addEventListener('click', closeSettings);
-  
-  // 设置项点击
-  document.querySelectorAll('.settings-item').forEach(item => {
+  document.querySelectorAll('.settings-item').forEach((item) => {
     item.addEventListener('click', () => handleSettingsAction(item.dataset.action));
   });
 }
 
-// ─── IPC 监听器 ───────────────────────────────────────────────────────
-
 function setupIPCListeners() {
-  // 监听状态变化（支持分离状态）
+  // 状态变化（支持分离状态）
   window.mofoxAPI?.onInstanceStatusChange?.((data) => {
-    if (data.instanceId === state.instanceId) {
-      // 如果有分离状态信息，优先使用
-      if (data.mofoxStatus !== undefined) {
-        state.mofoxStatus = data.mofoxStatus;
-      }
-      if (data.napcatStatus !== undefined) {
-        state.napcatStatus = data.napcatStatus;
-      }
-      
-      // 如果有分离状态，更新按钮；否则使用整体状态
-      if (data.mofoxStatus !== undefined || data.napcatStatus !== undefined) {
-        updateSeparatedButtonStates();
-      } else {
-        updateStatus(data.status);
-      }
+    if (data.instanceId !== state.instanceId) return;
+    if (data.mofoxStatus !== undefined) state.mofoxStatus = data.mofoxStatus;
+    if (data.napcatStatus !== undefined) state.napcatStatus = data.napcatStatus;
+    if (data.mofoxStatus !== undefined || data.napcatStatus !== undefined) {
+      updateSeparatedButtonStates();
+    } else {
+      updateStatus(data.status);
     }
   });
 
-  // 监听实例日志
-  window.mofoxAPI?.onInstanceLog?.((data) => {
-    if (data.instanceId === state.instanceId) {
-      const log = data.log;
-      addLog(log.type, log);
-    }
+  // PTY 数据流：直接喂给对应终端
+  window.mofoxAPI?.onInstancePtyData?.((data) => {
+    if (data.instanceId !== state.instanceId) return;
+    writeToTerminal(data.type, data.data);
   });
 
-  // 监听统计信息更新
+  // 资源/uptime 推送（如果主进程有的话）
   window.mofoxAPI?.onInstanceStatsUpdate?.((data) => {
-    if (data.instanceId === state.instanceId) {
-      updateStats(data.stats);
-    }
+    if (data.instanceId === state.instanceId) updateStats(data.stats);
   });
 }
 
 // ─── 标签页切换 ───────────────────────────────────────────────────────
-
 function switchTab(tabName) {
   state.currentTab = tabName;
-  
-  // 更新标签按钮
-  el.tabButtons.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabName);
-  });
+  el.tabButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tabName));
+  el.tabPanes.forEach((pane) => pane.classList.toggle('active', pane.dataset.tab === tabName));
 
-  // 更新标签内容
-  el.tabPanes.forEach(pane => {
-    pane.classList.toggle('active', pane.dataset.tab === tabName);
-  });
-  
-  // 渲染当前标签的日志
-  renderLogs();
+  // 切到新标签时，等浏览器布局完再 fit 一次
+  const entry = ensureTerminal(tabName);
+  if (entry) {
+    requestAnimationFrame(() => {
+      try { entry.fit.fit(); } catch (_) { /* ignore */ }
+      if (state.autoScroll) entry.term.scrollToBottom();
+    });
+  }
 }
 
-// ─── 控制操作 ─────────────────────────────────────────────────────────
+function currentTerminal() {
+  return terminals[state.currentTab];
+}
 
+// ─── 一键控制 / 分离控制 ──────────────────────────────────────────────
 async function handleStart() {
   try {
     updateStatus('starting');
-    
     const result = await window.mofoxAPI.startInstance(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
     console.error('启动失败:', error);
-    addLog('mofox', { level: 'error', message: '启动失败: ' + error.message });
     updateStatus('error');
     showError('启动失败: ' + error.message);
   }
@@ -462,19 +429,11 @@ async function handleStop() {
   if (state.instanceStatus === 'stopped') return;
   try {
     updateStatus('stopping');
-    
     const result = await window.mofoxAPI.stopInstance(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
-    
-    // 如果停止成功（包括实际上已停止但处于错误状态的补偿），强制更新 UI 为 stopped
+    if (!result.success) throw new Error(result.error || '未知错误');
     updateStatus('stopped');
   } catch (error) {
     console.error('停止失败:', error);
-    addLog('mofox', { level: 'error', message: '停止失败: ' + error.message });
-    // 不要强制切到 error 状态，可能保持现状更好，不过原版有，我们也就保留
     updateStatus('error');
     showError('停止失败: ' + error.message);
   }
@@ -483,34 +442,21 @@ async function handleStop() {
 async function handleRestart() {
   try {
     updateStatus('restarting');
-    
     const result = await window.mofoxAPI.restartInstance(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
     console.error('重启失败:', error);
-    addLog('mofox', { level: 'error', message: '重启失败: ' + error.message });
     updateStatus('error');
     showError('重启失败: ' + error.message);
   }
 }
 
-// ─── 分离控制处理函数 ─────────────────────────────────────────────────
-
 async function handleStartMofox() {
   try {
     updateMofoxStatus('starting');
-    
     const result = await window.mofoxAPI.startMoFoxOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    console.error('启动 MoFox 失败:', error);
-    addLog('mofox', { level: 'error', message: '启动失败: ' + error.message });
     updateMofoxStatus('error');
     showError('启动 MoFox 失败: ' + error.message);
   }
@@ -520,16 +466,10 @@ async function handleStopMofox() {
   if (state.mofoxStatus === 'stopped') return;
   try {
     updateMofoxStatus('stopping');
-    
     const result = await window.mofoxAPI.stopMoFoxOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
     updateMofoxStatus('stopped');
   } catch (error) {
-    console.error('停止 MoFox 失败:', error);
-    addLog('mofox', { level: 'error', message: '停止失败: ' + error.message });
     updateMofoxStatus('error');
     showError('停止 MoFox 失败: ' + error.message);
   }
@@ -538,15 +478,9 @@ async function handleStopMofox() {
 async function handleRestartMofox() {
   try {
     updateMofoxStatus('restarting');
-    
     const result = await window.mofoxAPI.restartMoFoxOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    console.error('重启 MoFox 失败:', error);
-    addLog('mofox', { level: 'error', message: '重启失败: ' + error.message });
     updateMofoxStatus('error');
     showError('重启 MoFox 失败: ' + error.message);
   }
@@ -555,15 +489,9 @@ async function handleRestartMofox() {
 async function handleStartNapcat() {
   try {
     updateNapcatStatus('starting');
-    
     const result = await window.mofoxAPI.startNapCatOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    console.error('启动 NapCat 失败:', error);
-    addLog('napcat', { level: 'error', message: '启动失败: ' + error.message });
     updateNapcatStatus('error');
     showError('启动 NapCat 失败: ' + error.message);
   }
@@ -573,16 +501,10 @@ async function handleStopNapcat() {
   if (state.napcatStatus === 'stopped') return;
   try {
     updateNapcatStatus('stopping');
-    
     const result = await window.mofoxAPI.stopNapCatOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
     updateNapcatStatus('stopped');
   } catch (error) {
-    console.error('停止 NapCat 失败:', error);
-    addLog('napcat', { level: 'error', message: '停止失败: ' + error.message });
     updateNapcatStatus('error');
     showError('停止 NapCat 失败: ' + error.message);
   }
@@ -591,28 +513,18 @@ async function handleStopNapcat() {
 async function handleRestartNapcat() {
   try {
     updateNapcatStatus('restarting');
-    
     const result = await window.mofoxAPI.restartNapCatOnly(state.instanceId);
-    
-    if (!result.success) {
-      throw new Error(result.error || '未知错误');
-    }
+    if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    console.error('重启 NapCat 失败:', error);
-    addLog('napcat', { level: 'error', message: '重启失败: ' + error.message });
     updateNapcatStatus('error');
     showError('重启 NapCat 失败: ' + error.message);
   }
 }
 
-async function handleSettings() {
-  // 打开设置对话框
+// ─── 设置对话框 ───────────────────────────────────────────────────────
+function handleSettings() {
   el.settingsDialog.classList.remove('hidden');
-  
-  // 根据是否安装了 NapCat 显示/隐藏 NapCat 按钮
-  if (!state.hasNapcat && el.btnOpenNapcat) {
-    el.btnOpenNapcat.style.display = 'none';
-  }
+  if (!state.hasNapcat && el.btnOpenNapcat) el.btnOpenNapcat.style.display = 'none';
 }
 
 function closeSettings() {
@@ -624,62 +536,33 @@ async function handleSettingsAction(action) {
     showError('实例信息丢失');
     return;
   }
-
   try {
     switch (action) {
-      case 'open-project':
-        await openFolder('project');
-        break;
-      case 'open-config-folder':
-        await openFolder('config');
-        break;
-      case 'open-data-folder':
-        await openFolder('data');
-        break;
-      case 'open-logs-folder':
-        await openFolder('logs');
-        break;
-      case 'open-plugins-folder':
-        await openFolder('plugins');
-        break;
-      case 'open-napcat':
-        await openFolder('napcat');
-        break;
-      case 'open-core-config':
-        await openFile('core-config');
-        break;
-      case 'open-model-config':
-        await openFile('model-config');
-        break;
-      case 'delete-database':
-        await handleDeleteDatabase();
-        break;
-      case 'delete-logs':
-        await handleDeleteInstanceLogs();
-        break;
-      default:
-        showWarning('未知操作: ' + action);
+      case 'open-project':       await openFolder('project'); break;
+      case 'open-config-folder': await openFolder('config'); break;
+      case 'open-data-folder':   await openFolder('data'); break;
+      case 'open-logs-folder':   await openFolder('logs'); break;
+      case 'open-plugins-folder':await openFolder('plugins'); break;
+      case 'open-napcat':        await openFolder('napcat'); break;
+      case 'open-core-config':   await openFile('core-config'); break;
+      case 'open-model-config':  await openFile('model-config'); break;
+      case 'delete-database':    await handleDeleteDatabase(); break;
+      case 'delete-logs':        await handleDeleteInstanceLogs(); break;
+      default:                   showWarning('未知操作: ' + action);
     }
   } catch (error) {
-    console.error('操作失败:', error);
     showError('操作失败: ' + error.message);
   }
 }
 
 async function openFolder(folderType) {
   const result = await window.mofoxAPI.openInstanceFolder(state.instanceId, folderType);
-  
-  if (result.success) {
-    showSuccess('已打开文件夹');
-  } else {
-    showError(result.error || '打开文件夹失败');
-  }
+  if (result.success) showSuccess('已打开文件夹');
+  else showError(result.error || '打开文件夹失败');
 }
 
 async function openFile(fileType) {
-  // 使用配置编辑器 API（根据用户设置自动选择内置或系统编辑器）
   const result = await window.mofoxAPI.configEditorOpen(state.instanceId, fileType);
-  
   if (result.success) {
     const mode = result.mode === 'builtin' ? '内置编辑器' : '系统编辑器';
     showSuccess(`已使用${mode}打开文件`);
@@ -689,29 +572,16 @@ async function openFile(fileType) {
 }
 
 async function handleDeleteDatabase() {
-  // 先检查实例是否在运行
   if (state.instanceStatus === 'running') {
     showError('请先停止实例再删除数据库');
     return;
   }
-  
-  // 确认对话框
   const confirmed = await customConfirm(
-    '确定要删除数据库吗？\n\n' +
-    '这将清空所有数据，包括：\n' +
-    '• 聊天记录\n' +
-    '• 用户数据\n' +
-    '• 插件数据\n\n' +
-    '此操作不可恢复！',
+    '确定要删除数据库吗？\n\n这将清空所有数据，包括：\n• 聊天记录\n• 用户数据\n• 插件数据\n\n此操作不可恢复！',
     '删除数据库'
   );
-  
-  if (!confirmed) {
-    return;
-  }
-  
+  if (!confirmed) return;
   const result = await window.mofoxAPI.deleteInstanceDatabase(state.instanceId);
-  
   if (result.success) {
     showSuccess(result.message || '数据库已删除');
     closeSettings();
@@ -721,20 +591,12 @@ async function handleDeleteDatabase() {
 }
 
 async function handleDeleteInstanceLogs() {
-  // 确认对话框
   const confirmed = await customConfirm(
-    '确定要清空日志文件吗？\n\n' +
-    '这将删除所有历史日志文件，但不会影响当前运行的日志显示。\n\n' +
-    '此操作不可恢复！',
+    '确定要清空日志文件吗？\n\n这将删除所有历史日志文件，但不会影响当前运行的日志显示。\n\n此操作不可恢复！',
     '清空日志文件'
   );
-  
-  if (!confirmed) {
-    return;
-  }
-  
+  if (!confirmed) return;
   const result = await window.mofoxAPI.deleteInstanceLogs(state.instanceId);
-  
   if (result.success) {
     showSuccess(result.message || '日志文件已清空');
     closeSettings();
@@ -743,333 +605,157 @@ async function handleDeleteInstanceLogs() {
   }
 }
 
-// ─── 状态更新 ─────────────────────────────────────────────────────────
-
+// ─── 状态显示 ─────────────────────────────────────────────────────────
 function updateStatus(status) {
   state.instanceStatus = status;
-  
-  // 更新状态点和文本
   el.statusDot.className = 'status-dot ' + status;
-  
   const statusTexts = {
-    'stopped': '未运行',
-    'starting': '启动中...',
-    'running': '运行中',
-    'stopping': '停止中...',
-    'restarting': '重启中...',
-    'error': '错误'
+    stopped: '未运行', starting: '启动中...', running: '运行中',
+    stopping: '停止中...', restarting: '重启中...', error: '错误',
   };
-  
   el.statusText.textContent = statusTexts[status] || status;
 
-  // 更新一键控制按钮状态
   const isRunning = status === 'running';
   const isStopped = status === 'stopped';
-  
-  // 启动按钮：只有在完全停止时才能启动
   el.btnStart.disabled = !isStopped;
-  
-  // 停止按钮：只在正常运行时可以停止，或者在 error 状态下也能强制停止
   el.btnStop.disabled = !isRunning && status !== 'error';
-  
-  // 重启按钮：只在正常运行时可用
   el.btnRestart.disabled = !isRunning;
-  
-  // 更新返回按钮 - 多开模式下始终可用
+
   el.btnBack.disabled = false;
   el.btnBack.style.opacity = '1';
   el.btnBack.style.cursor = 'pointer';
-  if (isStopped) {
-    el.btnBack.title = '返回主界面';
-  } else {
-    el.btnBack.title = '返回主界面（实例将在后台继续运行）';
-  }
+  el.btnBack.title = isStopped ? '返回主界面' : '返回主界面（实例将在后台继续运行）';
 }
 
-// ─── 分离状态更新函数 ─────────────────────────────────────────────────
-
-function updateMofoxStatus(status) {
-  state.mofoxStatus = status;
-  updateSeparatedButtonStates();
-}
-
-function updateNapcatStatus(status) {
-  state.napcatStatus = status;
-  updateSeparatedButtonStates();
-}
+function updateMofoxStatus(status) { state.mofoxStatus = status; updateSeparatedButtonStates(); }
+function updateNapcatStatus(status) { state.napcatStatus = status; updateSeparatedButtonStates(); }
 
 function updateSeparatedButtonStates() {
-  // 更新 MoFox 按钮状态
   const mofoxRunning = state.mofoxStatus === 'running';
   const mofoxStopped = state.mofoxStatus === 'stopped';
-  
-  if (el.btnStartMofox) {
-    el.btnStartMofox.disabled = !mofoxStopped;
-  }
-  if (el.btnStopMofox) {
-    el.btnStopMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
-  }
-  if (el.btnRestartMofox) {
-    el.btnRestartMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
-  }
-  
-  // 更新 NapCat 按钮状态
+  if (el.btnStartMofox)   el.btnStartMofox.disabled = !mofoxStopped;
+  if (el.btnStopMofox)    el.btnStopMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
+  if (el.btnRestartMofox) el.btnRestartMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
+
   const napcatRunning = state.napcatStatus === 'running';
   const napcatStopped = state.napcatStatus === 'stopped';
-  
-  if (el.btnStartNapcat) {
-    el.btnStartNapcat.disabled = !napcatStopped;
-  }
-  if (el.btnStopNapcat) {
-    el.btnStopNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
-  }
-  if (el.btnRestartNapcat) {
-    el.btnRestartNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
-  }
-  
-  // 更新整体状态（使用优先级最高的状态）
-  const statusPriority = {
-    'starting': 6,
-    'restarting': 5,
-    'running': 4,
-    'stopping': 3,
-    'error': 2,
-    'stopped': 1
-  };
-  
-  const mofoxPriority = statusPriority[state.mofoxStatus] || 0;
-  const napcatPriority = statusPriority[state.napcatStatus] || 0;
-  
-  const overallStatus = mofoxPriority >= napcatPriority ? state.mofoxStatus : state.napcatStatus;
-  updateStatus(overallStatus);
+  if (el.btnStartNapcat)   el.btnStartNapcat.disabled = !napcatStopped;
+  if (el.btnStopNapcat)    el.btnStopNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
+  if (el.btnRestartNapcat) el.btnRestartNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
+
+  const priority = { starting: 6, restarting: 5, running: 4, stopping: 3, error: 2, stopped: 1 };
+  const overall = (priority[state.mofoxStatus] || 0) >= (priority[state.napcatStatus] || 0)
+    ? state.mofoxStatus
+    : state.napcatStatus;
+  updateStatus(overall);
 }
 
-// ─── 日志管理 ─────────────────────────────────────────────────────────
-
-function addLog(type, logData) {
-  const log = {
-    timestamp: logData.timestamp || new Date().toISOString(),
-    level: logData.level || 'info',
-    message: logData.message || '',
-    ...logData
-  };
-
-  state.logs[type].push(log);
-  
-  // 限制内存中的日志数量，避免内存溢出
-  if (state.logs[type].length > MAX_LOG_BUFFER) {
-    state.logs[type] = state.logs[type].slice(-MAX_LOG_BUFFER);
-  }
-  
-  // 更新日志计数
-  if (type === 'mofox') {
-    el.mofoxLogCount.textContent = state.logs.mofox.length;
+// ─── 工具栏行为 ───────────────────────────────────────────────────────
+function toggleSearch(force) {
+  const wantOpen = typeof force === 'boolean' ? force : !state.searchOpen;
+  state.searchOpen = wantOpen;
+  el.searchBar.classList.toggle('hidden', !wantOpen);
+  if (wantOpen) {
+    el.searchInput.focus();
+    el.searchInput.select();
   } else {
-    el.napcatLogCount.textContent = state.logs.napcat.length;
-  }
-
-  // 如果当前标签是这个类型，使用防抖渲染
-  if (state.currentTab === type) {
-    scheduleRender();
+    el.searchInput.value = '';
+    runSearch('');
   }
 }
 
-// 防抖渲染，避免频繁渲染导致卡顿
-function scheduleRender() {
-  if (renderTimeout) {
-    clearTimeout(renderTimeout);
-  }
-  renderTimeout = setTimeout(() => {
-    renderLogs();
-    renderTimeout = null;
-  }, 100); // 100ms 防抖延迟
-}
-
-function renderLogs() {
-  const type = state.currentTab;
-  const container = type === 'mofox' ? el.mofoxLogs : el.napcatLogs;
-  const logs = state.logs[type];
-
-  // 过滤日志
-  let filteredLogs = logs;
-
-  // 搜索过滤
-  if (state.searchQuery) {
-    filteredLogs = filteredLogs.filter(log =>
-      log.message.toLowerCase().includes(state.searchQuery)
-    );
-  }
-
-  // 如果没有日志，显示空状态
-  if (filteredLogs.length === 0) {
-    container.innerHTML = `
-      <div class="log-empty">
-        <span class="material-symbols-rounded">inbox</span>
-        <p>${state.searchQuery ? '没有匹配的日志' : '暂无日志'}</p>
-      </div>
-    `;
+function runSearch(query) {
+  const entry = currentTerminal();
+  if (!entry) return;
+  if (!query) {
+    try { entry.search.clearDecorations(); } catch (_) { /* 旧版本可能没有 */ }
     return;
   }
-
-  // 只渲染最近的日志，避免 DOM 过多导致卡顿
-  const displayLogs = filteredLogs.slice(-MAX_LOG_DISPLAY);
-  const hiddenCount = filteredLogs.length - displayLogs.length;
-  
-  // 渲染日志 - 终端风格
-  let html = '';
-  
-  // 如果有隐藏的日志，显示提示
-  if (hiddenCount > 0) {
-    html += `
-      <div class="log-entry" style="opacity: 0.6; font-style: italic;">
-        ── 已隐藏前 ${hiddenCount} 条日志，仅显示最近 ${MAX_LOG_DISPLAY} 条 ──
-      </div>
-    `;
-  }
-  
-  html += displayLogs.map(log => {
-    // 先 escape HTML，然后解析 ANSI 代码
-    let message = escapeHtml(log.message);
-    message = parseAnsi(message);
-    
-    // 高亮搜索词
-    if (state.searchQuery) {
-      const regex = new RegExp(`(${escapeRegex(state.searchQuery)})`, 'gi');
-      message = message.replace(regex, '<span class="highlight">$1</span>');
-    }
-
-    // 纯文本输出，移除级别颜色
-    return `<div class="log-entry">${message}</div>`;
-  }).join('');
-  
-  container.innerHTML = html;
-
-  // 自动滚动到底部
-  if (state.autoScroll) {
-    scrollToBottom();
-  }
-}
-
-function scrollToBottom() {
-  const container = state.currentTab === 'mofox' ? el.mofoxLogs : el.napcatLogs;
-  container.scrollTop = container.scrollHeight;
+  entry.search.findNext(query, {
+    decorations: {
+      matchBackground: '#2d4f7c',
+      activeMatchBackground: '#f0883e',
+      matchOverviewRuler: '#2d4f7c',
+      activeMatchColorOverviewRuler: '#f0883e',
+    },
+  });
 }
 
 async function handleCopyLogs() {
-  const type = state.currentTab;
-  const logs = state.logs[type];
-  
-  if (logs.length === 0) {
-    showError('没有可复制的日志');
+  const entry = currentTerminal();
+  if (!entry) return;
+  let text = entry.term.getSelection();
+  if (!text) {
+    // 没有选中时，复制整个终端缓冲区
+    try {
+      text = entry.serialize.serialize({ excludeAltBuffer: true });
+      // serialize 含 ANSI，复制成纯文本会更友好。这里折中：保留可读纯文本。
+      text = stripAnsiClient(text);
+    } catch (_) {
+      text = '';
+    }
+  }
+  if (!text) {
+    showError('没有可复制的内容');
     return;
   }
-
   try {
-    // 将日志转换为纯文本
-    const logText = logs.map(log => log.message).join('\n');
-    
-    // 复制到剪贴板
-    await navigator.clipboard.writeText(logText);
-    
-    showSuccess(`已复制 ${logs.length} 条日志到剪贴板`);
+    await navigator.clipboard.writeText(text);
+    showSuccess('已复制到剪贴板');
   } catch (error) {
-    console.error('复制失败:', error);
-    
-    // 如果 clipboard API 失败，尝试使用旧方法
-    try {
-      const logText = logs.map(log => log.message).join('\n');
-      const textarea = document.createElement('textarea');
-      textarea.value = logText;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      
-      showSuccess(`已复制 ${logs.length} 条日志到剪贴板`);
-    } catch (fallbackError) {
-      console.error('备用复制方法也失败:', fallbackError);
-      showError('复制失败: ' + (error.message || '未知错误'));
-    }
+    showError('复制失败: ' + (error?.message || '未知错误'));
   }
 }
 
 function handleClearLogs() {
-  const type = state.currentTab;
-  state.logs[type] = [];
-  
-  // 更新日志计数
-  if (type === 'mofox') {
-    el.mofoxLogCount.textContent = '0';
-  } else {
-    el.napcatLogCount.textContent = '0';
-  }
-  
-  renderLogs();
-  
-  // 通知主进程清空日志
-  window.mofoxAPI?.clearInstanceLogs?.(state.instanceId, type);
+  const entry = currentTerminal();
+  if (!entry) return;
+  entry.term.reset();
+  // 通知主进程清空 ring buffer，下次刷新页面也不会再回放
+  window.mofoxAPI?.clearInstancePty?.(state.instanceId, state.currentTab);
+  const countEl = state.currentTab === 'mofox' ? el.mofoxLogCount : el.napcatLogCount;
+  if (countEl) countEl.textContent = '0';
 }
 
 async function handleExportLogs() {
-  const type = state.currentTab;
-  const logs = state.logs[type];
-  
-  if (logs.length === 0) {
-    showError('没有可导出的日志');
-    return;
-  }
-
   try {
-    const filePath = await window.mofoxAPI?.exportInstanceLogs?.(
-      state.instanceId,
-      type,
-      logs
-    );
-    
-    if (filePath) {
-      showSuccess('日志已导出到: ' + filePath);
-    }
+    const filePath = await window.mofoxAPI?.exportInstanceLogs?.(state.instanceId, state.currentTab);
+    if (filePath) showSuccess('日志已导出到: ' + filePath);
   } catch (error) {
-    console.error('导出失败:', error);
-    showError('导出失败: ' + error.message);
+    showError('导出失败: ' + (error?.message || error));
   }
 }
 
-// ─── 统计信息更新 ─────────────────────────────────────────────────────
+// 客户端轻量 ANSI strip：只在复制路径里用，不参与渲染
+function stripAnsiClient(text) {
+  return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+}
 
+// ─── 资源 / Uptime ────────────────────────────────────────────────────
 function updateStats(stats) {
-  if (stats.mofox) {
+  if (stats?.mofox) {
     state.stats.mofox = stats.mofox;
     el.mofoxUptime.textContent = formatUptime(stats.mofox.uptime);
   }
-
-  // 只在安装了 NapCat 时更新其统计信息
-  if (state.hasNapcat && stats.napcat) {
+  if (state.hasNapcat && stats?.napcat) {
     state.stats.napcat = stats.napcat;
     el.napcatUptime.textContent = formatUptime(stats.napcat.uptime);
   }
 }
 
 function startStatsUpdate() {
-  // 每秒更新一次运行时间
   setInterval(() => {
-    // 分离模式：分别检查 MoFox 和 NapCat 的状态
     if (state.mofoxStatus === 'running') {
       state.stats.mofox.uptime += 1;
       el.mofoxUptime.textContent = formatUptime(state.stats.mofox.uptime);
     }
-    
-    // 只在安装了 NapCat 且 NapCat 在运行时更新
     if (state.hasNapcat && state.napcatStatus === 'running') {
       state.stats.napcat.uptime += 1;
       el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
     }
   }, 1000);
 
-  // 每 2 秒轮询系统 CPU / 内存使用率
-  refreshResourceUsage(); // 立即执行一次
+  refreshResourceUsage();
   setInterval(refreshResourceUsage, 2000);
 }
 
@@ -1079,17 +765,12 @@ async function refreshResourceUsage() {
     if (!data) return;
     applyResourceBar(el.instCpuBar, el.instCpuVal, data.cpuPercent);
     applyResourceBar(el.instMemBar, el.instMemVal, data.memPercent);
-    if (el.instMemDetail) {
-      el.instMemDetail.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
-    }
-    // 同步到 NapCat 标签页副本
+    if (el.instMemDetail) el.instMemDetail.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
     applyResourceBar(el.instCpuBarNc, el.instCpuValNc, data.cpuPercent);
     applyResourceBar(el.instMemBarNc, el.instMemValNc, data.memPercent);
-    if (el.instMemDetailNc) {
-      el.instMemDetailNc.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
-    }
-  } catch (e) {
-    // 静默失败，不影响日志界面
+    if (el.instMemDetailNc) el.instMemDetailNc.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
+  } catch (_) {
+    /* 静默 */
   }
 }
 
@@ -1103,8 +784,6 @@ function applyResourceBar(barEl, valEl, percent) {
   valEl.textContent = p + '%';
 }
 
-// ─── 工具函数 ─────────────────────────────────────────────────────────
-
 function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -1112,199 +791,22 @@ function formatUptime(seconds) {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-function pad(num) {
-  return String(num).padStart(2, '0');
-}
+function pad(num) { return String(num).padStart(2, '0'); }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function escapeRegex(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// ─── ANSI 代码解析 - 移除控制码，保留颜色格式化 ───────────────────────
-function parseAnsi(text) {
-  let result = text;
-  
-  // 1. 先移除所有光标移动和清屏控制码（这些在HTML中无意义）
-  // 移除光标移动: ESC[nA, ESC[nB, ESC[nC, ESC[nD, ESC[nE, ESC[nF, ESC[nG
-  result = result.replace(/(?:\x1b|\u001b)\[\d*[ABCDEFG]/g, '');
-  // 移除光标位置: ESC[n;mH 或 ESC[n;mf
-  result = result.replace(/(?:\x1b|\u001b)\[\d*;?\d*[Hf]/g, '');
-  // 移除清屏/清行: ESC[nJ, ESC[nK
-  result = result.replace(/(?:\x1b|\u001b)\[\d*[JK]/g, '');
-  // 移除保存/恢复光标: ESC[s, ESC[u
-  result = result.replace(/(?:\x1b|\u001b)\[[su]/g, '');
-  // 移除显示/隐藏光标: ESC[?25h, ESC[?25l
-  result = result.replace(/(?:\x1b|\u001b)\[\?\d+[hl]/g, '');
-  // 移除滚动区域设置: ESC[n;mr
-  result = result.replace(/(?:\x1b|\u001b)\[\d*;?\d*r/g, '');
-  
-  // 2. 使用 parseAnsiOld 来处理颜色代码，转换为HTML样式
-  result = parseAnsiOld(result);
-  
-  return result;
-}
-
-// ─── 旧的ANSI颜色解析（已弃用，改为完全移除ANSI） ───────────────────────
-function parseAnsiOld(text) {
-  // ANSI 转 HTML 颜色映射
-  const ansiColors = {
-    '30': '#000000',   // 黑色
-    '31': '#ff7b72',   // 红色
-    '32': '#56d364',   // 绿色
-    '33': '#f0883e',   // 黄色
-    '34': '#58a6ff',   // 蓝色
-    '35': '#db61a2',   // 紫色
-    '36': '#76e3ea',   // 青色
-    '37': '#c9d1d9',   // 白色
-    '90': '#6e7681',   // 明黑
-    '91': '#ff7b72',   // 明红
-    '92': '#56d364',   // 明绿
-    '93': '#ffa657',   // 明黄
-    '94': '#79c0ff',   // 明蓝
-    '95': '#d2a8ff',   // 明紫
-    '96': '#76e3ea',   // 明青
-    '97': '#f0f6fc'    // 明白
-  };
-  
-  // 替换 ANSI escape 序列
-  let result = text;
-  
-  // 处理真实的 ESC 字符 (\x1b 或 \u001b)
-  // 以及可能被转义的字符串形式
-  const ansiPattern = /(?:\x1b|\u001b)\[(\d+)(?:;(\d+))?(?:;(\d+))?m/g;
-  
-  result = result.replace(ansiPattern, (match, code1, code2, code3) => {
-    const codes = [code1];
-    if (code2) codes.push(code2);
-    if (code3) codes.push(code3);
-    
-    // 0 = 重置
-    if (codes.includes('0') || codes.includes('00')) {
-      return '</span>';
-    }
-    
-    // 1 = 加粗, 2 = 暗淡, 3 = 斜体, 4 = 下划线  
-    if (codes.includes('1')) return '<span style="font-weight: bold;">';
-    if (codes.includes('2')) return '<span style="opacity: 0.6;">';
-    if (codes.includes('3')) return '<span style="font-style: italic;">';
-    if (codes.includes('4')) return '<span style="text-decoration: underline;">';
-    
-    // 38;5;XXX = 256色模式
-    if (codes[0] === '38' && codes[1] === '5' && codes[2]) {
-      const colorCode = parseInt(codes[2]);
-      if (!isNaN(colorCode)) {
-        const color = ansi256ToRgb(colorCode);
-        return `<span style="color: ${color};">`;
-      }
-    }
-    
-    // 30-37, 90-97 前景色
-    for (const code of codes) {
-      if (ansiColors[code]) {
-        return `<span style="color: ${ansiColors[code]};">`;
-      }
-    }
-    
-    return '';
-  });
-  
-  // 替换 \x1b[0m, \x1b[XXm 简写格式
-  result = result.replace(/\[0m/g, '</span>');
-  result = result.replace(/\[(\d+)m/g, (match, code) => {
-    if (code === '0') return '</span>';
-    if (ansiColors[code]) {
-      return `<span style="color: ${ansiColors[code]};">`;
-    }
-    return '';
-  });
-  
-  return result;
-}
-
-// ANSI 256 色 -> RGB
-function ansi256ToRgb(code) {
-  if (code < 16) {
-    // 基本 16 色
-    const colors = [
-      '#000000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0',
-      '#808080', '#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff', '#ffffff'
-    ];
-    return colors[code] || '#c9d1d9';
-  } else if (code < 232) {
-    // 216 色 (6x6x6 立方体)
-    const n = code - 16;
-    const r = Math.floor(n / 36);
-    const g = Math.floor((n % 36) / 6);
-    const b = n % 6;
-    const toHex = (c) => {
-      const val = c === 0 ? 0 : 55 + c * 40;
-      return val.toString(16).padStart(2, '0');
-    };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  } else {
-    // 24 级灰度
-    const gray = 8 + (code - 232) * 10;
-    const hex = gray.toString(16).padStart(2, '0');
-    return `#${hex}${hex}${hex}`;
-  }
-}
-
-// ─── 导航控制 ─────────────────────────────────────────────────────────
-
-let isNavigatingAway = false;
-
+// ─── 导航守护 ─────────────────────────────────────────────────────────
 function navigateToMain() {
-  isNavigatingAway = true;
   window.location.href = '../main-view/index.html';
 }
 
 function setupNavigationGuard() {
-  // 多开模式：实例在后台运行，允许自由导航
-  // 仅在用户通过非正常方式（如鼠标侧键）导航时给予提示
-  window.addEventListener('popstate', (e) => {
-    // 推回当前状态以防止页面跳转到未知地址
-    // 然后用正常方式导航回主页
+  window.addEventListener('popstate', () => {
     history.pushState(null, '', window.location.href);
     navigateToMain();
   });
-
-  // 初始推入一个状态，让 popstate 能被触发
   history.pushState(null, '', window.location.href);
 }
 
-// ─── 使用 Toast 组件显示消息 ──────────────────────────────────────────
-
-// Toast 组件函数已在 toast.js 中定义，这里直接使用
-// showError, showSuccess, showInfo, showWarning 已全局可用
-
-// ─── 模拟数据（开发测试用） ────────────────────────────────────────────
-
-function addMockLogs() {
-  // 模拟一些测试日志
-  const mockLogs = [
-    { level: 'info', message: 'MoFox 核心已启动' },
-    { level: 'info', message: '正在加载插件系统...' },
-    { level: 'warning', message: '警告: 某个插件版本过旧' },
-    { level: 'info', message: '已加载 5 个插件' },
-    { level: 'error', message: '错误: 连接到数据库失败' }
-  ];
-
-  mockLogs.forEach((log, index) => {
-    setTimeout(() => {
-      addLog('mofox', log);
-      addLog('napcat', { ...log, message: '[Napcat] ' + log.message });
-    }, index * 1000);
-  });
-}
-
-// ─── 页面加载完成后初始化 ─────────────────────────────────────────────
-
+// ─── 启动 ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   init();
-  });
+});

@@ -566,31 +566,41 @@
   white-space: nowrap;
 }
 
-/* ─── 日志内容 ──────────────────────────────────────────────────────── */
-.log-content {
+/* ─── 日志内容（xterm 终端宿主）─────────────────────────────────────── */
+.terminal-host {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  padding: 12px;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.3;
+  display: block;
+  position: relative;
   background-color: #0d1117;
-  color: #c9d1d9;
-  /* 确保 Unicode 字符正确显示 */
-  unicode-bidi: isolate;
-  text-rendering: geometricPrecision;
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
-  font-variant-ligatures: none;
-  font-kerning: none;
-  -moz-osx-font-smoothing: grayscale;
-  /* 允许文本选择和复制 */
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
-  cursor: text;
+  padding: 8px 12px;
+  overflow: hidden;
+}
+
+.terminal-host .xterm,
+.terminal-host .xterm-viewport,
+.terminal-host .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.terminal-host .xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* xterm 自带滚动条样式覆盖，保持和应用主题一致 */
+.terminal-host .xterm-viewport::-webkit-scrollbar {
+  width: 12px;
+}
+.terminal-host .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.terminal-host .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  border: 3px solid #0d1117;
+}
+.terminal-host .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .log-content::-webkit-scrollbar {

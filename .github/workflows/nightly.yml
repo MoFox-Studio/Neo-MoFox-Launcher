@@ -87,9 +87,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-${{ matrix.arch }}-
 
-      - name: 安装依赖
+      - name: 安装依赖（跳过 postinstall）
         working-directory: Neo-MoFox-Launcher
-        run: npm ci
+        env:
+          # postinstall 会调用 scripts/rebuild-node-pty.js；先跳过，
+          # 等下一步显式按目标架构重编，避免按主机 arch 浪费一次编译。
+          npm_config_ignore_scripts: 'true'
+        run: npm ci --ignore-scripts
+
+      - name: 重新编译 node-pty (${{ matrix.arch }})
+        working-directory: Neo-MoFox-Launcher
+        run: node scripts/rebuild-node-pty.js --force --arch=${{ matrix.arch }} --platform=win32
 
       - name: 构建 Windows ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
@@ -157,10 +165,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-${{ matrix.arch }}-
 
-      - name: 安装依赖
-        working-directory: Neo-MoFox-Launcher
-        run: npm ci
-
       - name: 安装打包依赖
         run: |
           sudo apt-get update
@@ -170,6 +174,18 @@ jobs:
         if: matrix.arch == 'arm64'
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: 安装依赖（跳过 postinstall）
+        working-directory: Neo-MoFox-Launcher
+        env:
+          # 跨架构构建时主机 arch 与目标 arch 可能不同，先跳过 postinstall，
+          # 下一步显式按目标 arch 编译 node-pty。
+          npm_config_ignore_scripts: 'true'
+        run: npm ci --ignore-scripts
+
+      - name: 重新编译 node-pty (${{ matrix.arch }})
+        working-directory: Neo-MoFox-Launcher
+        run: node scripts/rebuild-node-pty.js --force --arch=${{ matrix.arch }} --platform=linux
 
       - name: 构建 Linux deb / rpm / AppImage (${{ matrix.arch }})
         working-directory: Neo-MoFox-Launcher
