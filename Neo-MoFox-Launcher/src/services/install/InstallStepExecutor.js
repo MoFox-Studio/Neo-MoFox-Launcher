@@ -342,6 +342,7 @@ class InstallStepExecutor {
         cwd: inputs.neoMofoxDir,
         shell: platformHelper.config.shell,
         detached: false,
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: platformHelper.buildSpawnEnv({ PYTHONUNBUFFERED: '1' }),
       });
 
@@ -350,13 +351,60 @@ class InstallStepExecutor {
       let killed = false;
       let stdoutData = '';
       let stderrData = '';
+      let timeout;
+      let checkInterval;
+
+      // 超时控制：协议确认会延长进程时间，每次自动同意后重置计时器
+      const timeoutHandler = () => {
+        if (checkInterval) clearInterval(checkInterval);
+        if (!killed) {
+          killed = true;
+          platformHelper.killProcessTree(proc, 'SIGKILL');
+          reject(new Error(`生成配置文件超时（${Math.floor(CONFIG_DETECT_TIMEOUT / 1000)}秒）`));
+        }
+      };
+
+      const resetTimeout = () => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(timeoutHandler, CONFIG_DETECT_TIMEOUT);
+      };
+
+      timeout = setTimeout(timeoutHandler, CONFIG_DETECT_TIMEOUT);
+
+      // 协议确认提示的匹配模式（兼容空格差异）
+      // 来源：Neo-MoFox/src/app/runtime/user_agreements.py
+      //   提示形如："[EULA] 请输入 view / agree / decline: "
+      //   或     ："[云端遥测] 请输入 view / agree / decline: "
+      const AGREEMENT_PROMPT_PATTERN = /请输入\s*view\s*\/\s*agree\s*\/\s*decline/g;
+      let combinedOutput = '';
+      let agreedCount = 0;
+
+      const tryAutoAgree = () => {
+        const matches = combinedOutput.match(AGREEMENT_PROMPT_PATTERN);
+        const totalMatches = matches ? matches.length : 0;
+        while (agreedCount < totalMatches) {
+          agreedCount += 1;
+          if (proc.stdin && !proc.stdin.destroyed && proc.stdin.writable) {
+            try {
+              proc.stdin.write('agree\n');
+              context.emitOutput(`[gen-config] 检测到协议确认提示，已自动同意 (#${agreedCount})\n`);
+              // 协议确认期间进程仍在工作，重置超时计时器
+              resetTimeout();
+            } catch (err) {
+              context.emitOutput(`[gen-config] 写入协议确认失败: ${err.message}\n`);
+            }
+          }
+        }
+      };
 
       // 捕获进程输出
       if (proc.stdout) {
         proc.stdout.on('data', (data) => {
           const output = data.toString();
           stdoutData += output;
+          combinedOutput += output;
           context.emitOutput(output);
+          tryAutoAgree();
         });
       }
 
@@ -364,11 +412,13 @@ class InstallStepExecutor {
         proc.stderr.on('data', (data) => {
           const output = data.toString();
           stderrData += output;
+          combinedOutput += output;
           context.emitOutput(output);
+          tryAutoAgree();
         });
       }
 
-      const checkInterval = setInterval(() => {
+      checkInterval = setInterval(() => {
         if (fs.existsSync(coreToml) && fs.existsSync(modelToml)) {
           clearInterval(checkInterval);
           clearTimeout(timeout);
@@ -380,15 +430,6 @@ class InstallStepExecutor {
           }
         }
       }, 500);
-
-      const timeout = setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!killed) {
-          killed = true;
-          platformHelper.killProcessTree(proc, 'SIGKILL');
-          reject(new Error('生成配置文件超时（60秒）'));
-        }
-      }, CONFIG_DETECT_TIMEOUT);
 
       proc.on('error', (err) => {
         clearInterval(checkInterval);
@@ -403,10 +444,10 @@ class InstallStepExecutor {
       proc.on('close', (code) => {
         clearInterval(checkInterval);
         clearTimeout(timeout);
-        
+
         context.emitOutput(`[gen-config] 进程退出，退出码: ${code}`);
         context.emitOutput(`[gen-config] 检查配置文件...`);
-        
+
         if (fs.existsSync(coreToml) && fs.existsSync(modelToml)) {
           context.emitProgress('gen-config', 100, '配置文件生成完成');
           resolve({ success: true, configDir });
