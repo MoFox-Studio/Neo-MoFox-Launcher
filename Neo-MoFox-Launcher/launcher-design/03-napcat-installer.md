@@ -20,7 +20,7 @@
 
 ## 🎯 NapCat 简介
 
-###什么是 NapCat？
+### 什么是 NapCat？
 
 **NapCat** 是一个基于 NTQQ (QQ NT 架构) 的 OneBot 11 标准实现，提供 WebSocket/HTTP API 供机器人框架调用。
 

@@ -4,8 +4,8 @@
 
 ![Neo-MoFox Launcher](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-green)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
-![Electron](https://img.shields.io/badge/Electron-33.0.0-47848F?logo=electron)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)
+![Electron](https://img.shields.io/badge/Electron-39.0.0-47848F?logo=electron)
 
 **一个优雅的 Neo-MoFox QQ 机器人实例管理启动器**
 
@@ -23,18 +23,19 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 
 - 🎯 **零配置上手** - 图形化安装向导，一步步引导完成所有配置
 - 🚀 **一键部署** - 自动下载并配置 Neo-MoFox 和 NapCat
-- 📦 **多实例管理** - 在同一台电脑上管理多个  Neo-MoFox
+- 📦 **多实例管理** - 在同一台电脑上管理多个 Neo-MoFox
 - 🔄 **自动更新** - 支持 main 和 dev 分支的版本切换
-- 💎 **精美界面** - 遵循 Material Design 3 设计规范
+- 💎 **精美界面** - 遵循 Material Design 3 设计规范，支持动态主题
 - 🛡️ **稳定可靠** - 进程监控与自动崩溃恢复
+- 📦 **集成包支持** - 支持导入/导出完整的实例集成包
 
 ---
 
 ## ✨ 特性
 
-### 🎨 安装向导
+### 🎨 安装向导 (OOBE)
 
-- **环境自动检测** - 检查 Python、Git、uv 等必备工具（自动安装规划中）
+- **环境自动检测** - 检查 Python、Git、uv 等必备工具
 - **智能配置** - 引导式填写 QQ 号、API Key、端口等信息
 - **一站式部署** - 自动克隆仓库、创建虚拟环境、安装依赖
 - **NapCat 集成** - 自动下载并配置 NapCat QQ 客户端
@@ -45,6 +46,7 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 - **状态实时监控** - 运行中、已停止、安装中等状态一目了然
 - **快速操作** - 启动、停止、重启、编辑、删除实例
 - **自定义描述** - 为每个实例添加备注说明
+- **集成包导入/导出** - 方便地分享和备份你的机器人实例
 
 ### 🔧 进程管理
 
@@ -56,8 +58,14 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 ### 📡 版本管理
 
 - **双分支支持** - main（稳定版）和 dev（开发版）
-- **一键切换** - 轻松在不同版本间切换（规划中）
-- **自动更新检测** - 定期检查并提示可用更新（规划中）
+- **一键切换** - 轻松在不同版本间切换
+- **自动更新检测** - 定期检查并提示可用更新
+
+### 🛠️ 高级工具
+
+- **TOML 编辑器** - 内置带语法高亮和错误检查的配置文件编辑器
+- **环境管理** - 查看和管理系统依赖环境
+- **主题设置** - 自定义界面颜色和外观
 
 ---
 
@@ -65,7 +73,7 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 
 ### 系统要求
 
-- **操作系统**: Windows 10/11 (64-bit)
+- **操作系统**: Windows 10/11 (64-bit) 或主流 Linux 发行版
 - **运行时**: Node.js 18+ (LTS)
 - **必备工具**:
   - Python 3.11+
@@ -96,7 +104,7 @@ Neo-MoFox Launcher 是一个基于 Electron 的桌面应用程序，专为 Neo-M
 ```bash
 # 克隆项目到本地
 git clone https://github.com/MoFox-Studio/Neo-MoFox-Launcher.git
-cd Neo-MoFox-Launcher/Neo-MoFox-Luncher
+cd Neo-MoFox-Launcher/Neo-MoFox-Launcher
 ```
 
 #### 2. 安装依赖
@@ -167,7 +175,7 @@ npm start
 
 - 点击实例卡片上的 **"设置"** 按钮
 - 可修改实例名称和描述
-- **注意**: 核心配置（QQ号、端口等）需手动编辑配置文件
+- **注意**: 核心配置（QQ号、端口等）可通过内置的 TOML 编辑器修改
 
 #### 删除实例
 
@@ -185,7 +193,7 @@ npm start
 
 ---
 
-## � 命令行模式（Linux 服务器 / 无桌面环境）
+## 💻 命令行模式（Linux 服务器 / 无桌面环境）
 
 启动器内置了纯 Node.js 命令行入口，**不依赖 Electron GUI**，适用于无桌面环境的 Linux 服务器，
 可完整管理实例的**安装、启动、停止与查看**。
@@ -193,7 +201,7 @@ npm start
 ### 入口
 
 - 通过 PPA / AUR / Copr 安装时：`neo-mofox-cli` 或 `neo-mofox-launcher --cli ...`
-- 从源码运行：`npm run cli -- <command>` 或直接 `node Neo-MoFox-Launcher/src/cli/index.js <command>`
+- 从源码运行：`npm run cli -- <command>` 或直接 `node src/commands/cli/index.js <command>`
 
 > 在交互式终端下，直接运行 `neo-mofox-cli`（不带任何参数）会进入 **TUI 主菜单**：
 > 使用 ↑/↓ 方向键选择，Enter 确定，Esc 取消，类似 NapCat / whiptail 的体验。
@@ -275,7 +283,7 @@ neo-mofox-cli data-dir
 
 ---
 
-## �🛠️ 开发
+## 🛠️ 开发
 
 ### 开发环境搭建
 
@@ -299,46 +307,42 @@ Neo-MoFox-Launcher/
 │   ├── 01-architecture.md    # 架构设计
 │   ├── 02-install-wizard.md  # 安装向导设计
 │   ├── 03-napcat-installer.md # NapCat 安装器
-│   ├── 04-instance-manager.md # 实例管理器
-│   ├── 05-process-manager.md # 进程管理器
-│   ├── 06-update-channel.md  # 更新通道
-│   ├── 07-storage.md         # 数据持久化
-│   └── 08-ui-design.md       # UI 设计规范
+│   └── 07-storage.md         # 数据持久化
 │
 └── Neo-MoFox-Launcher/        # 主程序目录
     ├── src/
     │   ├── main.js           # Electron 主进程入口
     │   ├── preload.js        # 预加载脚本
     │   │
+    │   ├── commands/         # CLI 命令行工具
+    │   │   └── cli/          # CLI 实现
+    │   │
     │   ├── services/         # 后端服务
+    │   │   ├── environment/  # 环境检测服务
     │   │   ├── install/      # 安装相关服务
-    │   │   │   ├── InstallWizardService.js    # 安装向导
-    │   │   │   ├── NapCatInstallerService.js  # NapCat 安装器
-    │   │   │   └── StorageService.js          # 数据存储
-    │   │   ├── instance/     # 实例管理
-    │   │   ├── process/      # 进程管理
-    │   │   └── update/       # 更新服务
+    │   │   ├── integration-pack/ # 集成包导入导出服务
+    │   │   ├── oobe/         # 开箱体验服务
+    │   │   ├── settings/     # 设置服务
+    │   │   ├── theme/        # 主题服务
+    │   │   └── version/      # 版本管理服务
+    │   │
+    │   ├── windows/          # 独立窗口
+    │   │   └── editor/       # TOML 编辑器窗口
     │   │
     │   └── renderer/         # 渲染进程（UI）
-    │       ├── main-view/    # 主视图
-    │       │   ├── index.html
-    │       │   ├── styles.css
-    │       │   └── modules/
-    │       │       └── instances.js   # 实例管理模块
-    │       │
+    │       ├── components/   # 通用组件
+    │       ├── environment-view/ # 环境视图
+    │       ├── import-wizard/ # 导入向导
     │       ├── install-wizard/ # 安装向导
-    │       │   ├── wizard.html
-    │       │   ├── wizard.css
-    │       │   └── wizard.js
-    │       │
     │       ├── instance-view/ # 实例详情
-    │       │   └── index.html
-    │       │
-    │       └── components/    # 通用组件
-    │           └── dialog.css
+    │       ├── main-view/    # 主视图
+    │       ├── oobe-view/    # 开箱体验视图
+    │       ├── settings-view/ # 设置视图
+    │       └── version-view/ # 版本视图
     │
     ├── assets/               # 资源文件
-    │   └── icon.ico         # 应用图标
+    │   ├── images/           # 图标和插图
+    │   └── material-symbols/ # Material 图标字体
     │
     └── package.json         # 项目配置
 ```
@@ -354,6 +358,9 @@ Neo-MoFox-Launcher/
 
 - [@iarna/toml](https://www.npmjs.com/package/@iarna/toml) - TOML 配置文件读写
 - [tree-kill](https://www.npmjs.com/package/tree-kill) - 进程树管理
+- [CodeMirror](https://codemirror.net/) - 代码编辑器组件
+- [xterm.js](https://xtermjs.org/) - 终端模拟器组件
+- [@material/material-color-utilities](https://github.com/material-foundation/material-color-utilities) - Material Design 3 颜色工具
 
 **构建工具**
 
@@ -429,9 +436,6 @@ npm run build:linux:arm64
 - [总体架构](./launcher-design/01-architecture.md) - 模块划分与依赖关系
 - [安装向导](./launcher-design/02-install-wizard.md) - 安装流程设计
 - [NapCat 安装器](./launcher-design/03-napcat-installer.md) - NapCat 集成方案
-- [实例管理器](./launcher-design/04-instance-manager.md) - 多实例管理设计
-- [进程管理器](./launcher-design/05-process-manager.md) - 进程生命周期管理
-- [更新通道](./launcher-design/06-update-channel.md) - 版本更新机制
 - [数据持久化](./launcher-design/07-storage.md) - 数据存储方案
 
 ### API 文档
