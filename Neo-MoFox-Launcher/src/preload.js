@@ -45,6 +45,7 @@ const api = {
 
   // 文件操作
   selectProjectPath: () => ipcRenderer.invoke('select-project-path'),
+  selectDirectory: (options) => ipcRenderer.invoke('select-directory', options),
   selectFile: (options) => ipcRenderer.invoke('select-file', options),
   openProjectFolder: () => ipcRenderer.invoke('open-project-folder'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

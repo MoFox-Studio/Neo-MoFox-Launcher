@@ -570,6 +570,21 @@ ipcMain.handle('select-file', async (event, options = {}) => {
   return null;
 });
 
+ipcMain.handle('select-directory', async (event, options = {}) => {
+  const dialogOptions = {
+    title: options.title || '选择目录',
+    properties: ['openDirectory'],
+    defaultPath: options.defaultPath || app.getPath('home'),
+  };
+
+  const result = await dialog.showOpenDialog(mainWindow, dialogOptions);
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
 ipcMain.handle('clear-logs', () => {
   logBuffer = [];
 });
@@ -1265,7 +1280,6 @@ ipcMain.handle('get-git-info', async (event, repoPath) => {
 // 手动添加实例
 ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
   try {
-    const { instanceService } = require('./services/instance/InstanceService');
     const { spawn } = require('child_process');
     
     // 生成唯一 ID
@@ -1384,7 +1398,7 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
     };
     
     // 保存实例
-    await instanceService.addInstance(instance);
+    storageService.addInstance(instance);
     
     console.log(`[Manual Add] 成功手动添加实例: ${instance.extra.displayName} (${instanceId})`);
     console.log(`[Manual Add] Neo-MoFox 版本: ${neomofoxVersion}, 分支/频道: ${branch}`);

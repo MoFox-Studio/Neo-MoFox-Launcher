@@ -389,7 +389,11 @@ function bindEvents() {
 
   // 浏览安装目录
   el.btnBrowseInstallDir.addEventListener('click', async () => {
-    const selected = await window.mofoxAPI.selectProjectPath();
+    const currentPath = el.defaultInstallDir.value.trim();
+    const selected = await window.mofoxAPI.selectDirectory({
+      title: '选择默认安装目录',
+      defaultPath: currentPath || undefined,
+    });
     if (selected) {
       el.defaultInstallDir.value = selected;
       savePartial({ defaultInstallDir: selected });
@@ -572,8 +576,8 @@ function openManualAddInstanceDialog() {
       </div>
       <div class="dialog-content manual-instance-content">
         <div class="form-warning">
-          <span class="material-symbols-rounded">warning</span>
-          <span>此功能适合高级用户。请确保所有信息准确无误，错误的配置可能导致实例无法启动。</span>
+          <span class="material-symbols-rounded">info</span>
+          <span>填写实例路径信息即可添加，其他配置项将使用默认值。</span>
         </div>
         
         <div class="form-group">
@@ -582,45 +586,7 @@ function openManualAddInstanceDialog() {
             显示名称
           </label>
           <input type="text" class="form-input" id="instance-display-name" placeholder="例如: 我的机器人">
-          <span class="form-hint">实例的显示名称（可选，默认使用 QQ 号）</span>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">
-              <span class="material-symbols-rounded">numbers</span>
-              QQ 号 *
-            </label>
-            <input type="text" class="form-input" id="instance-qq" placeholder="例如: 123456789" required>
-            <span class="form-hint">机器人的 QQ 号</span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">
-              <span class="material-symbols-rounded">person</span>
-              主人 QQ 号 *
-            </label>
-            <input type="text" class="form-input" id="instance-owner-qq" placeholder="例如: 987654321" required>
-            <span class="form-hint">机器人主人的 QQ 号</span>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">
-            <span class="material-symbols-rounded">key</span>
-            API 密钥 *
-          </label>
-          <input type="text" class="form-input" id="instance-api-key" placeholder="例如: your-api-key-here" required>
-          <span class="form-hint">用于 API 访问的密钥</span>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">
-            <span class="material-symbols-rounded">api</span>
-            WebSocket 端口
-          </label>
-          <input type="number" class="form-input" id="instance-ws-port" placeholder="8080" value="8080" min="1024" max="65535">
-          <span class="form-hint">WebSocket 服务端口</span>
+          <span class="form-hint">实例的显示名称（可选）</span>
         </div>
 
         <div class="form-group">
@@ -690,10 +656,6 @@ function openManualAddInstanceDialog() {
   const confirmBtn = dialogOverlay.querySelector('#manual-instance-confirm');
   
   const displayNameInput = dialogOverlay.querySelector('#instance-display-name');
-  const qqInput = dialogOverlay.querySelector('#instance-qq');
-  const ownerQQInput = dialogOverlay.querySelector('#instance-owner-qq');
-  const apiKeyInput = dialogOverlay.querySelector('#instance-api-key');
-  const wsPortInput = dialogOverlay.querySelector('#instance-ws-port');
   const neomofoxDirInput = dialogOverlay.querySelector('#instance-neomofox-dir');
   const napcatDirInput = dialogOverlay.querySelector('#instance-napcat-dir');
   const napcatVersionInput = dialogOverlay.querySelector('#instance-napcat-version');
@@ -701,6 +663,37 @@ function openManualAddInstanceDialog() {
 
   const browseNeomofoxDirBtn = dialogOverlay.querySelector('#browse-neomofox-dir');
   const browseNapcatDirBtn = dialogOverlay.querySelector('#browse-napcat-dir');
+
+  // Linux 下禁用 NapCat 相关字段（变灰提示不可填写）
+  (async () => {
+    try {
+      const platformInfo = await window.mofoxAPI.getPlatformInfo();
+      if (platformInfo && platformInfo.platform === 'linux') {
+        // 禁用 NapCat 目录输入和浏览按钮
+        napcatDirInput.disabled = true;
+        napcatDirInput.placeholder = 'Linux 系统不支持此选项';
+        browseNapcatDirBtn.disabled = true;
+        const napcatDirGroup = napcatDirInput.closest('.form-group');
+        if (napcatDirGroup) {
+          napcatDirGroup.style.opacity = '0.5';
+          const hint = napcatDirGroup.querySelector('.form-hint');
+          if (hint) hint.textContent = 'Linux 系统下无需配置 NapCat 目录';
+        }
+
+        // 禁用 NapCat 版本输入
+        napcatVersionInput.disabled = true;
+        napcatVersionInput.placeholder = 'Linux 系统不支持此选项';
+        const napcatVersionGroup = napcatVersionInput.closest('.form-group');
+        if (napcatVersionGroup) {
+          napcatVersionGroup.style.opacity = '0.5';
+          const hint = napcatVersionGroup.querySelector('.form-hint');
+          if (hint) hint.textContent = 'Linux 系统下无需配置 NapCat 版本';
+        }
+      }
+    } catch (e) {
+      console.warn('[settings] 获取平台信息失败', e);
+    }
+  })();
 
   // 关闭对话框
   const closeDialog = () => {
@@ -713,7 +706,11 @@ function openManualAddInstanceDialog() {
 
   // 浏览 Neo-MoFox 目录
   browseNeomofoxDirBtn.addEventListener('click', async () => {
-    const selected = await window.mofoxAPI.selectProjectPath();
+    const currentPath = neomofoxDirInput.value.trim();
+    const selected = await window.mofoxAPI.selectDirectory({
+      title: '选择 Neo-MoFox 项目目录',
+      defaultPath: currentPath || undefined,
+    });
     if (selected) {
       neomofoxDirInput.value = selected;
     }
@@ -721,20 +718,21 @@ function openManualAddInstanceDialog() {
 
   // 浏览 NapCat 目录
   browseNapcatDirBtn.addEventListener('click', async () => {
-    const selected = await window.mofoxAPI.selectProjectPath();
+    const currentPath = napcatDirInput.value.trim();
+    const selected = await window.mofoxAPI.selectDirectory({
+      title: '选择 NapCat 目录',
+      defaultPath: currentPath || undefined,
+    });
     if (selected) napcatDirInput.value = selected;
   });
 
   // 确认添加
   confirmBtn.addEventListener('click', async () => {
-    const qqNumber = qqInput.value.trim();
-    const ownerQQNumber = ownerQQInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
     const neomofoxDir = neomofoxDirInput.value.trim();
 
-    // 验证必填字段
-    if (!qqNumber || !ownerQQNumber || !apiKey || !neomofoxDir) {
-      await window.customAlert('请填写所有必填字段（标记有 * 的字段）', '信息不完整');
+    // 验证必填字段（仅路径）
+    if (!neomofoxDir) {
+      await window.customAlert('请填写 Neo-MoFox 目录路径', '信息不完整');
       return;
     }
 
@@ -750,10 +748,10 @@ function openManualAddInstanceDialog() {
 
     // 构建实例配置
     const instanceConfig = {
-      qqNumber,
-      ownerQQNumber,
-      apiKey,
-      wsPort: wsPortInput.value ? parseInt(wsPortInput.value, 10) : 8080,
+      qqNumber: '114514',
+      ownerQQNumber: '114514',
+      apiKey: '114514',
+      wsPort: 8080,
       neomofoxDir,
       napcatDir: napcatDirInput.value.trim() || null,
       napcatVersion: napcatVersionInput.value.trim() || null,
@@ -767,7 +765,7 @@ function openManualAddInstanceDialog() {
       if (result.success) {
         const channelInfo = result.channel ? `\n频道: ${result.channel}` : '';
         await window.customAlert(
-          `实例已成功添加！\n\nQQ 号: ${qqNumber}\n实例 ID: ${result.instanceId}${channelInfo}\n\n请在主界面刷新实例列表以查看新添加的实例。`,
+          `实例已成功添加！\n\n实例 ID: ${result.instanceId}${channelInfo}\n\n请在主界面刷新实例列表以查看新添加的实例。`,
           '添加成功'
         );
         closeDialog();

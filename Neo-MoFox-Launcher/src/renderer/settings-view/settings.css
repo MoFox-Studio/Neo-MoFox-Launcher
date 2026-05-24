@@ -1028,10 +1028,11 @@ body {
   color: var(--md-sys-color-on-surface);
 }
 
-.manual-instance-content {
+.manual-instance-dialog .manual-instance-content {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  padding-top: 24px;
 }
 
 .manual-instance-dialog .dialog-actions {
