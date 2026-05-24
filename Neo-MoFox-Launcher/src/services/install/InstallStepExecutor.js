@@ -7,6 +7,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 const { storageService } = require('./StorageService');
@@ -155,6 +156,21 @@ class InstallStepExecutor {
         }).on('error', reject);
       };
       doDownload(url);
+    });
+  }
+
+  /**
+   * 计算文件的 SHA-256 校验值
+   * @param {string} filePath - 文件路径
+   * @returns {Promise<string>} 小写十六进制 SHA-256 哈希值
+   */
+  _computeFileSha256(filePath) {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', (err) => reject(err));
     });
   }
 
@@ -641,17 +657,66 @@ class InstallStepExecutor {
     context.emitOutput(`[napcat] 版本: ${release.tag_name}`);
     context.emitOutput(`[napcat] 资源: ${asset.name} (${(asset.size / 1024 / 1024).toFixed(1)} MB)`);
 
+    // 从 asset.digest 中提取期望的 SHA-256 校验值
+    let expectedSha256 = null;
+    if (asset.digest && asset.digest.startsWith('sha256:')) {
+      expectedSha256 = asset.digest.slice('sha256:'.length).toLowerCase();
+      context.emitOutput(`[napcat] 期望校验值: ${expectedSha256}`);
+    }
+
     const zipPath = path.join(napcatDir, ASSET_NAME);
-    context.emitProgress('napcat', 10, `正在下载 NapCat ${release.tag_name}...`);
+    const maxDownloadRetries = 3;
+    let downloadSuccess = false;
 
-    await this._downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
-      const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
-      const dlMB = (downloaded / 1024 / 1024).toFixed(1);
-      const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
-      context.emitProgress('napcat', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
-    });
+    for (let attempt = 1; attempt <= maxDownloadRetries; attempt++) {
+      context.emitProgress('napcat', 10, `正在下载 NapCat ${release.tag_name}...${attempt > 1 ? ` (第 ${attempt} 次尝试)` : ''}`);
 
-    context.emitOutput(`[napcat] 下载完成: ${zipPath}`);
+      await this._downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
+        const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
+        const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+        const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
+        context.emitProgress('napcat', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
+      });
+
+      context.emitOutput(`[napcat] 下载完成: ${zipPath}`);
+
+      // 校验 SHA-256
+      if (expectedSha256) {
+        context.emitProgress('napcat', 66, '正在校验文件完整性...');
+        const actualSha256 = await this._computeFileSha256(zipPath);
+        context.emitOutput(`[napcat] 实际校验值: ${actualSha256}`);
+
+        if (actualSha256 === expectedSha256) {
+          context.emitOutput('[napcat] 校验通过');
+          downloadSuccess = true;
+          break;
+        } else {
+          context.emitOutput(`[napcat] 校验失败 (第 ${attempt}/${maxDownloadRetries} 次)`);
+          context.emitOutput(`[napcat]   期望: ${expectedSha256}`);
+          context.emitOutput(`[napcat]   实际: ${actualSha256}`);
+          // 删除损坏的文件
+          try { fs.unlinkSync(zipPath); } catch (_) {}
+
+          if (attempt >= maxDownloadRetries) {
+            throw new Error(
+              `NapCat 下载校验失败，已重试 ${maxDownloadRetries} 次仍不一致。` +
+              `\n期望: ${expectedSha256}` +
+              `\n实际: ${actualSha256}` +
+              `\n请检查网络环境后重试。`
+            );
+          }
+        }
+      } else {
+        // 没有校验值信息，跳过校验
+        context.emitOutput('[napcat] 未找到校验值信息，跳过完整性校验');
+        downloadSuccess = true;
+        break;
+      }
+    }
+
+    if (!downloadSuccess) {
+      throw new Error('NapCat 下载失败');
+    }
 
     context.emitProgress('napcat', 68, '正在解压...');
     const unzipInfo = platformHelper.getUnzipCommand(zipPath, napcatDir);
@@ -670,7 +735,7 @@ class InstallStepExecutor {
       context.emitOutput('[napcat] 启动 NapCatInstaller.exe...');
       await this._execCommand(
         'cmd',
-        ['/c', `echo.|"${installerPath}"`],
+        ['/c', `chcp 65001 >nul && echo.|"${installerPath}"`],
         {
           cwd: napcatDir,
           onStdout: (d) => context.emitOutput(d),

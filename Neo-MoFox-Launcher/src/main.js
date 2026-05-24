@@ -423,7 +423,6 @@ function saveSettings() {
 }
 
 function killMofoxProcess() {
-  // 旧的单实例 mofoxProcess 仍是 ChildProcess（被启动器单实例模式使用）
   // 多实例进程都是 node-pty 的 IPty 对象，直接 kill 即可，附带平台命令兜底
   for (const [instanceId, data] of instanceProcesses.entries()) {
     for (const proc of [data.mofoxProcess, data.napcatProcess]) {
