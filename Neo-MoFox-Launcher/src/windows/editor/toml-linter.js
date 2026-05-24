@@ -69,17 +69,6 @@ async function lintTOML(view) {
           message: '可能缺少 = 符号，或这不是有效的 TOML 行',
         });
       }
-
-      // 检查重复的 = 号
-      const equalCount = (trimmed.match(/=/g) || []).length;
-      if (equalCount > 1 && !trimmed.includes('==')) {
-        diagnostics.push({
-          from: doc.line(lineIndex + 1).from,
-          to: doc.line(lineIndex + 1).to,
-          severity: 'error',
-          message: '一行中包含多个 = 符号',
-        });
-      }
     });
 
     // 检查括号匹配

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <title>Flappy Fox 🦊</title>
+  <link rel="stylesheet" href="../../../assets/material-symbols/index.css">
+  <script src="../theme-init.js"></script>
+  <link rel="stylesheet" href="../styles.css">
+  <script src="../window-controls.js" defer></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: var(--md-sys-color-background, #1a1a2e);
+      font-family: var(--font-sans, 'Inter', -apple-system, system-ui, sans-serif);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      user-select: none;
+      -webkit-app-region: no-drag;
+    }
+
+    #game-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 36px); /* Subtract titlebar height */
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 10;
+      transition: opacity 0.3s;
+    }
+
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-title {
+      font-size: 48px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .overlay-subtitle {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 24px;
+    }
+
+    .overlay-score {
+      font-size: 28px;
+      font-weight: 600;
+      color: #feca57;
+      margin-bottom: 16px;
+    }
+
+    .overlay-hint {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 16px;
+    }
+
+    .start-btn {
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #ff6b35, #f7931e);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 16px rgba(255, 107, 53, 0.4);
+    }
+
+    .start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.6);
+    }
+
+    .start-btn:active {
+      transform: scale(0.95);
+    }
+
+    #score-display {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 36px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      z-index: 5;
+    }
+
+    #esc-hint {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      z-index: 5;
+    }
+
+    .fox-logo {
+      font-size: 72px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ═══ Title Bar ═══ -->
+  <header class="title-bar">
+    <div class="title-drag-region">
+      <span class="app-title">Flappy Fox 🦊</span>
+    </div>
+    <div class="window-controls">
+      <button id="min-btn" class="window-btn minimize" title="最小化">
+        <span class="material-symbols-rounded">remove</span>
+      </button>
+      <button id="max-btn" class="window-btn maximize" title="最大化">
+        <span class="material-symbols-rounded">crop_square</span>
+      </button>
+      <button id="close-btn" class="window-btn close" title="关闭">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="game-wrapper">
+    <div id="game-container">
+      <canvas id="game-canvas"></canvas>
+      <div id="score-display">0</div>
+      <div id="esc-hint">ESC 返回设置</div>
+
+      <div id="overlay">
+        <div class="fox-logo">🦊</div>
+        <div class="overlay-title">Flappy Fox</div>
+        <div class="overlay-subtitle">点击或按空格键让狐狸飞起来！</div>
+        <button class="start-btn" id="btn-start">开始游戏</button>
+        <div class="overlay-hint">按 ESC 返回设置页面</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Flappy Fox 游戏逻辑 ──────────────────────────────────────────────
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const scoreDisplay = document.getElementById('score-display');
+    const btnStart = document.getElementById('btn-start');
+    const gameContainer = document.getElementById('game-container');
+
+    let W = gameContainer.clientWidth;
+    let H = gameContainer.clientHeight;
+    canvas.width = W;
+    canvas.height = H;
+
+    window.addEventListener('resize', () => {
+      W = gameContainer.clientWidth;
+      H = gameContainer.clientHeight;
+      canvas.width = W;
+      canvas.height = H;
+      initStars();
+      if (gameState === 'idle') {
+        fox.y = H / 2;
+        fox.x = W * 0.25;
+      }
+    });
+
+    // 游戏状态
+    let gameState = 'idle'; // idle | playing | dead
+    let score = 0;
+    let bestScore = 0;
+    let frameCount = 0;
+
+    // 狐狸
+    const fox = {
+      x: W * 0.25,
+      y: H / 2,
+      vy: 0,
+      width: 40,
+      height: 32,
+      gravity: 0.55,
+      jumpForce: -9.5,
+      rotation: 0,
+      tailWag: 0,
+    };
+
+    // 管道
+    let pipes = [];
+    const PIPE_WIDTH = 60;
+    const PIPE_GAP = 160;
+    const PIPE_SPEED = 3;
+    const PIPE_INTERVAL = 90; // 帧
+
+    // 粒子
+    let particles = [];
+
+    // 背景星星
+    let stars = [];
+    function initStars() {
+      stars = [];
+      for (let i = 0; i < 60; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          size: Math.random() * 2 + 0.5,
+          twinkle: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+    initStars();
+
+    // 地面
+    const GROUND_HEIGHT = 60;
+    let groundOffset = 0;
+
+    // ─── 绘制函数 ──────────────────────────────────────────────────────────
+
+    function drawBackground() {
+      // 渐变天空（夜空）
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0f0c29');
+      grad.addColorStop(0.5, '#302b63');
+      grad.addColorStop(1, '#24243e');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 星星
+      for (const star of stars) {
+        star.twinkle += 0.02;
+        const alpha = 0.3 + Math.sin(star.twinkle) * 0.3;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 远景山丘
+      ctx.fillStyle = 'rgba(30, 30, 60, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(0, H - GROUND_HEIGHT);
+      for (let x = 0; x <= W; x += 40) {
+        ctx.lineTo(x, H - GROUND_HEIGHT - 20 - Math.sin(x * 0.015) * 30);
+      }
+      ctx.lineTo(W, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawGround() {
+      groundOffset = (groundOffset + PIPE_SPEED) % 40;
+
+      ctx.fillStyle = '#2d2d44';
+      ctx.fillRect(0, H - GROUND_HEIGHT, W, GROUND_HEIGHT);
+
+      // 地面纹理线
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+      for (let x = -groundOffset; x < W; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, H - GROUND_HEIGHT);
+        ctx.lineTo(x + 20, H);
+        ctx.stroke();
+      }
+
+      // 草地顶部
+      ctx.fillStyle = '#4a9c5d';
+      ctx.fillRect(0, H - GROUND_HEIGHT, W, 4);
+    }
+
+    function drawFox() {
+      ctx.save();
+      ctx.translate(fox.x, fox.y);
+
+      // 旋转（根据速度）
+      fox.rotation = Math.min(Math.max(fox.vy * 3, -30), 70);
+      ctx.rotate((fox.rotation * Math.PI) / 180);
+
+      // 尾巴
+      fox.tailWag += 0.15;
+      const tailSwing = Math.sin(fox.tailWag) * 8;
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.quadraticCurveTo(-30, tailSwing - 5, -35, tailSwing + 5);
+      ctx.quadraticCurveTo(-28, tailSwing + 2, -18, 5);
+      ctx.closePath();
+      ctx.fill();
+      // 尾巴白尖
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-33, tailSwing + 3, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 身体
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 20, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 肚子
+      ctx.fillStyle = '#ffe0c2';
+      ctx.beginPath();
+      ctx.ellipse(4, 4, 10, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 头
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.arc(16, -4, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 耳朵
+      ctx.fillStyle = '#ff6b35';
+      ctx.beginPath();
+      ctx.moveTo(10, -14);
+      ctx.lineTo(14, -24);
+      ctx.lineTo(20, -14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(18, -14);
+      ctx.lineTo(22, -24);
+      ctx.lineTo(26, -14);
+      ctx.closePath();
+      ctx.fill();
+
+      // 耳朵内部
+      ctx.fillStyle = '#ffb380';
+      ctx.beginPath();
+      ctx.moveTo(12, -14);
+      ctx.lineTo(14, -20);
+      ctx.lineTo(18, -14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(20, -14);
+      ctx.lineTo(22, -20);
+      ctx.lineTo(24, -14);
+      ctx.closePath();
+      ctx.fill();
+
+      // 脸部白色
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(18, 0, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 眼睛
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.arc(14, -5, 3, 0, Math.PI * 2);
+      ctx.fill();
+      // 眼睛高光
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(15, -6, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 鼻子
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.arc(26, -2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 嘴巴（微笑）
+      ctx.strokeStyle = '#1a1a2e';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(24, 1, 3, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawPipe(pipe) {
+      const topHeight = pipe.topHeight;
+      const bottomY = topHeight + PIPE_GAP;
+
+      // 管道主体 - 上方
+      const pipeGrad = ctx.createLinearGradient(pipe.x, 0, pipe.x + PIPE_WIDTH, 0);
+      pipeGrad.addColorStop(0, '#2ecc71');
+      pipeGrad.addColorStop(0.3, '#27ae60');
+      pipeGrad.addColorStop(0.7, '#27ae60');
+      pipeGrad.addColorStop(1, '#1e8449');
+      ctx.fillStyle = pipeGrad;
+
+      // 上管道
+      ctx.fillRect(pipe.x, 0, PIPE_WIDTH, topHeight);
+      // 上管道帽
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillRect(pipe.x - 5, topHeight - 20, PIPE_WIDTH + 10, 20);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pipe.x - 5, topHeight - 20, PIPE_WIDTH + 10, 20);
+
+      // 下管道
+      ctx.fillStyle = pipeGrad;
+      ctx.fillRect(pipe.x, bottomY, PIPE_WIDTH, H - bottomY - GROUND_HEIGHT);
+      // 下管道帽
+      ctx.fillStyle = '#2ecc71';
+      ctx.fillRect(pipe.x - 5, bottomY, PIPE_WIDTH + 10, 20);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pipe.x - 5, bottomY, PIPE_WIDTH + 10, 20);
+
+      // 管道高光
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(pipe.x + 5, 0, 8, topHeight - 20);
+      ctx.fillRect(pipe.x + 5, bottomY + 20, 8, H - bottomY - GROUND_HEIGHT - 20);
+    }
+
+    function drawParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1;
+        p.life -= 0.02;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.fillStyle = `rgba(${p.color}, ${p.life})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function spawnJumpParticles() {
+      for (let i = 0; i < 5; i++) {
+        particles.push({
+          x: fox.x - 10,
+          y: fox.y + 5,
+          vx: (Math.random() - 0.5) * 2 - 1,
+          vy: Math.random() * 2 + 1,
+          size: Math.random() * 4 + 2,
+          life: 1,
+          color: '255, 107, 53',
+        });
+      }
+    }
+
+    function spawnDeathParticles() {
+      for (let i = 0; i < 20; i++) {
+        particles.push({
+          x: fox.x,
+          y: fox.y,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          size: Math.random() * 6 + 3,
+          life: 1,
+          color: '255, 107, 53',
+        });
+      }
+    }
+
+    // ─── 游戏逻辑 ──────────────────────────────────────────────────────────
+
+    function jump() {
+      if (gameState === 'idle') {
+        startGame();
+        return;
+      }
+      if (gameState === 'playing') {
+        fox.vy = fox.jumpForce;
+        spawnJumpParticles();
+      }
+    }
+
+    function startGame() {
+      gameState = 'playing';
+      score = 0;
+      frameCount = 0;
+      fox.y = H / 2;
+      fox.vy = 0;
+      fox.rotation = 0;
+      pipes = [];
+      particles = [];
+      overlay.classList.add('hidden');
+      scoreDisplay.textContent = '0';
+    }
+
+    function die() {
+      if (gameState !== 'playing') return;
+      gameState = 'dead';
+      spawnDeathParticles();
+      if (score > bestScore) bestScore = score;
+
+      setTimeout(() => {
+        showOverlay('游戏结束', `得分: ${score}`, score > 0 ? `最高分: ${bestScore}` : '');
+      }, 500);
+    }
+
+    function showOverlay(title, subtitle, extra) {
+      overlay.classList.remove('hidden');
+      overlay.innerHTML = `
+        <div class="fox-logo">🦊</div>
+        <div class="overlay-title">${title}</div>
+        <div class="overlay-subtitle">${subtitle}</div>
+        ${extra ? `<div class="overlay-score">${extra}</div>` : ''}
+        <button class="start-btn" id="btn-start">再来一次</button>
+        <div class="overlay-hint">按 ESC 返回设置页面</div>
+      `;
+      document.getElementById('btn-start').addEventListener('click', () => {
+        gameState = 'idle';
+        jump();
+      });
+    }
+
+    function checkCollision() {
+      // 地面碰撞
+      if (fox.y + 14 >= H - GROUND_HEIGHT) {
+        fox.y = H - GROUND_HEIGHT - 14;
+        return true;
+      }
+      // 天花板碰撞
+      if (fox.y - 14 <= 0) {
+        fox.y = 14;
+        return true;
+      }
+
+      // 管道碰撞
+      for (const pipe of pipes) {
+        if (
+          fox.x + 16 > pipe.x &&
+          fox.x - 16 < pipe.x + PIPE_WIDTH
+        ) {
+          if (fox.y - 12 < pipe.topHeight || fox.y + 12 > pipe.topHeight + PIPE_GAP) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function update() {
+      if (gameState !== 'playing') return;
+
+      frameCount++;
+
+      // 狐狸物理
+      fox.vy += fox.gravity;
+      fox.y += fox.vy;
+
+      // 生成管道
+      if (frameCount % PIPE_INTERVAL === 0) {
+        const minTop = 80;
+        const maxTop = H - GROUND_HEIGHT - PIPE_GAP - 80;
+        const topHeight = Math.random() * (maxTop - minTop) + minTop;
+        pipes.push({
+          x: W,
+          topHeight,
+          scored: false,
+        });
+      }
+
+      // 移动管道
+      for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= PIPE_SPEED;
+
+        // 计分
+        if (!pipes[i].scored && pipes[i].x + PIPE_WIDTH < fox.x) {
+          pipes[i].scored = true;
+          score++;
+          scoreDisplay.textContent = score;
+        }
+
+        // 移除屏幕外管道
+        if (pipes[i].x + PIPE_WIDTH < -10) {
+          pipes.splice(i, 1);
+        }
+      }
+
+      // 碰撞检测
+      if (checkCollision()) {
+        die();
+      }
+    }
+
+    function render() {
+      drawBackground();
+
+      if (gameState === 'playing' || gameState === 'dead') {
+        drawGround();
+        for (const pipe of pipes) {
+          drawPipe(pipe);
+        }
+      } else {
+        drawGround();
+      }
+
+      drawFox();
+      drawParticles();
+    }
+
+    function gameLoop() {
+      update();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ─── 事件绑定 ──────────────────────────────────────────────────────────
+
+    // 点击/空格跳跃
+    canvas.addEventListener('click', jump);
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        jump();
+      }
+      // ESC 返回设置页
+      if (e.code === 'Escape') {
+        window.location.href = 'settings.html';
+      }
+    });
+
+    btnStart.addEventListener('click', () => {
+      gameState = 'idle';
+      jump();
+    });
+
+    // ─── 启动 ──────────────────────────────────────────────────────────────
+    gameLoop();
+  </script>
+</body>
+</html>
