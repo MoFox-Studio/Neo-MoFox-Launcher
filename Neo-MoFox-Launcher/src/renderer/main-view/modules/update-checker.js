@@ -166,8 +166,20 @@ function showUpdateDetailsModal(instancesWithUpdates) {
 
 /**
  * 在主页面初始化时执行自动更新检查
+ * 启动器更新和实例更新并行执行，互不影响
  */
 export async function performAutoUpdateCheck() {
+  // 并行执行两个检查，任一失败不影响另一个
+  await Promise.allSettled([
+    checkInstanceUpdates(),
+    checkLauncherUpdate(),
+  ]);
+}
+
+/**
+ * 检查所有实例的更新
+ */
+async function checkInstanceUpdates() {
   try {
     console.log('🔍 开始检查实例更新...');
     
@@ -180,15 +192,7 @@ export async function performAutoUpdateCheck() {
       console.log('✓ 所有实例均为最新版本');
     }
   } catch (error) {
-    console.error('自动更新检查失败:', error);
-    // 静默失败，不打扰用户
-  }
-
-  // 检查启动器自身更新
-  try {
-    await checkLauncherUpdate();
-  } catch (error) {
-    console.warn('启动器更新检查失败:', error);
+    console.error('实例更新检查失败:', error);
   }
 }
 
