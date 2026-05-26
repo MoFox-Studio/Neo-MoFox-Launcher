@@ -1814,7 +1814,8 @@ async function startMoFoxProcess(instanceId, instance) {
   
   mofoxProc.onExit(({ exitCode, signal }) => {
     const code = exitCode != null ? exitCode : signal;
-    emitLauncherMessage(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code})`, 'info');
+    const killedBySignal = exitCode == null && signal != null;
+    emitLauncherMessage(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
     if (instanceData.mofoxGeneration !== currentGeneration) {
       console.log(`[Instance ${instanceId}] 忽略旧 MoFox 进程 close 事件`);
       return;
@@ -1832,7 +1833,12 @@ async function startMoFoxProcess(instanceId, instance) {
     } else if (instanceData.mofoxStatus === 'restarting') {
       console.log(`[Instance ${instanceId}] MoFox 进程在重启期间退出，等待重启流程`);
     } else {
-      instanceData.mofoxStatus = code === 0 ? 'stopped' : 'error';
+      // 被信号杀死（SIGINT/SIGTERM/SIGKILL）视为正常停止，不标记为 error
+      if (killedBySignal) {
+        instanceData.mofoxStatus = 'stopped';
+      } else {
+        instanceData.mofoxStatus = code === 0 ? 'stopped' : 'error';
+      }
     }
     updateInstanceStatus(instanceId);
   });
@@ -1985,7 +1991,8 @@ async function startNapcatProcess(instanceId, instance) {
   
   napcatProc.onExit(({ exitCode, signal }) => {
     const code = exitCode != null ? exitCode : signal;
-    emitLauncherMessage(instanceId, 'napcat', `NapCat 进程已退出 (code: ${code})`, 'info');
+    const killedBySignal = exitCode == null && signal != null;
+    emitLauncherMessage(instanceId, 'napcat', `NapCat 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
     if (instanceData.napcatGeneration !== currentGeneration) {
       console.log(`[Instance ${instanceId}] 忽略旧 NapCat 进程 close 事件`);
       return;
@@ -2003,7 +2010,12 @@ async function startNapcatProcess(instanceId, instance) {
     } else if (instanceData.napcatStatus === 'restarting') {
       console.log(`[Instance ${instanceId}] NapCat 进程在重启期间退出，等待重启流程`);
     } else {
-      instanceData.napcatStatus = code === 0 ? 'stopped' : 'error';
+      // 被信号杀死（SIGINT/SIGTERM/SIGKILL）视为正常停止，不标记为 error
+      if (killedBySignal) {
+        instanceData.napcatStatus = 'stopped';
+      } else {
+        instanceData.napcatStatus = code === 0 ? 'stopped' : 'error';
+      }
     }
     updateInstanceStatus(instanceId);
   });
@@ -2039,31 +2051,37 @@ async function startInstanceInternal(instanceId, instance) {
   }
 }
 
-// ── PTY 进程友好关闭：先 SIGTERM，超时再 SIGKILL，最后兜底用系统命令杀掉进程树
+// ── PTY 进程友好关闭：先 Ctrl+C，再 SIGTERM，超时再 SIGKILL，最后兜底用系统命令杀掉进程树
 async function stopPtyProcess(ptyProc, label = '') {
   if (!ptyProc) return;
   const pid = ptyProc.pid;
-
-  // 第一波：SIGTERM
-  try { ptyProc.kill('SIGTERM'); } catch (e) { /* ignore */ }
 
   await new Promise((resolve) => {
     let done = false;
     const finish = () => { if (!done) { done = true; resolve(); } };
     try { ptyProc.onExit(finish); } catch (_) { /* node-pty 已退出时会抛 */ }
 
+    // 第一波：写入 Ctrl+C（\x03）触发 SIGINT，让进程正常退出
+    try { ptyProc.write('\x03'); } catch (_) { /* ignore */ }
+
+    // 4 秒后如果进程还没退出，升级为 SIGTERM
     setTimeout(() => {
       if (done) return;
-      // 第二波：SIGKILL，并兜底用平台命令杀进程树
-      try { ptyProc.kill('SIGKILL'); } catch (_) { /* ignore */ }
-      try {
-        if (process.platform === 'win32') {
-          spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { shell: true });
-        } else {
-          require('tree-kill')(pid, 'SIGKILL', () => { /* ignore */ });
-        }
-      } catch (_) { /* ignore */ }
-      setTimeout(finish, 500);
+      try { ptyProc.kill('SIGTERM'); } catch (_) { /* ignore */ }
+
+      // 再等 3 秒，如果还没退出，升级为 SIGKILL + 平台命令兜底
+      setTimeout(() => {
+        if (done) return;
+        try { ptyProc.kill('SIGKILL'); } catch (_) { /* ignore */ }
+        try {
+          if (process.platform === 'win32') {
+            spawn('taskkill', ['/pid', String(pid), '/f', '/t'], { shell: true });
+          } else {
+            require('tree-kill')(pid, 'SIGKILL', () => { /* ignore */ });
+          }
+        } catch (_) { /* ignore */ }
+        setTimeout(finish, 500);
+      }, 3000);
     }, 4000);
   });
 }
