@@ -43,6 +43,10 @@ const api = {
   getPlatformInfo: () => ipcRenderer.invoke('get-platform-info'),
   getProjectInfo: () => ipcRenderer.invoke('get-project-info'),
 
+  // 更新检查
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getBuildVersion: () => ipcRenderer.invoke('get-build-version'),
+
   // 文件操作
   selectProjectPath: () => ipcRenderer.invoke('select-project-path'),
   selectDirectory: (options) => ipcRenderer.invoke('select-directory', options),

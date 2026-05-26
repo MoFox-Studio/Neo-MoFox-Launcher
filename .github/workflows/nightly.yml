@@ -99,6 +99,24 @@ jobs:
         working-directory: Neo-MoFox-Launcher
         run: node scripts/rebuild-node-pty.js --force --arch=${{ matrix.arch }} --platform=win32
 
+      - name: 写入构建版本号
+        working-directory: Neo-MoFox-Launcher
+        shell: pwsh
+        run: |
+          $version = "${{ needs.check-commits.outputs.version }}"
+          $content = @"
+          /**
+           * version.js - 构建版本号
+           * 此文件由 CI/CD 工作流自动生成，请勿手动修改。
+           * 版本号为空字符串时表示通过包管理器（如 AUR、PPA）安装，不进行自动更新检查。
+           */
+          module.exports = {
+            BUILD_VERSION: '$version'
+          };
+          "@
+          Set-Content -Path "src/version.js" -Value $content -Encoding UTF8
+          Write-Host "已写入版本号: $version"
+
       - name: 构建 Windows ${{ matrix.arch }}
         working-directory: Neo-MoFox-Launcher
         run: npx electron-builder --win --${{ matrix.arch }}
@@ -186,6 +204,22 @@ jobs:
       - name: 重新编译 node-pty (${{ matrix.arch }})
         working-directory: Neo-MoFox-Launcher
         run: node scripts/rebuild-node-pty.js --force --arch=${{ matrix.arch }} --platform=linux
+
+      - name: 写入构建版本号
+        working-directory: Neo-MoFox-Launcher
+        run: |
+          VERSION="${{ needs.check-commits.outputs.version }}"
+          cat > src/version.js << EOF
+          /**
+           * version.js - 构建版本号
+           * 此文件由 CI/CD 工作流自动生成，请勿手动修改。
+           * 版本号为空字符串时表示通过包管理器（如 AUR、PPA）安装，不进行自动更新检查。
+           */
+          module.exports = {
+            BUILD_VERSION: '${VERSION}'
+          };
+          EOF
+          echo "已写入版本号: ${VERSION}"
 
       - name: 构建 Linux deb / rpm / AppImage (${{ matrix.arch }})
         working-directory: Neo-MoFox-Launcher

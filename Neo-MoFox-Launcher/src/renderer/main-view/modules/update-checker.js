@@ -183,4 +183,37 @@ export async function performAutoUpdateCheck() {
     console.error('自动更新检查失败:', error);
     // 静默失败，不打扰用户
   }
+
+  // 检查启动器自身更新
+  try {
+    await checkLauncherUpdate();
+  } catch (error) {
+    console.warn('启动器更新检查失败:', error);
+  }
+}
+
+/**
+ * 检查启动器自身是否有新版本可用
+ * 版本号为空时（AUR/PPA 等包管理器安装）跳过检查
+ */
+async function checkLauncherUpdate() {
+  const result = await window.mofoxAPI.checkForUpdates();
+
+  if (!result) {
+    // null 表示不需要检查（包管理器安装）或检查失败
+    return;
+  }
+
+  if (result.hasUpdate) {
+    console.log(`🚀 启动器有新版本: ${result.remoteVersion} (当前: ${result.localVersion})`);
+    const confirmed = await window.customConfirm(
+      `启动器有新版本可用！\n\n当前版本: ${result.localVersion}\n最新版本: ${result.remoteVersion}\n\n是否前往下载页面？`,
+      '发现新版本'
+    );
+    if (confirmed) {
+      window.mofoxAPI.openExternal(result.releaseUrl);
+    }
+  } else {
+    console.log('✓ 启动器已是最新版本');
+  }
 }

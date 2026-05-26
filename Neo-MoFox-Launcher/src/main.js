@@ -64,6 +64,7 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
 const { platformHelper } = require('./services/PlatformHelper');
 const { LauncherLogger, InstanceLogger, LogReader } = require('./services/LoggerService');
 const { storageService } = require('./services/install/StorageService');
+const { updateChecker } = require('./services/update/UpdateChecker');
 const { getOobeService } = require('./services/oobe/OobeService');
 
 // 初始化 OobeService（传入 app 和 dialog）
@@ -533,6 +534,15 @@ ipcMain.handle('get-resource-usage', () => {
 
 ipcMain.handle('get-platform-info', () => {
   return platformHelper.detectSystemEnv();
+});
+
+// ─── 更新检查 IPC ─────────────────────────────────────────────────────
+ipcMain.handle('check-for-updates', async () => {
+  return await updateChecker.check();
+});
+
+ipcMain.handle('get-build-version', () => {
+  return updateChecker.getLocalVersion();
 });
 
 ipcMain.handle('select-project-path', async () => {
