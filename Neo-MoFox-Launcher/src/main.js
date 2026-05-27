@@ -35,7 +35,12 @@ const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
-const stripAnsi = require('strip-ansi');
+
+// strip-ansi v7+ 是纯 ESM 模块，无法通过 require() 加载。
+// 使用内联正则实现等效功能，避免 ESM/CJS 兼容性问题。
+// 参考: https://github.com/chalk/ansi-regex/blob/main/index.js
+const ansiRegex = /[\u001B\u009B][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><~]/g;
+const stripAnsi = (str) => typeof str === 'string' ? str.replace(ansiRegex, '') : str;
 
 // ─── 设置应用名称和 WM_CLASS ────────────────────────────────────────
 // 这对于系统 electron 正确显示应用图标和名称至关重要
