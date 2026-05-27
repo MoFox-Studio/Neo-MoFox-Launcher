@@ -30,8 +30,13 @@ export async function renderFinishStep(container, stepManager) {
     },
     {
       icon: 'update',
-      label: '自动检查更新',
+      label: '自动检查实例更新',
       value: config.autoCheckUpdates !== false ? '已启用' : '已禁用'
+    },
+    {
+      icon: 'upgrade',
+      label: '自动检查启动器更新',
+      value: config.autoCheckLauncherUpdates !== false ? '已启用' : '已禁用'
     },
     {
       icon: 'code',

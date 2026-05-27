@@ -167,13 +167,18 @@ function showUpdateDetailsModal(instancesWithUpdates) {
 /**
  * 在主页面初始化时执行自动更新检查
  * 启动器更新和实例更新并行执行，互不影响
+ * @param {object} options - 检查选项
+ * @param {boolean} options.checkInstances - 是否检查实例更新，默认 true
+ * @param {boolean} options.checkLauncher - 是否检查启动器更新，默认 true
  */
-export async function performAutoUpdateCheck() {
-  // 并行执行两个检查，任一失败不影响另一个
-  await Promise.allSettled([
-    checkInstanceUpdates(),
-    checkLauncherUpdate(),
-  ]);
+export async function performAutoUpdateCheck({ checkInstances = true, checkLauncher = true } = {}) {
+  const tasks = [];
+  if (checkInstances) tasks.push(checkInstanceUpdates());
+  if (checkLauncher) tasks.push(checkLauncherUpdate());
+  
+  if (tasks.length > 0) {
+    await Promise.allSettled(tasks);
+  }
 }
 
 /**

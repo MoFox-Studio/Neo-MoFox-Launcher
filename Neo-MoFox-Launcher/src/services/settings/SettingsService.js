@@ -13,7 +13,7 @@ const SETTINGS_FILE = 'settings.json';
 
 // ─── 默认设置 ────────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS = {
+const    = {
   // OOBE
   oobeCompleted: false,       // 首次启动向导是否已完成
 
@@ -29,7 +29,8 @@ const DEFAULT_SETTINGS = {
   autoOpenNapcatWebUI: true,  // 实例启动后自动打开 Napcat WebUI
   
   // 更新
-  autoCheckUpdates: true,     // 启动时自动检查实例更新
+  autoCheckUpdates: true,     // 启动时自动检查 MoFox 实例更新
+  autoCheckLauncherUpdates: true, // 启动时自动检查启动器自身更新
 
   // 关闭行为
   closeToTray: false,         // true: 关闭窗口时最小化到系统托盘 | false: 直接退出

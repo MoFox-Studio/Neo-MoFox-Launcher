@@ -14,8 +14,10 @@ export async function renderPreferencesStep(container, stepManager) {
     },
     // WebUI 自动打开
     autoOpenNapcatWebUI: settings.autoOpenNapcatWebUI !== false, // 默认 true
-    // 自动检查更新
+    // 自动检查实例更新
     autoCheckUpdates: settings.autoCheckUpdates !== false, // 默认 true
+    // 自动检查启动器更新
+    autoCheckLauncherUpdates: settings.autoCheckLauncherUpdates !== false, // 默认 true
     // 配置编辑器
     configEditor: {
       useBuiltIn: settings.configEditor?.useBuiltIn !== false // 默认 true
@@ -98,9 +100,17 @@ export async function renderPreferencesStep(container, stepManager) {
           <div class="form-field">
             <label class="switch-row">
               <input type="checkbox" class="settings-switch" id="auto-check-updates" ${config.autoCheckUpdates ? 'checked' : ''}>
-              <span class="switch-label">启动时检查更新</span>
+              <span class="switch-label">启动时检查实例更新</span>
             </label>
-            <p class="card-desc" style="margin-top: 4px;">启动时自动检查 Launcher 和框架组件的更新</p>
+            <p class="card-desc" style="margin-top: 4px;">启动时自动检查 MoFox 框架组件的更新</p>
+          </div>
+
+          <div class="form-field" style="margin-top: 12px;">
+            <label class="switch-row">
+              <input type="checkbox" class="settings-switch" id="auto-check-launcher-updates" ${config.autoCheckLauncherUpdates ? 'checked' : ''}>
+              <span class="switch-label">启动时检查启动器更新</span>
+            </label>
+            <p class="card-desc" style="margin-top: 4px;">启动时自动检查 Launcher 自身是否有新版本</p>
           </div>
         </div>
 
@@ -392,6 +402,7 @@ export async function renderPreferencesStep(container, stepManager) {
   const checkboxCompress = document.getElementById('compress-archive');
   const toggleWebUI = document.getElementById('auto-open-webui');
   const toggleUpdates = document.getElementById('auto-check-updates');
+  const toggleLauncherUpdates = document.getElementById('auto-check-launcher-updates');
   const editorBuiltIn = document.getElementById('editor-builtin');
   const editorSystem = document.getElementById('editor-system');
 
@@ -425,6 +436,11 @@ export async function renderPreferencesStep(container, stepManager) {
     updateConfig();
   });
 
+  toggleLauncherUpdates?.addEventListener('change', (e) => {
+    config.autoCheckLauncherUpdates = e.target.checked;
+    updateConfig();
+  });
+
   editorBuiltIn?.addEventListener('click', () => {
     editorBuiltIn.classList.add('selected');
     editorSystem?.classList.remove('selected');
@@ -444,6 +460,7 @@ export async function renderPreferencesStep(container, stepManager) {
     stepManager.config.logging = config.logging;
     stepManager.config.autoOpenNapcatWebUI = config.autoOpenNapcatWebUI;
     stepManager.config.autoCheckUpdates = config.autoCheckUpdates;
+    stepManager.config.autoCheckLauncherUpdates = config.autoCheckLauncherUpdates;
     stepManager.config.configEditor = config.configEditor;
   }
 

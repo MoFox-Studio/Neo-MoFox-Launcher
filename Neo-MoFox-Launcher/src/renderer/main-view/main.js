@@ -58,16 +58,14 @@ async function init() {
   // 🔍 检测平台并显示 Linux NapCat 提示
   checkAndShowLinuxNotice();
   
-  // 🔍 自动检查所有实例的更新（非阻塞）
+  // 🔍 自动检查更新（非阻塞）
   // 延迟 2 秒执行，让界面优先完成渲染
   setTimeout(async () => {
-    // 读取设置，检查是否启用自动更新检查
     const settings = await window.mofoxAPI.settingsRead();
-    if (settings.autoCheckUpdates !== false) {
-      performAutoUpdateCheck();
-    } else {
-      console.log('⏭️  已跳过自动更新检查（设置已禁用）');
-    }
+    performAutoUpdateCheck({
+      checkInstances: settings.autoCheckUpdates !== false,
+      checkLauncher: settings.autoCheckLauncherUpdates !== false,
+    });
   }, 2000);
   
   // 每30秒更新一次名言
