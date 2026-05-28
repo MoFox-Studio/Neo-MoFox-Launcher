@@ -13,7 +13,7 @@ const SETTINGS_FILE = 'settings.json';
 
 // ─── 默认设置 ────────────────────────────────────────────────────────────
 
-const    = {
+const DEFAULT_SETTINGS   = {
   // OOBE
   oobeCompleted: false,       // 首次启动向导是否已完成
 
