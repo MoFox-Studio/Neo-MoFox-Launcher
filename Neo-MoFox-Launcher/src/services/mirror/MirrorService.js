@@ -44,6 +44,31 @@ const MIRROR_SOURCES = [
 ];
 
 /**
+ * Python 发布文件镜像源配置。
+ * 这些镜像按 python.org/ftp/python 后的相对路径映射安装包文件。
+ */
+const PYTHON_MIRROR_SOURCES = [
+  {
+    name: 'Python.org (直连)',
+    baseUrl: 'https://www.python.org/ftp/python/',
+    testHost: 'www.python.org',
+    testPort: 443,
+  },
+  {
+    name: '清华 TUNA Python 镜像',
+    baseUrl: 'https://mirrors.tuna.tsinghua.edu.cn/python/',
+    testHost: 'mirrors.tuna.tsinghua.edu.cn',
+    testPort: 443,
+  },
+  {
+    name: '华为云 Python 镜像',
+    baseUrl: 'https://mirrors.huaweicloud.com/python/',
+    testHost: 'mirrors.huaweicloud.com',
+    testPort: 443,
+  },
+];
+
+/**
  * 原始 URL 模板定义
  * 所有需要镜像加速的原始 GitHub URL 集中在此处管理
  */
@@ -64,6 +89,13 @@ const ORIGIN_URLS = {
   raw: {
     eula: 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/eula.md',
     privacy: 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/PRIVACY.md',
+  },
+  // 第三方依赖下载（用于 OOBE 自动安装）
+  dependency: {
+    pythonBase: 'https://www.python.org/ftp/python/',
+    pythonWin: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe',
+    pythonMac: 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg',
+    gitWin: 'https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe',
   },
 };
 
@@ -254,6 +286,39 @@ class MirrorService {
    */
   async getPrivacyUrls() {
     return await this.getUrls(ORIGIN_URLS.raw.privacy);
+  }
+
+  /**
+   * 基于 Python 镜像源生成下载 URL 列表。
+   * @param {string} originUrl - python.org 官方下载地址
+   * @returns {Promise<string[]>} Python 下载 URL 列表
+   */
+  async getPythonDownloadUrls(originUrl) {
+    const relativePath = originUrl.replace(ORIGIN_URLS.dependency.pythonBase, '');
+    if (relativePath === originUrl) {
+      return [originUrl];
+    }
+
+    const results = await Promise.all(
+      PYTHON_MIRROR_SOURCES.map(async (mirror) => {
+        const latency = await this._measureLatency(mirror.testHost, mirror.testPort);
+        return { mirror, latency };
+      })
+    );
+
+    results.sort((a, b) => a.latency - b.latency);
+    const reachable = results.filter((result) => result.latency !== Infinity);
+    const ordered = reachable.length > 0 ? reachable : results;
+
+    return ordered.map(({ mirror }) => mirror.baseUrl + relativePath);
+  }
+
+  /**
+   * 获取 Windows Git 安装包 URL 列表。
+   * @returns {Promise<string[]>}
+   */
+  async getGitForWindowsDownloadUrls() {
+    return await this.getUrls(ORIGIN_URLS.dependency.gitWin);
   }
 
   /**

@@ -17,6 +17,7 @@ const os   = require('os');
 const https = require('https');
 const http  = require('http');
 const { platformHelper } = require('../PlatformHelper');
+const { mirrorService } = require('../mirror/MirrorService');
 
 // ─── 下载链接 & 静默安装参数 ──────────────────────────────────────────────
 
@@ -640,6 +641,33 @@ class OobeService {
   }
 
   /**
+   * 按 URL 列表顺序下载文件，失败时自动尝试下一个镜像源。
+   * @param {string[]} urls - 下载 URL 列表
+   * @param {string} destPath - 下载目标路径
+   * @param {(line: string) => void} onLog - 日志回调
+   * @param {(progress: {percent: number, downloaded: number, total: number}) => void} onProgress - 进度回调
+   * @returns {Promise<string>} 下载后的文件路径
+   */
+  async _downloadWithFallback(urls, destPath, onLog = () => {}, onProgress = () => {}) {
+    let lastError = null;
+
+    for (const url of urls) {
+      try {
+        onLog(`[下载] 尝试 URL: ${url}\n`);
+        await this._downloadFile(url, destPath, onProgress);
+        onLog(`[下载] 使用 URL 下载成功: ${url}\n`);
+        return destPath;
+      } catch (error) {
+        lastError = error;
+        onLog(`[下载] URL 下载失败: ${url}\n[下载] 原因: ${error.message}\n`);
+        try { fs.unlinkSync(destPath); } catch (_) {}
+      }
+    }
+
+    throw new Error(lastError ? lastError.message : '所有镜像源下载失败');
+  }
+
+  /**
    * 运行安装程序（静默模式）
    * @param {string} installerPath
    * @param {string[]} args
@@ -849,7 +877,14 @@ class OobeService {
       // 1. 下载
       onProgress({ type: 'status', message: `正在下载 ${meta.displayName}...` });
       onProgress({ type: 'log', message: `[下载] 开始下载 ${meta.displayName}\n` });
-      onProgress({ type: 'log', message: `[下载] URL: ${platMeta.downloadUrl}\n` });
+
+      let downloadUrls = [platMeta.downloadUrl];
+      if (depName === 'python') {
+        downloadUrls = await mirrorService.getPythonDownloadUrls(platMeta.downloadUrl);
+      } else if (depName === 'git') {
+        downloadUrls = await mirrorService.getGitForWindowsDownloadUrls();
+      }
+      onProgress({ type: 'log', message: `[下载] 将使用镜像源下载，共 ${downloadUrls.length} 个候选 URL\n` });
 
       // 如果文件已存在且大小 > 1MB，跳过下载
       if (fs.existsSync(destPath)) {
@@ -864,13 +899,18 @@ class OobeService {
       }
 
       if (!fs.existsSync(destPath)) {
-        await this._downloadFile(platMeta.downloadUrl, destPath, (prog) => {
-          onProgress({
-            type: 'download',
-            percent: prog.percent,
-            message: `下载中... ${prog.percent}% (${(prog.downloaded / 1024 / 1024).toFixed(1)} / ${(prog.total / 1024 / 1024).toFixed(1)} MB)`,
-          });
-        });
+        await this._downloadWithFallback(
+          downloadUrls,
+          destPath,
+          (line) => onProgress({ type: 'log', message: line }),
+          (prog) => {
+            onProgress({
+              type: 'download',
+              percent: prog.percent,
+              message: `下载中... ${prog.percent}% (${(prog.downloaded / 1024 / 1024).toFixed(1)} / ${(prog.total / 1024 / 1024).toFixed(1)} MB)`,
+            });
+          }
+        );
         onProgress({ type: 'log', message: `[下载] 下载完成: ${destPath}\n` });
       }
 
