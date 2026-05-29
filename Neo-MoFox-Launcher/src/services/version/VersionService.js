@@ -9,8 +9,8 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { storageService } = require('../install/StorageService');
-const { platformHelper } = require('../PlatformHelper');
-const { mirrorService } = require('../mirror/MirrorService');
+const { platformHelper } = require('../utils/PlatformHelper');
+const { mirrorService } = require('../utils/MirrorService');
 
 // ─── VersionService 类 ──────────────────────────────────────────────────
 

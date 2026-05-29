@@ -528,7 +528,7 @@ function loadInstallServices() {
   // 延迟引入：仅 install/env-check/delete 命令需要
   const { installWizardService } = require('../../services/install/InstallWizardService');
   const { storageService } = require('../../services/install/StorageService');
-  const { platformHelper } = require('../../services/PlatformHelper');
+  const { platformHelper } = require('../../services/utils/PlatformHelper');
   return { installWizardService, storageService, platformHelper };
 }
 

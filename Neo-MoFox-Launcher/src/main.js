@@ -66,12 +66,12 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
   process.stderr.setEncoding('utf-8');
 }
 
-const { platformHelper } = require('./services/PlatformHelper');
-const { LauncherLogger, InstanceLogger, LogReader } = require('./services/LoggerService');
+const { platformHelper } = require('./services/utils/PlatformHelper');
+const { LauncherLogger, InstanceLogger, LogReader } = require('./services/utils/LoggerService');
 const { storageService } = require('./services/install/StorageService');
 const { updateChecker } = require('./services/update/UpdateChecker');
 const { getOobeService } = require('./services/oobe/OobeService');
-const { mirrorService } = require('./services/mirror/MirrorService');
+const { mirrorService } = require('./services/utils/MirrorService');
 
 // 初始化 OobeService（传入 app 和 dialog）
 const oobeService = getOobeService(app, dialog);

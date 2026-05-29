@@ -7,7 +7,7 @@
 const https = require('https');
 const http = require('http');
 const { BUILD_VERSION } = require('../../version');
-const { mirrorService } = require('../mirror/MirrorService');
+const { mirrorService } = require('../utils/MirrorService');
 
 // GitHub Releases API 地址（通过镜像服务动态获取）
 

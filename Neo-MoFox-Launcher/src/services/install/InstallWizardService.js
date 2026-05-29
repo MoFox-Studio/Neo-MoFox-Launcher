@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const net = require('net');
 const { storageService } = require('./StorageService');
-const { platformHelper } = require('../PlatformHelper');
+const { platformHelper } = require('../utils/PlatformHelper');
 const { installStepExecutor } = require('./InstallStepExecutor');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────

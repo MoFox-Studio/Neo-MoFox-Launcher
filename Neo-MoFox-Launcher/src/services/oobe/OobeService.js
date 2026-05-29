@@ -16,8 +16,8 @@ const path = require('path');
 const os   = require('os');
 const https = require('https');
 const http  = require('http');
-const { platformHelper } = require('../PlatformHelper');
-const { mirrorService } = require('../mirror/MirrorService');
+const { platformHelper } = require('../utils/PlatformHelper');
+const { mirrorService } = require('../utils/MirrorService');
 
 // ─── 下载链接 & 静默安装参数 ──────────────────────────────────────────────
 

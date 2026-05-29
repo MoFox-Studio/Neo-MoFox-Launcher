@@ -11,8 +11,8 @@ const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 const { storageService } = require('./StorageService');
-const { platformHelper } = require('../PlatformHelper');
-const { mirrorService } = require('../mirror/MirrorService');
+const { platformHelper } = require('../utils/PlatformHelper');
+const { mirrorService } = require('../utils/MirrorService');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 

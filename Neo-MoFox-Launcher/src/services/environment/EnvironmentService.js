@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const si = require('systeminformation');
-const { platformHelper } = require('../PlatformHelper');
+const { platformHelper } = require('../utils/PlatformHelper');
 
 const execAsync = promisify(exec);
 
