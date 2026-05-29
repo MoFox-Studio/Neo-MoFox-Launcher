@@ -15,7 +15,7 @@ const gunzip = promisify(zlib.gunzip);
 let settingsService = null;
 function getSettingsService() {
   if (!settingsService) {
-    const { settingsService: service } = require('./settings/SettingsService');
+    const { settingsService: service } = require('../settings/SettingsService');
     settingsService = service;
   }
   return settingsService;

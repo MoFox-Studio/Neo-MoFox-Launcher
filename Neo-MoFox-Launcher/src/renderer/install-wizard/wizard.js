@@ -39,6 +39,36 @@ function parseUrlParams() {
 }
 
 /**
+ * 根据安装选项构建安装步骤列表。
+ * @param {{installNapcat: boolean, installWebui: boolean}} options 安装选项
+ * @returns {string[]} 安装步骤列表
+ */
+function buildInstallSteps(options) {
+  const installWebui = options.installWebui !== false;
+  const installSteps = [
+    'clone',
+    'venv',
+    'deps',
+    'gen-config',
+    'write-core',
+    'write-model',
+    'write-webui-key',
+    'write-adapter',
+  ];
+
+  if (options.installNapcat) {
+    installSteps.push('napcat', 'napcat-config');
+  }
+
+  if (installWebui) {
+    installSteps.push('webui');
+  }
+
+  installSteps.push('register');
+  return installSteps;
+}
+
+/**
  * 加载待续装的实例数据
  */
 async function loadResumeInstance(instanceId) {
@@ -54,9 +84,16 @@ async function loadResumeInstance(instanceId) {
       throw new Error('实例安装已完成');
     }
     
-    // 恢复配置信息到 state.inputs
+    const resumeInstallSteps = Array.isArray(instance.installSteps)
+      ? [...instance.installSteps]
+      : buildInstallSteps({
+          installNapcat: Boolean(instance.napcatDir),
+          installWebui: false,
+        });
+
+    // 恢复配置信息到 state.inputs。续装必须复用实例原始步骤，避免把未选择的步骤重新加回去。
     state.inputs = {
-      instanceName: instance.displayName || '',
+      instanceName: instance.displayName || instance.extra?.displayName || '',
       qqNumber: instance.qqNumber || '',
       qqNickname: instance.qqNickname || '',
       ownerQQNumber: instance.ownerQQNumber || '',
@@ -64,8 +101,11 @@ async function loadResumeInstance(instanceId) {
       wsPort: instance.wsPort || 8095,
       channel: instance.channel || 'main',
       installDir: instance.neomofoxDir ? instance.neomofoxDir.replace(/[\\\/]neo-mofox$/, '').replace(/[\\\/][^\\\/]+$/, '') : '',
-      installNapcat: instance.installSteps ? instance.installSteps.includes('napcat') : true,
-      installWebui: instance.installSteps ? instance.installSteps.includes('webui') : true,      webuiApiKey: instance.webuiApiKey || '',    };
+      installNapcat: resumeInstallSteps.includes('napcat'),
+      installWebui: resumeInstallSteps.includes('webui'),
+      webuiApiKey: instance.webuiApiKey || '',
+      installSteps: resumeInstallSteps,
+    };
     
     state.resumeMode = true;
     state.resumeInstanceId = instanceId;
@@ -291,7 +331,7 @@ async function goNext() {
   }
   
   // 步骤 4: 实例名称
-  if (state.currentStep === 7) {
+  if (state.currentStep === 4) {
     const name = el.inputInstanceName.value.trim();
     if (!name) {
       showFieldError(el.inputInstanceName, '❌ 请输入实例名称');
@@ -301,7 +341,10 @@ async function goNext() {
     // 检查实例名称是否已存在
     try {
       const instances = await window.mofoxAPI.getInstances();
-      const exists = instances.some(inst => inst.name === name);
+      const exists = instances.some(inst => {
+        if (state.resumeMode && inst.id === state.resumeInstanceId) return false;
+        return inst.name === name || inst.displayName === name || inst.extra?.displayName === name;
+      });
       if (exists) {
         showFieldError(el.inputInstanceName, '❌ 该实例名称已存在，请使用其他名称');
         return;
@@ -313,7 +356,7 @@ async function goNext() {
   }
   
   // 步骤 5: 账号配置
-  if (state.currentStep === 7) {
+  if (state.currentStep === 5) {
     const qqNumber = el.inputQqNumber.value.trim();
     const qqNickname = el.inputQqNickname.value.trim();
     const ownerQq = el.inputOwnerQq.value.trim();
@@ -333,7 +376,7 @@ async function goNext() {
   }
   
   // 步骤 6: 模型配置
-  if (state.currentStep === 7) {
+  if (state.currentStep === 6) {
     const apiKey = el.inputApiKey.value.trim();
     if (!apiKey) {
       showFieldError(el.inputApiKey, '❌ 请输入 API Key');
@@ -378,7 +421,7 @@ async function goNext() {
   // 步骤 8: 组件选择（无需验证）
   
   // 步骤 9: 安装位置
-  if (state.currentStep === 10) {
+  if (state.currentStep === 9) {
     const dir = el.inputInstallDir.value.trim();
     if (!dir) {
       showFieldError(el.inputInstallDir, '❌ 请选择安装目录');
@@ -388,6 +431,7 @@ async function goNext() {
   
   // 步骤 10: 确认摘要（最终验证）
   if (state.currentStep === 10) {
+    collectInputs();
     if (!validateInputs()) return;
   }
   
@@ -616,6 +660,7 @@ function switchLicenseTab(tabName) {
 
 
 function collectInputs() {
+  const installWebui = el.inputInstallWebui ? el.inputInstallWebui.checked : true;
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
     qqNumber: el.inputQqNumber.value.trim(),
@@ -626,38 +671,11 @@ function collectInputs() {
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
     installNapcat: el.inputInstallNapcat.checked,
-    installWebui: el.inputInstallWebui.checked,
+    installWebui,
     webuiApiKey: el.inputWebuiApiKey.value.trim(),
   };
   
-  // 基础安装步骤（始终执行）
-  const baseSteps = [
-    'clone',
-    'venv',
-    'deps',
-    'gen-config',
-    'write-core',
-    'write-model',
-    'write-webui-key',
-    'write-adapter',
-  ];
-  
-  const installSteps = [...baseSteps];
-  
-  // 如果选择安装 NapCat，添加相关步骤
-  if (state.inputs.installNapcat) {
-    installSteps.push('napcat', 'napcat-config');
-  }
-  
-  // 如果选择安装 WebUI，添加相关步骤
-  if (state.inputs.installWebui) {
-    installSteps.push('webui');
-  }
-  
-  // 始终包含 register 步骤
-  installSteps.push('register');
-  
-  state.inputs.installSteps = installSteps;
+  state.inputs.installSteps = buildInstallSteps(state.inputs);
   
   return state.inputs;
 }
@@ -776,6 +794,9 @@ async function startInstall() {
   
   try {
     state.activeInstanceId = state.resumeMode ? state.resumeInstanceId : null;
+    if (!state.resumeMode) {
+      collectInputs();
+    }
     const result = await window.mofoxAPI.installRun(state.inputs);
     if (result?.instance?.id) state.activeInstanceId = result.instance.id;
     

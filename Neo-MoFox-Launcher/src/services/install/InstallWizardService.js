@@ -522,8 +522,12 @@ class InstallWizardService {
     let napcatShellPath = null;
     let napcatVersion = null; // NapCat 版本号
 
-    // 获取要执行的步骤（使用用户自定义或默认全部步骤）
-    const stepsResult = this.validateInstallSteps(inputs.installSteps);
+    const existing = storageService.getInstance(instanceId);
+    const isResume = existing && !existing.installCompleted;
+
+    // 获取要执行的步骤。续装必须以已保存步骤为准，避免缺失的可选步骤被默认步骤补回。
+    const requestedSteps = inputs.installSteps || (isResume ? existing.installSteps : null);
+    const stepsResult = this.validateInstallSteps(requestedSteps);
     if (!stepsResult.valid) {
       throw new Error(`安装步骤配置无效: ${stepsResult.error}`);
     }
@@ -533,7 +537,6 @@ class InstallWizardService {
     this._emitOutput(`[安装步骤] 将执行以下步骤: ${stepOrder.join(', ')}`);
 
     // 检查是否已存在相同 ID 的实例，确定续装起点
-    const existing = storageService.getInstance(instanceId);
     let resumeStep = 'clone';
     if (existing) {
       if (existing.installCompleted) {

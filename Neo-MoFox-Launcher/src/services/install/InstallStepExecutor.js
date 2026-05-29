@@ -160,6 +160,27 @@ class InstallStepExecutor {
   }
 
   /**
+   * 删除安装目标目录中已存在的组件文件夹。
+   * @param {string} dirPath - 需要删除的目录路径
+   * @param {string} label - 用于日志输出的组件名称
+   * @param {Object} context - 执行上下文
+   */
+  _removeExistingInstallDirectory(dirPath, label, context) {
+    if (!fs.existsSync(dirPath)) {
+      return;
+    }
+
+    const stat = fs.statSync(dirPath);
+    if (!stat.isDirectory()) {
+      throw new Error(`${label} 安装目标已存在但不是文件夹: ${dirPath}`);
+    }
+
+    context.emitOutput(`[${label}] 检测到已存在的安装目录，正在删除: ${dirPath}`);
+    fs.rmSync(dirPath, { recursive: true, force: true });
+    context.emitOutput(`[${label}] 已删除旧目录`);
+  }
+
+  /**
    * 获取 Git 仓库的当前 commit ID
    */
   async _getGitCommitId(repoDir) {
@@ -240,6 +261,8 @@ class InstallStepExecutor {
       throw new Error('克隆仓库失败: 缺少实例 ID');
     }
     const targetDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
+    this._removeExistingInstallDirectory(targetDir, 'clone', context);
+
     const urls = await mirrorService.getRepoUrls();
     const branch = inputs.channel === 'dev' ? 'dev' : 'main';
 
@@ -619,6 +642,7 @@ class InstallStepExecutor {
       throw new Error('安装 NapCat 失败: 缺少实例 ID');
     }
     const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
+    this._removeExistingInstallDirectory(napcatDir, 'napcat', context);
     fs.mkdirSync(napcatDir, { recursive: true });
 
     if (!platformHelper.supportsNapcatAutoInstall) {
@@ -816,12 +840,7 @@ class InstallStepExecutor {
     const webuiDir = path.join(pluginsDir, 'webui_backend');
 
     fs.mkdirSync(pluginsDir, { recursive: true });
-
-    if (fs.existsSync(webuiDir)) {
-      context.emitOutput('[webui] 检测到已存在的 webui_backend 目录，跳过安装');
-      context.emitProgress('webui', 100, 'WebUI 已存在，跳过安装');
-      return { success: true, path: webuiDir, skipped: true };
-    }
+    this._removeExistingInstallDirectory(webuiDir, 'webui', context);
 
     const WEBUI_BRANCH = 'webui-dist';
     const webuiRepoUrls = await mirrorService.getWebuiRepoUrls();
