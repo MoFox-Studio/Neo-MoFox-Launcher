@@ -84,12 +84,11 @@ async function loadResumeInstance(instanceId) {
       throw new Error('实例安装已完成');
     }
     
-    const resumeInstallSteps = Array.isArray(instance.installSteps)
-      ? [...instance.installSteps]
-      : buildInstallSteps({
-          installNapcat: Boolean(instance.napcatDir),
-          installWebui: false,
-        });
+    if (!Array.isArray(instance.installSteps) || instance.installSteps.length === 0) {
+      throw new Error('实例缺少安装步骤，无法续装');
+    }
+
+    const resumeInstallSteps = [...instance.installSteps];
 
     // 恢复配置信息到 state.inputs。续装必须复用实例原始步骤，避免把未选择的步骤重新加回去。
     state.inputs = {
@@ -660,6 +659,7 @@ function switchLicenseTab(tabName) {
 
 
 function collectInputs() {
+  const previousInstallSteps = state.inputs.installSteps;
   const installWebui = el.inputInstallWebui ? el.inputInstallWebui.checked : true;
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
@@ -675,7 +675,9 @@ function collectInputs() {
     webuiApiKey: el.inputWebuiApiKey.value.trim(),
   };
   
-  state.inputs.installSteps = buildInstallSteps(state.inputs);
+  state.inputs.installSteps = state.resumeMode
+    ? previousInstallSteps
+    : buildInstallSteps(state.inputs);
   
   return state.inputs;
 }
