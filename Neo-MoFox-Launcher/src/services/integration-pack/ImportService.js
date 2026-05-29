@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const TOML = require('@iarna/toml');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { storageService } = require('../install/StorageService');
+const { generateInstanceId } = require('../install/InstanceIdService');
 const { installStepExecutor } = require('../install/InstallStepExecutor');
 const { PackValidator } = require('./PackValidator');
 const { ManifestManager, MANIFEST_FILENAME } = require('./ManifestManager');
@@ -116,8 +117,8 @@ class ImportService {
       this._emitOutput(`整合包已解压到: ${tempDir}`);
       this._emitStepChange('extract-pack', 'completed');
 
-      // 3. 生成实例 ID（使用与 InstallWizardService 相同的格式）
-      instanceId = `bot-${userInputs.qqNumber}`;
+      // 3. 生成实例 ID（统一走冲突检查函数）
+      instanceId = generateInstanceId(userInputs.qqNumber);
       if (!userInputs.installDir) {
         throw new Error('安装目录 (installDir) 未设置');
       }
@@ -629,6 +630,7 @@ class ImportService {
     // 准备步骤输入参数
     const stepInputs = {
       ...userInputs,
+      instanceId,
       neoMofoxDir,
       napcatDir,
       qqNumber: userInputs.qqNumber,

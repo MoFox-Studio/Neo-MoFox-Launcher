@@ -235,7 +235,10 @@ class InstallStepExecutor {
    * @param {string} inputs.channel - 渠道（main/dev）
    */
   async executeClone(context, inputs, options = {}) {
-    const instanceId = `bot-${inputs.qqNumber}`;
+    const instanceId = inputs.instanceId;
+    if (!instanceId) {
+      throw new Error('克隆仓库失败: 缺少实例 ID');
+    }
     const targetDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     const urls = await mirrorService.getRepoUrls();
     const branch = inputs.channel === 'dev' ? 'dev' : 'main';
@@ -611,7 +614,10 @@ class InstallStepExecutor {
    * @param {string} inputs.qqNumber - QQ 号
    */
   async executeNapcat(context, inputs, options = {}) {
-    const instanceId = `bot-${inputs.qqNumber}`;
+    const instanceId = inputs.instanceId;
+    if (!instanceId) {
+      throw new Error('安装 NapCat 失败: 缺少实例 ID');
+    }
     const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
     fs.mkdirSync(napcatDir, { recursive: true });
 
@@ -867,8 +873,10 @@ class InstallStepExecutor {
   async executeRegister(context, inputs, options = {}) {
     context.emitProgress('register', 0, '正在注册实例...');
 
-    // 使用传入的 instanceId，如果没有则生成默认的 bot-{qqNumber} 格式
-    const instanceId = options.instanceId || `bot-${inputs.qqNumber}`;
+    const instanceId = options.instanceId || inputs.instanceId;
+    if (!instanceId) {
+      throw new Error('注册实例失败: 缺少实例 ID');
+    }
     const { neoMofoxDir, napcatDir, installSteps, napcatVersion } = options;
 
     const neomofoxVersion = await this._getGitCommitId(neoMofoxDir);

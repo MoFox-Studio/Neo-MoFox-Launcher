@@ -69,6 +69,7 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
 const { platformHelper } = require('./services/utils/PlatformHelper');
 const { LauncherLogger, InstanceLogger, LogReader } = require('./services/utils/LoggerService');
 const { storageService } = require('./services/install/StorageService');
+const { generateInstanceId } = require('./services/install/InstanceIdService');
 const { updateChecker } = require('./services/update/UpdateChecker');
 const { getOobeService } = require('./services/oobe/OobeService');
 const { mirrorService } = require('./services/utils/MirrorService');
@@ -1311,8 +1312,8 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
   try {
     const { spawn } = require('child_process');
     
-    // 生成唯一 ID
-    const instanceId = `bot-${instanceConfig.qqNumber}`;
+    // 生成经过冲突检查的实例 ID
+    const instanceId = generateInstanceId(instanceConfig.qqNumber);
     
     // 验证必填字段
     if (!instanceConfig.qqNumber || !instanceConfig.ownerQQNumber || !instanceConfig.apiKey) {

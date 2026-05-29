@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const net = require('net');
 const { storageService } = require('./StorageService');
+const { generateInstanceId } = require('./InstanceIdService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { installStepExecutor } = require('./InstallStepExecutor');
 
@@ -63,7 +64,13 @@ class InstallWizardService {
    * 发送进度事件
    */
   _emitProgress(step, percent, message = '', error = null) {
-    const progress = { step, percent, message, error };
+    const progress = {
+      instanceId: this._currentInstance?.id || null,
+      step,
+      percent,
+      message,
+      error,
+    };
     console.log(`[InstallWizard] ${step}: ${percent}% - ${message}`);
     if (this._progressCallback) {
       this._progressCallback(progress);
@@ -440,11 +447,11 @@ class InstallWizardService {
     if (!portResult.valid) errors.push({ field: 'wsPort', error: portResult.error });
 
     // 检查是否为续装模式
-    const instanceId = this._generateInstanceId(inputs.qqNumber);
-    const existing = storageService.getInstance(instanceId);
+    const baseInstanceId = `bot-${String(inputs.qqNumber || '').trim()}`;
+    const existing = storageService.getInstance(baseInstanceId);
     const isResume = existing && !existing.installCompleted;
 
-    const dirResult = this.validateInstallDir(inputs.installDir, instanceId, isResume);
+    const dirResult = this.validateInstallDir(inputs.installDir, baseInstanceId, isResume);
     if (!dirResult.valid) errors.push({ field: 'installDir', error: dirResult.error });
 
     // 校验安装步骤配置
@@ -460,7 +467,7 @@ class InstallWizardService {
     // 检查端口可用性（同时检查实例配置冲突和系统占用）
     const portAvailable = await this.checkPortAvailable(
       parseInt(inputs.wsPort, 10),
-      isResume ? instanceId : null  // 续装时排除自己
+      isResume ? baseInstanceId : null  // 续装时排除自己
     );
     if (!portAvailable.available) {
       errors.push({ field: 'wsPort', error: portAvailable.error });
@@ -481,10 +488,18 @@ class InstallWizardService {
   // ─── Phase 3: 安装执行 ─────────────────────────────────────────────────
 
   /**
-   * 生成实例 ID
+   * 获取安装流程要使用的实例 ID。
+   * 未完成实例存在时继续使用原 ID；否则生成经过冲突检查的新 ID。
    */
-  _generateInstanceId(qqNumber) {
-    return `bot-${qqNumber}`;
+  _resolveInstallInstanceId(qqNumber) {
+    const baseInstanceId = `bot-${String(qqNumber || '').trim()}`;
+    const existing = storageService.getInstance(baseInstanceId);
+
+    if (existing && !existing.installCompleted) {
+      return baseInstanceId;
+    }
+
+    return generateInstanceId(qqNumber);
   }
 
   /**
@@ -499,7 +514,7 @@ class InstallWizardService {
       this.setOutputCallback(outputCallback);
     }
 
-    const instanceId = this._generateInstanceId(inputs.qqNumber);
+    const instanceId = this._resolveInstallInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     
     // 只在需要安装 NapCat 时定义相关路径
@@ -572,7 +587,7 @@ class InstallWizardService {
 
     // 准备步骤执行的输入参数
     const stepInputs = {
-      ...inputs,
+      instanceId,
       neoMofoxDir,
       installDir: inputs.installDir,
       qqNumber: inputs.qqNumber,
@@ -672,6 +687,7 @@ class InstallWizardService {
       // 3.10 注册实例
       storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
       const result = await installStepExecutor.executeStep('register', context, stepInputs, {
+        instanceId,
         neoMofoxDir,
         napcatDir,
         installSteps: configuredSteps,

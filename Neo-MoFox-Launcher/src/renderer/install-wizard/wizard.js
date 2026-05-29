@@ -21,6 +21,7 @@ const state = {
     webuiApiKey: '',
   },
   installing: false,
+  activeInstanceId: null,
   pythonCmd: null,
 };
 
@@ -68,6 +69,7 @@ async function loadResumeInstance(instanceId) {
     
     state.resumeMode = true;
     state.resumeInstanceId = instanceId;
+    state.activeInstanceId = instanceId;
     
     return instance;
   } catch (error) {
@@ -760,7 +762,9 @@ async function startInstall() {
   };
   
   window.mofoxAPI.onInstallProgress((progress) => {
-    const {step, percent, message} = progress;
+    const {instanceId, step, percent, message} = progress;
+    if (instanceId) state.activeInstanceId = instanceId;
+
     const stepInfo = stepMap[step] || {name: step, progress: 0};
     updateProgress(stepInfo.progress, message || stepInfo.name);
     if (message) appendLog(`[${step}] ${message}`);
@@ -771,7 +775,9 @@ async function startInstall() {
   });
   
   try {
-    await window.mofoxAPI.installRun(state.inputs);
+    state.activeInstanceId = state.resumeMode ? state.resumeInstanceId : null;
+    const result = await window.mofoxAPI.installRun(state.inputs);
+    if (result?.instance?.id) state.activeInstanceId = result.instance.id;
     
     updateProgress(100, '安装完成');
     
@@ -802,11 +808,17 @@ async function startInstall() {
 }
 
 async function cleanupAndRestart() {
-  const instanceId = `bot-${state.inputs.qqNumber}`;
+  const instanceId = state.activeInstanceId || state.resumeInstanceId;
+  if (!instanceId) {
+    appendLog('[ERROR] 清理失败: 缺少实例 ID');
+    return;
+  }
+
   appendLog('[INFO] 开始清理安装文件...');
   
   try {
     await window.mofoxAPI.installCleanup(instanceId);
+    state.activeInstanceId = state.resumeMode ? state.resumeInstanceId : null;
     appendLog('[INFO] 清理完成，准备重新安装...');
     
     el.installResult.classList.add('hidden');
