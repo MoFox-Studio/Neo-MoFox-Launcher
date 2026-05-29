@@ -45,22 +45,26 @@
         </div>
         <div class="step-item" data-step="2">
           <div class="step-indicator">2</div>
-          <div class="step-content"><span class="step-title">环境检测</span></div>
+          <div class="step-content"><span class="step-title">网络检测</span></div>
         </div>
         <div class="step-item" data-step="3">
           <div class="step-indicator">3</div>
-          <div class="step-content"><span class="step-title">用户配置</span></div>
+          <div class="step-content"><span class="step-title">环境检测</span></div>
         </div>
         <div class="step-item" data-step="4">
           <div class="step-indicator">4</div>
-          <div class="step-content"><span class="step-title">组件配置</span></div>
+          <div class="step-content"><span class="step-title">用户配置</span></div>
         </div>
         <div class="step-item" data-step="5">
           <div class="step-indicator">5</div>
-          <div class="step-content"><span class="step-title">安装确认</span></div>
+          <div class="step-content"><span class="step-title">组件配置</span></div>
         </div>
         <div class="step-item" data-step="6">
           <div class="step-indicator">6</div>
+          <div class="step-content"><span class="step-title">安装确认</span></div>
+        </div>
+        <div class="step-item" data-step="7">
+          <div class="step-indicator">7</div>
           <div class="step-content"><span class="step-title">安装执行</span></div>
         </div>
       </nav>
@@ -133,8 +137,46 @@
           </div>
         </section>
         
-        <!-- Step 2: 环境检测 -->
+        <!-- Step 2: 网络检测 -->
         <section class="wizard-step hidden" id="step-2">
+          <div class="step-header">
+            <h1>网络环境检测</h1>
+            <p>正在检测网络连通性并选择最佳下载源...</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-network">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">网络连通性</span>
+                <span class="check-requirement">检测镜像源可达性</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">检测中...</span>
+              </div>
+            </div>
+          </div>
+          <div class="mirror-results hidden" id="mirror-results">
+            <h3>镜像源延迟检测结果</h3>
+            <div class="mirror-list" id="mirror-list"></div>
+          </div>
+          <div class="env-check-result hidden" id="network-check-result">
+            <div class="result-success hidden">
+              <span class="material-symbols-rounded">verified</span>
+              <span class="network-result-text">网络检测通过，已选择最佳镜像源</span>
+            </div>
+            <div class="result-error hidden">
+              <span class="material-symbols-rounded">error</span>
+              <span class="error-message">所有镜像源均不可达，请检查网络连接</span>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 3: 环境检测 -->
+        <section class="wizard-step hidden" id="step-3">
           <div class="step-header">
             <h1>环境检测</h1>
             <p>检查系统环境是否满足安装要求</p>
@@ -178,8 +220,8 @@
           </div>
         </section>
         
-        <!-- Step 3: 用户配置 -->
-        <section class="wizard-step hidden" id="step-3">
+        <!-- Step 4: 用户配置 -->
+        <section class="wizard-step hidden" id="step-4">
           <div class="step-header">
             <h1>配置实例参数</h1>
             <p>请填写实例的基本信息和配置参数</p>
@@ -271,8 +313,8 @@
           </div>
         </section>
         
-        <!-- Step 4: 组件配置 -->
-        <section class="wizard-step hidden" id="step-4">
+        <!-- Step 5: 组件配置 -->
+        <section class="wizard-step hidden" id="step-5">
           <div class="step-header">
             <h1>选择安装组件</h1>
             <p>请选择需要安装的附加组件</p>
@@ -309,8 +351,8 @@
           </div>
         </section>
         
-        <!-- Step 5: 安装确认 -->
-        <section class="wizard-step hidden" id="step-5">
+        <!-- Step 6: 安装确认 -->
+        <section class="wizard-step hidden" id="step-6">
           <div class="step-header">
             <h1>确认安装信息</h1>
             <p>请检查以下配置是否正确</p>
@@ -385,8 +427,8 @@
           </div>
         </section>
         
-        <!-- Step 6: 安装执行 -->
-        <section class="wizard-step hidden" id="step-6">
+        <!-- Step 7: 安装执行 -->
+        <section class="wizard-step hidden" id="step-7">
           <div class="step-header">
             <h1>正在安装</h1>
             <p>请稍候，正在导入整合包...</p>

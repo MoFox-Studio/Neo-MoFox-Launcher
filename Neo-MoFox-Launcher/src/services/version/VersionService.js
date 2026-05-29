@@ -10,21 +10,7 @@ const https = require('https');
 const http = require('http');
 const { storageService } = require('../install/StorageService');
 const { platformHelper } = require('../PlatformHelper');
-
-// ─── 常量定义 ───────────────────────────────────────────────────────────
-
-const GITHUB_API_URLS = {
-  napcat: [
-    'https://api.github.com/repos/NapNeko/NapCatQQ/releases',
-    'https://github.ikun114.top/https://api.github.com/repos/NapNeko/NapCatQQ/releases',
-    'https://ghproxy.com/https://api.github.com/repos/NapNeko/NapCatQQ/releases',
-  ],
-  mofox: [
-    'https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
-    'https://github.ikun114.top/https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
-    'https://ghproxy.com/https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
-  ],
-};
+const { mirrorService } = require('../mirror/MirrorService');
 
 // ─── VersionService 类 ──────────────────────────────────────────────────
 
@@ -229,7 +215,7 @@ class VersionService {
    * 获取远程分支列表（从 GitHub API）
    */
   async getRemoteBranches() {
-    const apiUrls = GITHUB_API_URLS.mofox;
+    const apiUrls = await mirrorService.getMofoxBranchesUrls();
     let lastError = null;
 
     for (const apiUrl of apiUrls) {
@@ -517,12 +503,13 @@ class VersionService {
    * 获取 NapCat 所有 Release 列表
    */
   async getNapCatReleases(limit = 10) {
-    const apiUrls = GITHUB_API_URLS.napcat;
+    const apiUrls = await mirrorService.getNapcatReleasesUrls();
     let lastError = null;
 
     for (const apiUrl of apiUrls) {
       try {
-        const data = await this._httpsGet(`${apiUrl}?per_page=${limit}`, {
+        const separator = apiUrl.includes('?') ? '&' : '?';
+        const data = await this._httpsGet(`${apiUrl}${separator}per_page=${limit}`, {
           'User-Agent': 'Neo-MoFox-Launcher',
           'Accept': 'application/vnd.github.v3+json',
         });

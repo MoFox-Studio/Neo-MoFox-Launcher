@@ -7,14 +7,9 @@
 const https = require('https');
 const http = require('http');
 const { BUILD_VERSION } = require('../../version');
+const { mirrorService } = require('../mirror/MirrorService');
 
-// GitHub Releases API 地址（含镜像回退）
-// 注意：nightly 构建标记为 prerelease，/releases/latest 不会返回 prerelease，
-// 所以使用 /releases 列表接口并取第一个（按时间倒序）
-const RELEASE_API_URLS = [
-  'https://api.github.com/repos/MoFox-Studio/Neo-MoFox-Launcher/releases?per_page=1',
-  'https://github.ikun114.top/https://api.github.com/repos/MoFox-Studio/Neo-MoFox-Launcher/releases?per_page=1',
-];
+// GitHub Releases API 地址（通过镜像服务动态获取）
 
 class UpdateChecker {
   constructor() {
@@ -80,7 +75,8 @@ class UpdateChecker {
    * @returns {Promise<{version: string, url: string, notes: string} | null>}
    */
   async _fetchLatestRelease() {
-    for (const apiUrl of RELEASE_API_URLS) {
+    const releaseApiUrls = await mirrorService.getLauncherReleasesUrls();
+    for (const apiUrl of releaseApiUrls) {
       try {
         const raw = await this._httpGet(apiUrl);
         const releases = JSON.parse(raw);

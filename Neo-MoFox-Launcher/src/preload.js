@@ -47,6 +47,10 @@ const api = {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getBuildVersion: () => ipcRenderer.invoke('get-build-version'),
 
+  // 镜像服务
+  mirrorCheckConnectivity: () => ipcRenderer.invoke('mirror-check-connectivity'),
+  mirrorGetLicenseUrls: () => ipcRenderer.invoke('mirror-get-license-urls'),
+
   // 文件操作
   selectProjectPath: () => ipcRenderer.invoke('select-project-path'),
   selectDirectory: (options) => ipcRenderer.invoke('select-directory', options),

@@ -7,7 +7,7 @@
 
 const state = {
   currentStep: 1,
-  totalSteps: 6,
+  totalSteps: 7,
   
   // 整合包信息
   packPath: null,
@@ -15,6 +15,7 @@ const state = {
   
   // 环境检测
   envCheckPassed: false,
+  networkCheckPassed: false,
   pythonCmd: null,
   
   // 用户输入
@@ -224,28 +225,33 @@ function goToStep(step) {
   });
   
   // 更新按钮状态
-  el.btnBack.classList.toggle('hidden', step === 1 || step === 6);
-  el.btnNext.classList.toggle('hidden', step === 6);
+  el.btnBack.classList.toggle('hidden', step === 1 || step === 7);
+  el.btnNext.classList.toggle('hidden', step === 7);
   el.btnCancel.classList.toggle('hidden', step !== 1);
   
-  // 步骤 2 自动运行环境检测
-  if (step === 2 && !state.envCheckPassed) {
+  // 步骤 2 自动运行网络检测
+  if (step === 2 && !state.networkCheckPassed) {
+    runNetworkCheck();
+  }
+  
+  // 步骤 3 自动运行环境检测
+  if (step === 3 && !state.envCheckPassed) {
     runEnvCheck();
   }
   
-  // 步骤 4 组件配置处理
-  if (step === 4) {
+  // 步骤 5 组件配置处理
+  if (step === 5) {
     initComponentSelection();
   }
 
-  // 步骤 5 显示摘要
-  if (step === 5) {
+  // 步骤 6 显示摘要
+  if (step === 6) {
     updateSummary();
   }
   
-  // 步骤 6 开始安装
-  if (step === 6) {
-    console.log('[ImportWizard] 进入步骤 6，准备开始导入');
+  // 步骤 7 开始安装
+  if (step === 7) {
+    console.log('[ImportWizard] 进入步骤 7，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
     
@@ -275,16 +281,24 @@ async function goNext() {
     }
   }
   
-  // 步骤 2: 环境检测
+  // 步骤 2: 网络检测
   if (state.currentStep === 2) {
+    if (!state.networkCheckPassed) {
+      await showError('网络检测未通过，请检查网络连接后重试');
+      return;
+    }
+  }
+  
+  // 步骤 3: 环境检测
+  if (state.currentStep === 3) {
     if (!state.envCheckPassed) {
       await showError('环境检测未通过，请先安装缺失的依赖');
       return;
     }
   }
   
-  // 步骤 3: 用户配置
-  if (state.currentStep === 3) {
+  // 步骤 4: 用户配置
+  if (state.currentStep === 4) {
     if (!validateInputs()) {
       return;
     }
@@ -305,8 +319,8 @@ async function goNext() {
     collectInputs();
   }
   
-  // 步骤 4: 组件配置
-  if (state.currentStep === 4) {
+  // 步骤 5: 组件配置
+  if (state.currentStep === 5) {
     state.inputs.installWebui = el.checkInstallWebui?.checked ?? true;
     state.inputs.installNapcat = el.checkInstallNapcat?.checked ?? true;
   }
@@ -516,7 +530,100 @@ function generateContentItems(content) {
   return items.join('');
 }
 
-// ─── 步骤 2: 环境检测 ─────────────────────────────────────────────────
+// ─── 步骤 2: 网络检测 ─────────────────────────────────────────────────
+
+async function runNetworkCheck() {
+  const checkItem = document.getElementById('check-network');
+  const resultContainer = document.getElementById('network-check-result');
+  const mirrorResults = document.getElementById('mirror-results');
+  const mirrorList = document.getElementById('mirror-list');
+  
+  if (!checkItem) return;
+  
+  // 重置为加载状态
+  const loadingIcon = checkItem.querySelector('.loading');
+  const successIcon = checkItem.querySelector('.success');
+  const errorIcon = checkItem.querySelector('.error');
+  const statusText = checkItem.querySelector('.status-text');
+  
+  loadingIcon?.classList.remove('hidden');
+  successIcon?.classList.add('hidden');
+  errorIcon?.classList.add('hidden');
+  if (statusText) statusText.textContent = '检测中...';
+  
+  resultContainer?.classList.add('hidden');
+  mirrorResults?.classList.add('hidden');
+  
+  try {
+    const result = await window.mofoxAPI.mirrorCheckConnectivity();
+    
+    // 隐藏加载图标
+    loadingIcon?.classList.add('hidden');
+    
+    // 显示镜像源检测结果列表
+    if (mirrorList && result.results) {
+      mirrorList.innerHTML = result.results.map(item => {
+        const statusIcon = item.reachable ? 'check_circle' : 'cancel';
+        const statusClass = item.reachable ? 'success' : 'error';
+        const latencyText = item.cached ? '(缓存)' : (item.latency !== null ? `${item.latency}ms` : '超时');
+        const bestBadge = (result.bestMirror && item.name === result.bestMirror.name) ? '<span class="best-badge">最佳</span>' : '';
+        
+        return `
+          <div class="mirror-item ${statusClass}">
+            <span class="material-symbols-rounded ${statusClass}">${statusIcon}</span>
+            <span class="mirror-name">${item.name} ${bestBadge}</span>
+            <span class="mirror-latency">${latencyText}</span>
+          </div>
+        `;
+      }).join('');
+      mirrorResults?.classList.remove('hidden');
+    }
+    
+    // 更新检测结果
+    if (result.reachable) {
+      successIcon?.classList.remove('hidden');
+      if (statusText) statusText.textContent = result.bestMirror?.name || '已连接';
+      state.networkCheckPassed = true;
+      
+      resultContainer?.classList.remove('hidden');
+      const successDiv = resultContainer?.querySelector('.result-success');
+      const errorDiv = resultContainer?.querySelector('.result-error');
+      successDiv?.classList.remove('hidden');
+      errorDiv?.classList.add('hidden');
+      
+      const resultText = successDiv?.querySelector('.network-result-text');
+      if (resultText && result.bestMirror) {
+        resultText.textContent = `网络检测通过，已选择最佳镜像源: ${result.bestMirror.name}`;
+      }
+    } else {
+      errorIcon?.classList.remove('hidden');
+      if (statusText) statusText.textContent = '不可达';
+      state.networkCheckPassed = false;
+      
+      resultContainer?.classList.remove('hidden');
+      const successDiv = resultContainer?.querySelector('.result-success');
+      const errorDiv = resultContainer?.querySelector('.result-error');
+      successDiv?.classList.add('hidden');
+      errorDiv?.classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('[ImportWizard] 网络检测失败:', error);
+    loadingIcon?.classList.add('hidden');
+    errorIcon?.classList.remove('hidden');
+    if (statusText) statusText.textContent = '检测失败';
+    state.networkCheckPassed = false;
+    
+    resultContainer?.classList.remove('hidden');
+    const successDiv = resultContainer?.querySelector('.result-success');
+    const errorDiv = resultContainer?.querySelector('.result-error');
+    successDiv?.classList.add('hidden');
+    errorDiv?.classList.remove('hidden');
+    const errorMsg = errorDiv?.querySelector('.error-message');
+    if (errorMsg) errorMsg.textContent = `网络检测失败: ${error.message}`;
+  }
+}
+
+// ─── 步骤 3: 环境检测 ─────────────────────────────────────────────────
 
 async function runEnvCheck() {
   try {
@@ -569,7 +676,7 @@ function updateCheckItem(itemEl, passed, version = '') {
   }
 }
 
-// ─── 步骤 3: 用户配置 ─────────────────────────────────────────────────
+// ─── 步骤 4: 用户配置 ─────────────────────────────────────────────────
 
 async function setDefaultInstallDir() {
   try {
@@ -921,7 +1028,7 @@ async function startImport() {
   
   console.log('[ImportWizard] 开始导入整合包...');
   state.installing = true;
-  
+
   try {
     el.btnBack.classList.add('hidden');
     el.btnCancel.classList.add('hidden');

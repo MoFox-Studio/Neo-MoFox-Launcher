@@ -45,38 +45,42 @@
         </div>
         <div class="step-item" data-step="2">
           <div class="step-indicator">2</div>
-          <div class="step-content"><span class="step-title">许可协议</span></div>
+          <div class="step-content"><span class="step-title">网络检测</span></div>
         </div>
         <div class="step-item" data-step="3">
           <div class="step-indicator">3</div>
-          <div class="step-content"><span class="step-title">实例信息</span></div>
+          <div class="step-content"><span class="step-title">许可协议</span></div>
         </div>
         <div class="step-item" data-step="4">
           <div class="step-indicator">4</div>
-          <div class="step-content"><span class="step-title">账号配置</span></div>
+          <div class="step-content"><span class="step-title">实例信息</span></div>
         </div>
         <div class="step-item" data-step="5">
           <div class="step-indicator">5</div>
-          <div class="step-content"><span class="step-title">模型配置</span></div>
+          <div class="step-content"><span class="step-title">账号配置</span></div>
         </div>
         <div class="step-item" data-step="6">
           <div class="step-indicator">6</div>
-          <div class="step-content"><span class="step-title">网络配置</span></div>
+          <div class="step-content"><span class="step-title">模型配置</span></div>
         </div>
         <div class="step-item" data-step="7">
           <div class="step-indicator">7</div>
-          <div class="step-content"><span class="step-title">组件选择</span></div>
+          <div class="step-content"><span class="step-title">网络配置</span></div>
         </div>
         <div class="step-item" data-step="8">
           <div class="step-indicator">8</div>
-          <div class="step-content"><span class="step-title">安装位置</span></div>
+          <div class="step-content"><span class="step-title">组件选择</span></div>
         </div>
         <div class="step-item" data-step="9">
           <div class="step-indicator">9</div>
-          <div class="step-content"><span class="step-title">确认摘要</span></div>
+          <div class="step-content"><span class="step-title">安装位置</span></div>
         </div>
         <div class="step-item" data-step="10">
           <div class="step-indicator">10</div>
+          <div class="step-content"><span class="step-title">确认摘要</span></div>
+        </div>
+        <div class="step-item" data-step="11">
+          <div class="step-indicator">11</div>
           <div class="step-content"><span class="step-title">安装执行</span></div>
         </div>
       </nav>
@@ -150,8 +154,46 @@
           </div>
         </section>
         
-        <!-- Step 2: EULA & Privacy -->
+        <!-- Step 2: 网络检测 -->
         <section class="wizard-step hidden" id="step-2">
+          <div class="step-header">
+            <h1>网络环境检测</h1>
+            <p>正在检测网络连通性并选择最佳下载源...</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-network">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">网络连通性</span>
+                <span class="check-requirement">检测镜像源可达性</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">检测中...</span>
+              </div>
+            </div>
+          </div>
+          <div class="mirror-results hidden" id="mirror-results">
+            <h3>镜像源延迟检测结果</h3>
+            <div class="mirror-list" id="mirror-list"></div>
+          </div>
+          <div class="env-check-result hidden" id="network-check-result">
+            <div class="result-success hidden">
+              <span class="material-symbols-rounded">verified</span>
+              <span class="network-result-text">网络检测通过，已选择最佳镜像源</span>
+            </div>
+            <div class="result-error hidden">
+              <span class="material-symbols-rounded">error</span>
+              <span class="error-message">所有镜像源均不可达，请检查网络连接</span>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 3: EULA & Privacy -->
+        <section class="wizard-step hidden" id="step-3">
           <div class="step-header">
             <h1>许可协议</h1>
             <p>请仔细阅读以下条款并同意后继续</p>
@@ -190,8 +232,8 @@
           </div>
         </section>
         
-        <!-- Step 3 -->
-        <section class="wizard-step hidden" id="step-3">
+        <!-- Step 4 -->
+        <section class="wizard-step hidden" id="step-4">
           <div class="step-header">
             <h1>实例信息</h1>
             <p>为你的 Bot 实例设置名称</p>
@@ -205,8 +247,8 @@
           </form>
         </section>
         
-        <!-- Step 4 -->
-        <section class="wizard-step hidden" id="step-4">
+        <!-- Step 5 -->
+        <section class="wizard-step hidden" id="step-5">
           <div class="step-header">
             <h1>账号配置</h1>
             <p>配置 Bot 的 QQ 账号信息</p>
@@ -232,8 +274,8 @@
           </form>
         </section>
         
-        <!-- Step 5 -->
-        <section class="wizard-step hidden" id="step-5">
+        <!-- Step 6 -->
+        <section class="wizard-step hidden" id="step-6">
           <div class="step-header">
             <h1>模型配置</h1>
             <p>配置大模型 API 密钥</p>
@@ -258,8 +300,8 @@
           </form>
         </section>
         
-        <!-- Step 6 -->
-        <section class="wizard-step hidden" id="step-6">
+        <!-- Step 7 -->
+        <section class="wizard-step hidden" id="step-7">
           <div class="step-header">
             <h1>网络配置</h1>
             <p>配置 WebSocket 端口和更新通道</p>
@@ -329,8 +371,8 @@
           </form>
         </section>
         
-        <!-- Step 7 -->
-        <section class="wizard-step hidden" id="step-7">
+        <!-- Step 8 -->
+        <section class="wizard-step hidden" id="step-8">
           <div class="step-header">
             <h1>组件选择</h1>
             <p>选择要安装的组件</p>
@@ -353,8 +395,8 @@
           </form>
         </section>
         
-        <!-- Step 8 -->
-        <section class="wizard-step hidden" id="step-8">
+        <!-- Step 9 -->
+        <section class="wizard-step hidden" id="step-9">
           <div class="step-header">
             <h1>安装位置</h1>
             <p>选择安装目录</p>
@@ -373,14 +415,14 @@
           </form>
         </section>
         
-        <!-- Step 9 -->
-        <section class="wizard-step hidden" id="step-9">
+        <!-- Step 10 -->
+        <section class="wizard-step hidden" id="step-10">
           <div class="step-header">
             <h1>确认摘要</h1>
             <p>请确认以下配置信息</p>
           </div>
           <div class="summary-content">
-            <div class="summary-section" data-edit-step="3">
+            <div class="summary-section" data-edit-step="4">
               <div class="summary-section-header">
                 <h3>实例信息</h3>
                 <button class="btn-edit-section" onclick="editSection(3)" title="编辑实例信息">
@@ -393,10 +435,10 @@
                 <span class="summary-item-value" id="summary-instance-name"></span>
               </div>
             </div>
-            <div class="summary-section" data-edit-step="4">
+            <div class="summary-section" data-edit-step="5">
               <div class="summary-section-header">
                 <h3>账号配置</h3>
-                <button class="btn-edit-section" onclick="editSection(4)" title="编辑账号配置">
+                <button class="btn-edit-section" onclick="editSection(5)" title="编辑账号配置">
                   <span class="material-symbols-rounded">edit</span>
                 </button>
               </div>
@@ -416,10 +458,10 @@
                 <span class="summary-item-value" id="summary-owner-qq"></span>
               </div>
             </div>
-            <div class="summary-section" data-edit-step="5">
+            <div class="summary-section" data-edit-step="7">
               <div class="summary-section-header">
                 <h3>网络配置</h3>
-                <button class="btn-edit-section" onclick="editSection(5)" title="编辑网络配置">
+                <button class="btn-edit-section" onclick="editSection(7)" title="编辑网络配置">
                   <span class="material-symbols-rounded">edit</span>
                 </button>
               </div>
@@ -439,10 +481,10 @@
                 <span class="summary-item-value" id="summary-webui-api-key">********</span>
               </div>
             </div>
-            <div class="summary-section" data-edit-step="7">
+            <div class="summary-section" data-edit-step="8">
               <div class="summary-section-header">
                 <h3>安装选项</h3>
-                <button class="btn-edit-section" onclick="editSection(7)" title="编辑安装选项">
+                <button class="btn-edit-section" onclick="editSection(8)" title="编辑安装选项">
                   <span class="material-symbols-rounded">edit</span>
                 </button>
               </div>
@@ -469,8 +511,8 @@
           </div>
         </section>
         
-        <!-- Step 10 -->
-        <section class="wizard-step hidden" id="step-10">
+        <!-- Step 11 -->
+        <section class="wizard-step hidden" id="step-11">
           <div class="carousel-container">
             <div class="carousel-item active">
               <h2>智能对话</h2>

@@ -350,6 +350,78 @@ body {
   color: #e57373;
 }
 
+/* ===== Mirror Results ===== */
+.mirror-results {
+  margin-top: 20px;
+}
+
+.mirror-results h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  margin-bottom: 12px;
+}
+
+.mirror-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mirror-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mirror-item.success {
+  background: rgba(76, 175, 80, 0.06);
+  border-color: rgba(76, 175, 80, 0.15);
+}
+
+.mirror-item.error {
+  background: rgba(211, 47, 47, 0.06);
+  border-color: rgba(211, 47, 47, 0.15);
+}
+
+.mirror-item .material-symbols-rounded.success {
+  color: #81c784;
+  font-size: 18px;
+}
+
+.mirror-item .material-symbols-rounded.error {
+  color: #e57373;
+  font-size: 18px;
+}
+
+.mirror-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+
+.mirror-latency {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.best-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(76, 175, 80, 0.15);
+  color: #81c784;
+  margin-left: 6px;
+}
+
 /* ===== Forms ===== */
 .config-form {
   display: flex;

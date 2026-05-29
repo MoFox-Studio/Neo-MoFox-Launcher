@@ -1,7 +1,8 @@
 const state = {
   currentStep: 1,
-  totalSteps: 10,
+  totalSteps: 11,
   envCheckPassed: false,
+  networkCheckPassed: false,
   licenseLoaded: false,
   licenseAgreed: false,
   resumeMode: false, // 是否为续装模式
@@ -192,19 +193,23 @@ function goToStep(step) {
     else if (stepNum === step) item.classList.add('active');
   });
   
-  el.btnBack.classList.toggle('hidden', step === 1 || step === 10);
-  el.btnNext.classList.toggle('hidden', step === 10);
+  el.btnBack.classList.toggle('hidden', step === 1 || step === 11);
+  el.btnNext.classList.toggle('hidden', step === 11);
   el.btnCancel.classList.toggle('hidden', step !== 1);
   
-  if (step === 2 && !state.licenseLoaded) {
+  if (step === 2 && !state.networkCheckPassed) {
+    runNetworkCheck();
+  }
+  
+  if (step === 3 && !state.licenseLoaded) {
     loadLicenseAgreements();
   }
   
-  if (step === 9) {
+  if (step === 10) {
     updateSummary();
   }
   
-  if (step === 10) {
+  if (step === 11) {
     startCarousel();
     startInstall();
   }
@@ -267,8 +272,11 @@ async function goNext() {
   // 步骤 1: 环境检测
   if (state.currentStep === 1 && !state.envCheckPassed) return;
   
-  // 步骤 2: 许可协议
-  if (state.currentStep === 2) {
+  // 步骤 2: 网络检测
+  if (state.currentStep === 2 && !state.networkCheckPassed) return;
+  
+  // 步骤 3: 许可协议
+  if (state.currentStep === 3) {
     if (!state.licenseLoaded) {
       // 协议还未加载完成，不做处理，让用户等待
       return;
@@ -280,8 +288,8 @@ async function goNext() {
     state.licenseAgreed = true;
   }
   
-  // 步骤 3: 实例名称
-  if (state.currentStep === 3) {
+  // 步骤 4: 实例名称
+  if (state.currentStep === 7) {
     const name = el.inputInstanceName.value.trim();
     if (!name) {
       showFieldError(el.inputInstanceName, '❌ 请输入实例名称');
@@ -302,8 +310,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 4: 账号配置
-  if (state.currentStep === 4) {
+  // 步骤 5: 账号配置
+  if (state.currentStep === 7) {
     const qqNumber = el.inputQqNumber.value.trim();
     const qqNickname = el.inputQqNickname.value.trim();
     const ownerQq = el.inputOwnerQq.value.trim();
@@ -322,8 +330,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 5: 模型配置
-  if (state.currentStep === 5) {
+  // 步骤 6: 模型配置
+  if (state.currentStep === 7) {
     const apiKey = el.inputApiKey.value.trim();
     if (!apiKey) {
       showFieldError(el.inputApiKey, '❌ 请输入 API Key');
@@ -331,8 +339,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 6: 网络配置（端口验证 + WebUI API 密钥）
-  if (state.currentStep === 6) {
+  // 步骤 7: 网络配置（端口验证 + WebUI API 密钥）
+  if (state.currentStep === 7) {
     const port = parseInt(el.inputWsPort.value, 10);
     if (!port || port < 1024 || port > 65535) {
       showFieldError(el.inputWsPort, '❌ 请输入有效的端口号（1024-65535）');
@@ -365,10 +373,10 @@ async function goNext() {
     state.inputs.webuiApiKey = apiKey;
   }
   
-  // 步骤 7: 组件选择（无需验证）
+  // 步骤 8: 组件选择（无需验证）
   
-  // 步骤 8: 安装位置
-  if (state.currentStep === 8) {
+  // 步骤 9: 安装位置
+  if (state.currentStep === 10) {
     const dir = el.inputInstallDir.value.trim();
     if (!dir) {
       showFieldError(el.inputInstallDir, '❌ 请选择安装目录');
@@ -376,8 +384,8 @@ async function goNext() {
     }
   }
   
-  // 步骤 9: 确认摘要（最终验证）
-  if (state.currentStep === 9) {
+  // 步骤 10: 确认摘要（最终验证）
+  if (state.currentStep === 10) {
     if (!validateInputs()) return;
   }
   
@@ -387,7 +395,7 @@ async function goNext() {
 }
 
 function goBack() {
-  if (state.currentStep > 1 && state.currentStep !== 10) {
+  if (state.currentStep > 1 && state.currentStep !== 11) {
     goToStep(state.currentStep - 1);
   }
 }
@@ -459,28 +467,113 @@ async function runEnvCheck() {
   }
 }
 
+// ─── 网络环境检测 ──────────────────────────────────────────────────────
+
+async function runNetworkCheck() {
+  const checkItem = document.getElementById('check-network');
+  const resultContainer = document.getElementById('network-check-result');
+  const mirrorResults = document.getElementById('mirror-results');
+  const mirrorList = document.getElementById('mirror-list');
+  
+  if (!checkItem) return;
+  
+  // 重置状态
+  updateCheckItem('check-network', 'loading');
+  resultContainer?.classList.add('hidden');
+  mirrorResults?.classList.add('hidden');
+  
+  try {
+    const result = await window.mofoxAPI.mirrorCheckConnectivity();
+    
+    // 显示镜像源检测结果列表
+    if (mirrorList && result.results) {
+      mirrorList.innerHTML = result.results.map(item => {
+        const statusIcon = item.reachable ? 'check_circle' : 'cancel';
+        const statusClass = item.reachable ? 'success' : 'error';
+        const latencyText = item.cached ? '(缓存)' : (item.latency !== null ? `${item.latency}ms` : '超时');
+        const bestBadge = (result.bestMirror && item.name === result.bestMirror.name) ? '<span class="best-badge">最佳</span>' : '';
+        
+        return `
+          <div class="mirror-item ${statusClass}">
+            <span class="material-symbols-rounded ${statusClass}">${statusIcon}</span>
+            <span class="mirror-name">${item.name} ${bestBadge}</span>
+            <span class="mirror-latency">${latencyText}</span>
+          </div>
+        `;
+      }).join('');
+      mirrorResults?.classList.remove('hidden');
+    }
+    
+    // 更新检测结果
+    if (result.reachable) {
+      updateCheckItem('check-network', 'success', result.bestMirror?.name || '已连接');
+      state.networkCheckPassed = true;
+      
+      resultContainer?.classList.remove('hidden');
+      const successDiv = resultContainer?.querySelector('.result-success');
+      const errorDiv = resultContainer?.querySelector('.result-error');
+      successDiv?.classList.remove('hidden');
+      errorDiv?.classList.add('hidden');
+      
+      // 更新成功文本
+      const resultText = successDiv?.querySelector('.network-result-text');
+      if (resultText && result.bestMirror) {
+        resultText.textContent = `网络检测通过，已选择最佳镜像源: ${result.bestMirror.name}`;
+      }
+    } else {
+      updateCheckItem('check-network', 'error', '不可达');
+      state.networkCheckPassed = false;
+      
+      resultContainer?.classList.remove('hidden');
+      const successDiv = resultContainer?.querySelector('.result-success');
+      const errorDiv = resultContainer?.querySelector('.result-error');
+      successDiv?.classList.add('hidden');
+      errorDiv?.classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('网络检测失败:', error);
+    updateCheckItem('check-network', 'error', '检测失败');
+    state.networkCheckPassed = false;
+    
+    resultContainer?.classList.remove('hidden');
+    const successDiv = resultContainer?.querySelector('.result-success');
+    const errorDiv = resultContainer?.querySelector('.result-error');
+    successDiv?.classList.add('hidden');
+    errorDiv?.classList.remove('hidden');
+    errorDiv.querySelector('.error-message').textContent = `网络检测失败: ${error.message}`;
+  }
+}
+
 // License agreements loading and rendering
 async function loadLicenseAgreements() {
-  const EULA_URL = 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/eula.md';
-  const PRIVACY_URL = 'https://raw.githubusercontent.com/MoFox-Studio/Neo-MoFox/refs/heads/dev/PRIVACY.md';
-  
   el.licenseLoading.classList.remove('hidden');
   el.licenseError.classList.add('hidden');
   el.licenseContentEula.classList.add('hidden');
   el.licenseContentPrivacy.classList.add('hidden');
   
   try {
-    const [eulaResponse, privacyResponse] = await Promise.all([
-      fetch(EULA_URL),
-      fetch(PRIVACY_URL)
+    // 从镜像服务获取许可证 URL 列表
+    const { eulaUrls, privacyUrls } = await window.mofoxAPI.mirrorGetLicenseUrls();
+
+    // 尝试从 URL 列表中获取内容（依次尝试直到成功）
+    const fetchFromUrls = async (urls) => {
+      let lastError = null;
+      for (const url of urls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) return await response.text();
+          lastError = new Error(`HTTP ${response.status}`);
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError || new Error('所有 URL 均不可达');
+    };
+
+    const [eulaText, privacyText] = await Promise.all([
+      fetchFromUrls(eulaUrls),
+      fetchFromUrls(privacyUrls),
     ]);
-    
-    if (!eulaResponse.ok || !privacyResponse.ok) {
-      throw new Error('加载许可协议失败');
-    }
-    
-    const eulaText = await eulaResponse.text();
-    const privacyText = await privacyResponse.text();
     
     // Use marked.js to render markdown
     if (typeof marked !== 'undefined') {
@@ -800,7 +893,7 @@ function bindEvents() {
       );
       
       // 如果焦点不在输入控件上，且不在步骤1（环境检测）和步骤10（安装中），则触发下一步
-      if (!isInputFocused && state.currentStep !== 1 && state.currentStep !== 10) {
+      if (!isInputFocused && state.currentStep !== 1 && state.currentStep !== 11) {
         e.preventDefault();
         goNext();
       }
@@ -1025,10 +1118,11 @@ async function init() {
       
       // 标记环境检测已通过（续装时跳过）
       state.envCheckPassed = true;
+      state.networkCheckPassed = true;
       state.licenseAgreed = true;
       
       // 直接跳到安装步骤
-      goToStep(10);
+      goToStep(11);
       
     } catch (error) {
       console.error('续装初始化失败:', error);

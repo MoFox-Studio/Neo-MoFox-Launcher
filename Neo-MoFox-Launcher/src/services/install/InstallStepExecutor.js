@@ -12,24 +12,9 @@ const https = require('https');
 const http = require('http');
 const { storageService } = require('./StorageService');
 const { platformHelper } = require('../PlatformHelper');
+const { mirrorService } = require('../mirror/MirrorService');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
-
-const REPO_URLS = {
-  main: [
-    'https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
-  ],
-  dev: [
-    'https://github.com/MoFox-Studio/Neo-MoFox.git',
-    'https://github.ikun114.top/https://github.com/MoFox-Studio/Neo-MoFox.git',
-  ],
-};
-
-const WEBUI_REPOS = [
-  'https://github.com/MoFox-Studio/MoFox-Core-Webui.git',
-  'https://github.ikun114.top/https://github.com/MoFox-Studio/MoFox-Core-Webui.git',
-];
 
 const MAX_RETRY = 3;
 const CONFIG_DETECT_TIMEOUT = 60000; // 60 秒
@@ -207,10 +192,7 @@ class InstallStepExecutor {
    * 获取 NapCat 最新 Release 信息
    */
   async _fetchLatestNapCatRelease(context) {
-    const apiUrls = [
-      'https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
-      'https://github.ikun114.top/https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
-    ];
+    const apiUrls = await mirrorService.getNapcatLatestUrls();
 
     let lastError = null;
     for (const apiUrl of apiUrls) {
@@ -255,7 +237,7 @@ class InstallStepExecutor {
   async executeClone(context, inputs, options = {}) {
     const instanceId = `bot-${inputs.qqNumber}`;
     const targetDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
-    const urls = REPO_URLS[inputs.channel] || REPO_URLS.main;
+    const urls = await mirrorService.getRepoUrls();
     const branch = inputs.channel === 'dev' ? 'dev' : 'main';
 
     for (let retry = 0; retry < MAX_RETRY; retry++) {
@@ -836,9 +818,10 @@ class InstallStepExecutor {
     }
 
     const WEBUI_BRANCH = 'webui-dist';
+    const webuiRepoUrls = await mirrorService.getWebuiRepoUrls();
 
     for (let retry = 0; retry < MAX_RETRY; retry++) {
-      const url = WEBUI_REPOS[retry % WEBUI_REPOS.length];
+      const url = webuiRepoUrls[retry % webuiRepoUrls.length];
       context.emitProgress('webui', Math.floor(10 + (retry / MAX_RETRY) * 80), `尝试克隆 WebUI (${retry + 1}/${MAX_RETRY})`);
       context.emitOutput(`[webui] 正在尝试克隆仓库: ${url}`);
 

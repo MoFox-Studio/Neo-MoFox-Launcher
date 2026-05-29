@@ -71,6 +71,7 @@ const { LauncherLogger, InstanceLogger, LogReader } = require('./services/Logger
 const { storageService } = require('./services/install/StorageService');
 const { updateChecker } = require('./services/update/UpdateChecker');
 const { getOobeService } = require('./services/oobe/OobeService');
+const { mirrorService } = require('./services/mirror/MirrorService');
 
 // 初始化 OobeService（传入 app 和 dialog）
 const oobeService = getOobeService(app, dialog);
@@ -548,6 +549,19 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('get-build-version', () => {
   return updateChecker.getLocalVersion();
+});
+
+// ─── 镜像服务 IPC ─────────────────────────────────────────────────────
+ipcMain.handle('mirror-check-connectivity', async () => {
+  return await mirrorService.checkConnectivity();
+});
+
+ipcMain.handle('mirror-get-license-urls', async () => {
+  const [eulaUrls, privacyUrls] = await Promise.all([
+    mirrorService.getEulaUrls(),
+    mirrorService.getPrivacyUrls(),
+  ]);
+  return { eulaUrls, privacyUrls };
 });
 
 ipcMain.handle('select-project-path', async () => {
