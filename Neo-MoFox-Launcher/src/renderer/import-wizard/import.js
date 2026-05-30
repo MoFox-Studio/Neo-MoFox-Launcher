@@ -34,6 +34,8 @@ const state = {
   
   // 安装状态
   installing: false,
+  activeInstanceId: null,
+  importAbortable: false,
   installSteps: [],
 };
 
@@ -48,6 +50,7 @@ const el = {
   btnBack: document.getElementById('btn-back'),
   btnNext: document.getElementById('btn-next'),
   btnCancel: document.getElementById('btn-cancel'),
+  btnBackHome: document.getElementById('btn-back-home'),
   btnRetry: document.getElementById('btn-retry'),
   btnFinish: document.getElementById('btn-finish'),
   
@@ -145,6 +148,7 @@ function bindEvents() {
   el.btnBack?.addEventListener('click', async () => await goBack());
   el.btnNext?.addEventListener('click', goNext);
   el.btnCancel?.addEventListener('click', async () => await handleCancel());
+  el.btnBackHome?.addEventListener('click', handleBackHome);
   el.btnRetry?.addEventListener('click', retryInstall);
   el.btnFinish?.addEventListener('click', finishAndClose);
   
@@ -191,7 +195,14 @@ function bindEvents() {
   
   window.mofoxAPI.onImportStepChange?.((data) => {
     console.log('[ImportWizard] 收到步骤变化:', data);
-    const { step, status } = data || {};
+    const { step, status, instanceId } = data || {};
+    if (instanceId) {
+      state.activeInstanceId = instanceId;
+    }
+    if (step === 'install-step-executor' && status === 'running') {
+      state.importAbortable = true;
+      el.btnBackHome?.classList.remove('hidden');
+    }
     updateStepIndicator(step, status);
   });
   
@@ -228,6 +239,7 @@ function goToStep(step) {
   el.btnBack.classList.toggle('hidden', step === 1 || step === 7);
   el.btnNext.classList.toggle('hidden', step === 7);
   el.btnCancel.classList.toggle('hidden', step !== 1);
+  el.btnBackHome?.classList.add('hidden');
   
   // 步骤 2 自动运行网络检测
   if (step === 2 && !state.networkCheckPassed) {
@@ -254,6 +266,9 @@ function goToStep(step) {
     console.log('[ImportWizard] 进入步骤 7，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
+    el.btnBackHome?.classList.add('hidden');
+    state.activeInstanceId = null;
+    state.importAbortable = false;
     
     // 初始化步骤指示器
     initializeStepIndicators();
@@ -1049,8 +1064,14 @@ async function startImport() {
     });
     
     console.log('[ImportWizard] 后端返回结果:', result);
+    if (result.instanceId) {
+      state.activeInstanceId = result.instanceId;
+    }
     
     if (!result.success) {
+      if (result.aborted) {
+        return;
+      }
       throw new Error(result.error || '导入失败');
     }
     
@@ -1104,6 +1125,10 @@ function updateStepIndicator(step, status) {
     console.warn('[ImportWizard] 步骤名称为空');
     return;
   }
+
+  if (step === 'instance-registered' || step === 'install-step-executor') {
+    return;
+  }
   
   const stepEl = document.querySelector(`.install-step-item[data-step="${step}"]`);
   if (!stepEl) {
@@ -1134,6 +1159,11 @@ function updateStepIndicator(step, status) {
 function onInstallComplete(success, instanceId, error) {
   console.log('[ImportWizard] 安装完成:', { success, instanceId, error });
   state.installing = false;
+  state.importAbortable = false;
+  el.btnBackHome?.classList.add('hidden');
+  if (instanceId) {
+    state.activeInstanceId = instanceId;
+  }
   
   // 不要隐藏步骤指示器，让用户看到完整的安装过程
   // el.installSteps.classList.add('hidden');
@@ -1181,6 +1211,55 @@ async function retryInstall() {
   
   // 重新开始安装
   await startImport();
+}
+
+async function handleBackHome() {
+  if (!state.importAbortable) {
+    await showError('当前正在解压或复制整合包文件，暂不能中止；安装步骤开始后才允许返回主界面');
+    return;
+  }
+
+  const choice = await window.customDialog.choice(
+    '整合包导入的安装步骤正在进行中，请选择返回方式：\n\n• 直接返回：停止后续安装步骤并保留已复制的文件与未完成实例\n• 清理后返回：停止后续安装步骤，删除已安装目录和实例注册信息后返回',
+    '返回主界面',
+    [
+      { label: '直接返回', value: 'stop', variant: 'text' },
+      { label: '清理后返回', value: 'cleanup', variant: 'tonal' },
+    ]
+  );
+
+  if (choice === null) return;
+
+  try {
+    const result = await window.mofoxAPI.importAbort?.();
+    if (result && result.success === false) {
+      await showError(result.error || '当前阶段暂不能中止导入');
+      return;
+    }
+    appendLog('[INFO] 已请求中止整合包导入');
+  } catch (error) {
+    console.error('[ImportWizard] 中止导入失败:', error);
+    appendLog(`[ERROR] 中止导入失败: ${error.message}`);
+    return;
+  }
+
+  if (choice === 'cleanup') {
+    const instanceId = state.activeInstanceId;
+    if (instanceId) {
+      appendLog('[INFO] 正在清理导入文件...');
+      try {
+        await window.mofoxAPI.installCleanup(instanceId);
+        appendLog('[INFO] 清理完成');
+      } catch (error) {
+        console.error('[ImportWizard] 清理导入文件失败:', error);
+        appendLog(`[ERROR] 清理失败: ${error.message}`);
+      }
+    } else {
+      appendLog('[WARN] 未获取到实例 ID，跳过自动清理');
+    }
+  }
+
+  window.location.href = '../index.html';
 }
 
 function finishAndClose() {

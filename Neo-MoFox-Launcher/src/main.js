@@ -2981,6 +2981,17 @@ ipcMain.handle('import-integration-pack', async (event, options) => {
   }
 });
 
+// import-abort: 中止整合包导入（仅安装步骤执行阶段生效）
+ipcMain.handle('import-abort', async () => {
+  try {
+    const { importService } = require('./services/integration-pack/ImportService');
+    return importService.abortImport();
+  } catch (error) {
+    console.error('[IPC] importAbort 失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // ─── TOML 验证（使用 @iarna/toml 完整解析）─────────────────────────────
 ipcMain.handle('validate-toml', async (event, content) => {
   try {

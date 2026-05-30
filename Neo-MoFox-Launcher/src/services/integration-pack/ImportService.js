@@ -43,6 +43,35 @@ class ImportService {
     this._outputCallback = null;
     this._stepChangeCallback = null;
     this._tempDir = null;
+    this._abortRequested = false;
+    this._installStepPhaseActive = false;
+    this._activeInstanceId = null;
+  }
+
+  /**
+   * 请求中止当前导入流程。
+   * 仅在安装步骤执行器接管后生效；解压、配置处理和文件复制阶段不可中止。
+   */
+  abortImport() {
+    if (!this._installStepPhaseActive) {
+      this._emitOutput('当前仍在导入准备阶段，暂不能中止；安装步骤开始后才允许返回');
+      return { success: false, error: '当前阶段不可中止' };
+    }
+
+    this._abortRequested = true;
+    this._emitOutput('已请求中止整合包导入');
+    return { success: true };
+  }
+
+  /**
+   * 检查导入流程是否已被用户中止。
+   */
+  _throwIfAborted() {
+    if (this._abortRequested) {
+      const error = new Error('导入已被用户中止');
+      error.code = 'IMPORT_ABORTED';
+      throw error;
+    }
   }
 
   /**
@@ -84,6 +113,10 @@ class ImportService {
   async importIntegrationPack(packPath, userInputs) {
     let instanceId = null;
     let instanceRegistered = false;
+    let instanceData = null;
+    this._abortRequested = false;
+    this._installStepPhaseActive = false;
+    this._activeInstanceId = null;
 
     try {
       // 验证输入参数
@@ -143,19 +176,24 @@ class ImportService {
       await this._copyIncludedFiles(tempDir, userInputs.installDir, instanceId, manifest);
       this._emitOutput('文件复制完成');
 
-      // 6. 确定需要执行的安装步骤
+      // 6. 确定需要执行的安装步骤，并在安装步骤执行前注册实例
       const installSteps = this._determineInstallSteps(manifest, userInputs);
       this._emitOutput(`安装步骤: ${installSteps.join(', ')}`);
 
-      // 7. 创建实例记录
-      const instanceData = {
+      instanceData = {
         id: instanceId,
         name: userInputs.instanceName,
+        qqNumber: userInputs.qqNumber,
+        qqNickname: userInputs.qqNickname || '',
+        ownerQQNumber: userInputs.ownerQQNumber,
+        apiKey: userInputs.apiKey,
+        webuiApiKey: userInputs.webuiApiKey || '',
+        channel: userInputs.channel || 'main',
+        enabled: false,
         neomofoxDir: neoMofoxDir,
         napcatDir: path.join(userInputs.installDir, instanceId, 'napcat'),
         webuiDir: null,
-        qqNumber: userInputs.qqNumber,
-        wsPort: userInputs.wsPort,
+        wsPort: parseInt(userInputs.wsPort, 10),
         installCompleted: false,
         installProgress: { step: 'prepare', substep: 0 },
         installSteps: installSteps,
@@ -175,17 +213,19 @@ class ImportService {
 
       storageService.addInstance({ ...instanceData, createdAt: new Date().toISOString() });
       instanceRegistered = true;
+      this._activeInstanceId = instanceId;
       this._emitOutput(`实例已注册: ${instanceId}`);
+      this._emitStepChange('instance-registered', 'completed', { instanceId });
 
-      // 8. 执行安装步骤
+      // 7. 执行安装步骤（只有进入该阶段后才允许中止）
       await this._executeInstallSteps(installSteps, instanceId, instanceData, userInputs, manifest);
 
-      // 9. 标记安装完成
-      storageService.updateInstance(instanceId, { installCompleted: true });
+      // 8. 标记安装完成
+      storageService.updateInstance(instanceId, { installCompleted: true, enabled: true, installProgress: null });
       this._emitProgress(100, '导入完成');
       this._emitOutput('整合包导入成功！');
 
-      // 10. 清理临时目录（后台执行，不等待）
+      // 9. 清理临时目录（后台执行，不等待）
       this._cleanup();
 
       return { success: true, instanceId };
@@ -195,6 +235,17 @@ class ImportService {
 
       // 清理临时目录（后台执行，不等待）
       this._cleanup();
+
+      if (error.code === 'IMPORT_ABORTED') {
+        if (instanceId && instanceRegistered) {
+          try {
+            storageService.updateInstance(instanceId, { installCompleted: false });
+          } catch (updateError) {
+            console.error('[ImportService] 更新中止实例状态失败:', updateError);
+          }
+        }
+        return { success: false, aborted: true, instanceId, error: error.message };
+      }
 
       // 清理失败的实例
       if (instanceId) {
@@ -237,6 +288,8 @@ class ImportService {
       }
 
       return { success: false, error: error.message };
+    } finally {
+      this._abortRequested = false;
     }
   }
 
@@ -647,12 +700,17 @@ class ImportService {
     let napcatVersion = null;
 
     // 执行每个步骤
-    for (const step of installSteps) {
-      this._emitStepChange(step, 'running');
-      storageService.updateInstance(instanceId, { installProgress: { step, substep: 0 } });
+    this._installStepPhaseActive = true;
+    this._emitStepChange('install-step-executor', 'running', { instanceId });
 
-      try {
-        switch (step) {
+    try {
+      for (const step of installSteps) {
+        this._throwIfAborted();
+        this._emitStepChange(step, 'running', { instanceId });
+        storageService.updateInstance(instanceId, { installProgress: { step, substep: 0 } });
+
+        try {
+          switch (step) {
           case 'clone':
             await installStepExecutor.executeStep('clone', context, stepInputs);
             break;
@@ -716,11 +774,15 @@ class ImportService {
             this._emitOutput(`未知步骤: ${step}`);
         }
 
-        this._emitStepChange(step, 'completed');
-      } catch (error) {
-        this._emitStepChange(step, 'failed');
-        throw error;
+          this._throwIfAborted();
+          this._emitStepChange(step, 'completed', { instanceId });
+        } catch (error) {
+          this._emitStepChange(step, 'failed', { instanceId });
+          throw error;
+        }
       }
+    } finally {
+      this._installStepPhaseActive = false;
     }
   }
 
@@ -816,10 +878,10 @@ class ImportService {
   /**
    * 发送步骤变化事件
    */
-  _emitStepChange(step, status) {
+  _emitStepChange(step, status, extra = {}) {
     console.log(`[ImportService] 步骤变化: ${step} -> ${status}`);
     if (this._stepChangeCallback) {
-      this._stepChangeCallback({ step, status });
+      this._stepChangeCallback({ step, status, ...extra });
     }
   }
 }
