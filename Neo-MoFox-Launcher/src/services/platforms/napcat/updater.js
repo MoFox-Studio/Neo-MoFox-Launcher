@@ -8,8 +8,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { platformHelper } = require('../../utils/PlatformHelper');
-const { getRootPath } = require('./installer');
+const { WINDOWS_NODE_ASSET_NAME, getRootPath } = require('./installer');
 const { getConfigPath } = require('./config');
 
 /**
@@ -76,7 +75,7 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
     throw new Error(`找不到版本: ${targetVersion}`);
   }
 
-  const assetName = platformHelper.napcatAssetName;
+  const assetName = WINDOWS_NODE_ASSET_NAME;
   const asset = targetRelease.assets.find((item) => item.name === assetName);
   if (!asset) {
     throw new Error(`找不到适合当前系统的 NapCat Node 包: ${assetName}`);
@@ -89,12 +88,29 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
   const zipPath = path.join(tempDir, asset.name);
 
   emitProgress('update-platform', 20, '下载中...');
-  await helpers.downloadFile(asset.downloadUrl, zipPath, (downloaded, total) => {
-    const percent = total > 0 ? Math.floor(20 + (downloaded / total) * 40) : 20;
-    const downloadedMB = Math.floor(downloaded / 1024 / 1024);
-    const totalMB = total > 0 ? Math.floor(total / 1024 / 1024) : '?';
-    emitProgress('update-platform', percent, `下载中: ${downloadedMB}MB / ${totalMB}MB`);
-  });
+  const downloadUrls = await resolveDownloadUrls(asset.downloadUrl, helpers);
+  let lastDownloadError = null;
+  for (let index = 0; index < downloadUrls.length; index++) {
+    const downloadUrl = downloadUrls[index];
+    try {
+      emitProgress('update-platform', 20, `下载中 (${index + 1}/${downloadUrls.length})...`);
+      await helpers.downloadFile(downloadUrl, zipPath, (downloaded, total) => {
+        const percent = total > 0 ? Math.floor(20 + (downloaded / total) * 40) : 20;
+        const downloadedMB = Math.floor(downloaded / 1024 / 1024);
+        const totalMB = total > 0 ? Math.floor(total / 1024 / 1024) : '?';
+        emitProgress('update-platform', percent, `下载中: ${downloadedMB}MB / ${totalMB}MB`);
+      });
+      lastDownloadError = null;
+      break;
+    } catch (error) {
+      lastDownloadError = error;
+      console.warn(`[NapCatUpdater] 下载失败 (${downloadUrl}): ${error.message}`);
+    }
+  }
+
+  if (lastDownloadError) {
+    throw new Error(`下载 NapCat 更新包失败: ${lastDownloadError.message}`);
+  }
 
   emitProgress('update-platform', 60, '备份配置...');
   const configBackupDir = path.join(os.tmpdir(), `napcat-config-backup-${Date.now()}`);
@@ -133,6 +149,21 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
 
   emitProgress('update-platform', 100, `更新到 ${targetRelease.version} 完成`);
   return { success: true, version: targetRelease.version };
+}
+
+/**
+ * 解析下载地址的镜像列表。
+ * @param {string} originUrl 原始下载地址
+ * @param {Object} helpers 更新工具函数
+ * @returns {Promise<string[]>} 下载地址列表
+ */
+async function resolveDownloadUrls(originUrl, helpers) {
+  if (typeof helpers.getMirroredUrls !== 'function') {
+    return [originUrl];
+  }
+
+  const urls = await helpers.getMirroredUrls(originUrl);
+  return Array.isArray(urls) && urls.length > 0 ? urls : [originUrl];
 }
 
 module.exports = { getReleases, update };

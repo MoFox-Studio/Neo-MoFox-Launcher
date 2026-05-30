@@ -2,7 +2,7 @@
  * PlatformHelper - 多系统平台适配模块
  *
  * 统一封装 Windows / Linux (Ubuntu) / macOS 下的命令差异，
- * 包括 Python 可执行文件名、Shell 命令、解压命令、NapCat 资源名等。
+ * 包括 Python 可执行文件名、Shell 命令、解压命令等。
  *
  * 新增系统时只需在 PLATFORM_CONFIG 里加一个条目。
  */
@@ -25,8 +25,6 @@ const fs = require('fs');
  * @property {string}   shell           - 是否在 spawn 中启用 shell（=true 走系统 shell）
  * @property {Function} killCmd         - 生成"杀死进程树"的命令 (pid) => { cmd, args }
  * @property {Function} unzipCmd        - 生成解压命令 (zipPath, destDir) => { cmd, args }
- * @property {string|null} napcatAsset  - NapCat Release 中匹配的资源文件名（null 表示不支持自动安装）
- * @property {Function|null} napcatStartCmd - 生成 NapCat 启动命令 (shellDir, qq) => { cmd, args, cwd }
  */
 
 const PLATFORM_CONFIG = {
@@ -50,44 +48,6 @@ const PLATFORM_CONFIG = {
       cmd: 'powershell',
       args: ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`],
     }),
-    napcatAsset: 'NapCat.Shell.Windows.Node.zip',
-    napcatStartCmd(shellDir, qq) {
-      const launcher = path.join(shellDir, `start_napcat_${qq}.bat`);
-      if (fs.existsSync(launcher)) {
-        return { cmd: launcher, args: [], cwd: shellDir };
-      }
-
-      const bat = path.join(shellDir, 'napcat.bat');
-      if (fs.existsSync(bat)) {
-        return { cmd: bat, args: ['-q', String(qq)], cwd: shellDir };
-      }
-
-      const nodeExe = path.join(shellDir, 'node.exe');
-      const entry = path.join(shellDir, 'index.js');
-      if (fs.existsSync(nodeExe) && fs.existsSync(entry)) {
-        return { cmd: nodeExe, args: [entry, '-q', String(qq)], cwd: shellDir };
-      }
-
-      return null;
-    },
-    /** 生成 NapCat 快速启动脚本 */
-    writeNapcatLauncher: (shellDir, qq) => {
-      const sourceBat = path.join(shellDir, 'napcat.bat');
-      if (!fs.existsSync(sourceBat)) {
-        return null;
-      }
-
-      const content = [
-        '@echo off',
-        'chcp 65001 >nul',
-        `echo 正在启动 NapCat (QQ: ${qq})...`,
-        `call "%~dp0napcat.bat" -q ${qq}`,
-        'pause',
-      ].join('\r\n');
-      const p = path.join(shellDir, `start_napcat_${qq}.bat`);
-      fs.writeFileSync(p, content, 'utf8');
-      return p;
-    },
   },
 
   // ──────────────── Linux (Ubuntu / Debian 等) ────────────────
@@ -112,10 +72,6 @@ const PLATFORM_CONFIG = {
       cmd: 'unzip',
       args: ['-o', zipPath, '-d', destDir],
     }),
-    // Linux 不支持自动安装 NapCat，用户需自行安装
-    napcatAsset: null,
-    napcatStartCmd: () => null,
-    writeNapcatLauncher: () => null,
   },
 
   // ──────────────── macOS（预留） ────────────────
@@ -140,9 +96,6 @@ const PLATFORM_CONFIG = {
       cmd: 'unzip',
       args: ['-o', zipPath, '-d', destDir],
     }),
-    napcatAsset: null, // macOS 暂无 NapCat 官方包
-    napcatStartCmd: () => null,
-    writeNapcatLauncher: () => null,
   },
 };
 
@@ -344,39 +297,6 @@ class PlatformHelper {
    */
   getUnzipCommand(zipPath, destDir) {
     return this._config.unzipCmd(zipPath, destDir);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // NapCat 相关
-  // ═══════════════════════════════════════════════════════════════════════
-
-  /** 当前平台对应的 NapCat Release 资源文件名（null = 不支持） */
-  get napcatAssetName() { return this._config.napcatAsset; }
-
-  /** 当前平台是否支持 NapCat 自动安装（仅 Windows） */
-  get supportsNapcatAutoInstall() { return !!this._config.napcatAsset; }
-
-  /**
-   * 生成 NapCat 启动命令
-   * @param {string} shellDir - NapCat Shell 目录
-   * @param {string} qq - QQ 号
-   * @returns {{ cmd: string, args: string[], cwd: string }|null}
-   */
-  getNapcatStartCommand(shellDir, qq) {
-    return this._config.napcatStartCmd(shellDir, qq);
-  }
-
-  /**
-   * 写入 NapCat 快速启动脚本
-   * @param {string} shellDir
-   * @param {string} qq
-   * @returns {string|null} 脚本路径
-   */
-  writeNapcatLauncherScript(shellDir, qq) {
-    if (this._config.writeNapcatLauncher) {
-      return this._config.writeNapcatLauncher(shellDir, qq);
-    }
-    return null;
   }
 
   // ═══════════════════════════════════════════════════════════════════════

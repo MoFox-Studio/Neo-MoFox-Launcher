@@ -16,6 +16,7 @@ const state = {
   mofoxStatus: 'stopped',
   napcatStatus: 'stopped',
   hasNapcat: true,
+  platformName: '平台',
   stats: {
     mofox: { uptime: 0 },
     napcat: { uptime: 0 },
@@ -90,6 +91,7 @@ const el = {
   settingsDialog: document.getElementById('settingsDialog'),
   btnCloseSettings: document.getElementById('btnCloseSettings'),
   btnOpenNapcat: document.getElementById('btnOpenNapcat'),
+  platformTabLabel: document.querySelector('.tab-button[data-tab="napcat"] .tab-label'),
 };
 
 // ─── xterm 主题：跟暗色面板一致 ───────────────────────────────────────
@@ -291,6 +293,11 @@ async function loadInstanceData() {
       const instanceData = await window.mofoxAPI.getInstance(state.instanceId);
       if (instanceData) {
         state.hasNapcat = !!(instanceData.platformDir);
+        state.platformName = instanceData.platformDisplayName || instanceData.platformName || instanceData.platform || '平台';
+        if (el.platformTabLabel) el.platformTabLabel.textContent = state.platformName;
+        if (el.btnStartNapcat) el.btnStartNapcat.title = `启动 ${state.platformName} 适配器`;
+        if (el.btnStopNapcat) el.btnStopNapcat.title = `停止 ${state.platformName} 适配器`;
+        if (el.btnRestartNapcat) el.btnRestartNapcat.title = `重启 ${state.platformName} 适配器`;
         if (!state.hasNapcat) hideNapcatUI();
       }
     }
@@ -330,9 +337,9 @@ function setupEventListeners() {
   el.btnStopMofox?.addEventListener('click', handleStopMofox);
   el.btnRestartMofox?.addEventListener('click', handleRestartMofox);
 
-  el.btnStartNapcat?.addEventListener('click', handleStartNapcat);
-  el.btnStopNapcat?.addEventListener('click', handleStopNapcat);
-  el.btnRestartNapcat?.addEventListener('click', handleRestartNapcat);
+  el.btnStartNapcat?.addEventListener('click', handleStartPlatform);
+  el.btnStopNapcat?.addEventListener('click', handleStopPlatform);
+  el.btnRestartNapcat?.addEventListener('click', handleRestartPlatform);
 
   el.tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
 
@@ -495,38 +502,38 @@ async function handleRestartMofox() {
   }
 }
 
-async function handleStartNapcat() {
+async function handleStartPlatform() {
   try {
     updateNapcatStatus('starting');
-    const result = await window.mofoxAPI.startNapCatOnly(state.instanceId);
+    const result = await window.mofoxAPI.startPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
     updateNapcatStatus('error');
-    showError('启动 NapCat 失败: ' + error.message);
+    showError(`启动 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
 
-async function handleStopNapcat() {
+async function handleStopPlatform() {
   if (state.napcatStatus === 'stopped') return;
   try {
     updateNapcatStatus('stopping');
-    const result = await window.mofoxAPI.stopNapCatOnly(state.instanceId);
+    const result = await window.mofoxAPI.stopPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
     updateNapcatStatus('stopped');
   } catch (error) {
     updateNapcatStatus('error');
-    showError('停止 NapCat 失败: ' + error.message);
+    showError(`停止 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
 
-async function handleRestartNapcat() {
+async function handleRestartPlatform() {
   try {
     updateNapcatStatus('restarting');
-    const result = await window.mofoxAPI.restartNapCatOnly(state.instanceId);
+    const result = await window.mofoxAPI.restartPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
     updateNapcatStatus('error');
-    showError('重启 NapCat 失败: ' + error.message);
+    showError(`重启 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
 

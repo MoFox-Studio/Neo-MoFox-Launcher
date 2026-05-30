@@ -120,13 +120,16 @@ const api = {
   stopInstance: (instanceId) => ipcRenderer.invoke('instance-stop', instanceId),
   restartInstance: (instanceId) => ipcRenderer.invoke('instance-restart', instanceId),
   
-  // 分离控制（独立启停 MoFox 或 NapCat）
+  // 分离控制（独立启停 MoFox 或平台适配器）
   startMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-start-mofox-only', instanceId),
   stopMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-stop-mofox-only', instanceId),
   restartMoFoxOnly: (instanceId) => ipcRenderer.invoke('instance-restart-mofox-only', instanceId),
-  startNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-start-napcat-only', instanceId),
-  stopNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-stop-napcat-only', instanceId),
-  restartNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-restart-napcat-only', instanceId),
+  startPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-start-platform-only', instanceId),
+  stopPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-stop-platform-only', instanceId),
+  restartPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-restart-platform-only', instanceId),
+  startNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-start-platform-only', instanceId),
+  stopNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-stop-platform-only', instanceId),
+  restartNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-restart-platform-only', instanceId),
   
   getInstanceStatus: (instanceId) => ipcRenderer.invoke('instance-status', instanceId),
   getSeparatedStatus: (instanceId) => ipcRenderer.invoke('instance-status-separated', instanceId),

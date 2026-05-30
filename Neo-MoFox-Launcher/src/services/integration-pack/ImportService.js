@@ -180,7 +180,10 @@ class ImportService {
       const installSteps = this._determineInstallSteps(manifest, userInputs);
       this._emitOutput(`安装步骤: ${installSteps.join(', ')}`);
 
-      const platformId = manifest.content.platform?.id || userInputs.platform || platformRegistry.getDefaultPlatformId();
+      const platformId = manifest.content.platform?.id || userInputs.platform;
+      if (!platformId) {
+        throw new Error('整合包导入失败: 缺少平台 ID');
+      }
       const platform = platformRegistry.getPlatform(platformId);
       const platformDir = path.join(userInputs.installDir, instanceId, platform.directoryName);
 

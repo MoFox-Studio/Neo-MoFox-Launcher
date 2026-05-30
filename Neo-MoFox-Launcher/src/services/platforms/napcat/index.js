@@ -9,6 +9,7 @@ const { metadata, isAvailable } = require('./metadata');
 const installer = require('./installer');
 const config = require('./config');
 const updater = require('./updater');
+const runtime = require('./runtime');
 
 const napcatPlatform = {
   ...metadata,
@@ -16,6 +17,7 @@ const napcatPlatform = {
   installer,
   config,
   updater,
+  runtime,
 };
 
 module.exports = { napcatPlatform };

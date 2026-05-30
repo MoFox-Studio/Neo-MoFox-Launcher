@@ -487,6 +487,7 @@ class VersionService {
       httpsGet: this._httpsGet.bind(this),
       downloadFile: this._downloadFile.bind(this),
       extractZip: this._extractZip.bind(this),
+      getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
     };
   }
 
@@ -496,7 +497,10 @@ class VersionService {
    * @param {number} limit 返回数量
    * @returns {Promise<Array<Object>>} Release 列表
    */
-  async getPlatformReleases(platformId = platformRegistry.getDefaultPlatformId(), limit = 10) {
+  async getPlatformReleases(platformId, limit = 10) {
+    if (!platformId) {
+      throw new Error('获取平台版本列表失败: 缺少平台 ID');
+    }
     const platform = platformRegistry.getPlatform(platformId);
     if (!platform.updater || typeof platform.updater.getReleases !== 'function') {
       throw new Error(`平台 ${platformId} 未提供版本列表能力`);

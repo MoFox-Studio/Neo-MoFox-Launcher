@@ -832,12 +832,31 @@ const { themeService } = require('./services/theme/ThemeService');
 storageService.init();
 
 // 实例管理
+function enrichInstancePlatformInfo(instance) {
+  if (!instance || !instance.platform) return instance;
+
+  try {
+    const platform = platformRegistry.getPlatform(instance.platform);
+    return {
+      ...instance,
+      platformName: platform.name || instance.platform,
+      platformDisplayName: platform.displayName || platform.name || instance.platform,
+    };
+  } catch (_) {
+    return {
+      ...instance,
+      platformName: instance.platform,
+      platformDisplayName: instance.platform,
+    };
+  }
+}
+
 ipcMain.handle('instances-get-all', () => {
-  return storageService.getInstances();
+  return storageService.getInstances().map(enrichInstancePlatformInfo);
 });
 
 ipcMain.handle('instances-get', (event, instanceId) => {
-  return storageService.getInstance(instanceId);
+  return enrichInstancePlatformInfo(storageService.getInstance(instanceId));
 });
 
 ipcMain.handle('instances-add', (event, instance) => {
@@ -1898,16 +1917,18 @@ async function startMoFoxProcess(instanceId, instance) {
     }
   }, 3000);
 }
-// ── NapCat 独立启动函数 ──────────────────────────────────────────────────────
-async function startNapcatProcess(instanceId, instance) {
-  const napcatPath = instance.platformDir;
+// ── 平台适配器独立启动函数 ────────────────────────────────────────────────────
+async function startPlatformProcess(instanceId, instance) {
+  const platformPath = instance.platformDir;
+  const platform = platformRegistry.getPlatform(instance.platform);
+  const platformName = platform.displayName || platform.name || '平台适配器';
   
-  if (!napcatPath) {
-    throw new Error('未安装 NapCat');
+  if (!platformPath) {
+    throw new Error(`未安装${platformName}`);
   }
   
-  if (!fs.existsSync(napcatPath)) {
-    throw new Error('NapCat 路径无效: ' + napcatPath);
+  if (!fs.existsSync(platformPath)) {
+    throw new Error(`${platformName} 路径无效: ${platformPath}`);
   }
   
   // 初始化实例数据
@@ -1932,7 +1953,7 @@ async function startNapcatProcess(instanceId, instance) {
   instanceData.napcatGeneration = (instanceData.napcatGeneration || 0) + 1;
   const currentGeneration = instanceData.napcatGeneration;
   
-  // 初始化 NapCat 日志管理器
+  // 初始化平台适配器日志管理器
   if (!instanceData.loggers.napcat) {
     const logsDir = path.join(storageService.getDataDir(), 'logs');
     instanceData.loggers.napcat = new InstanceLogger(
@@ -1946,26 +1967,30 @@ async function startNapcatProcess(instanceId, instance) {
   instanceData.napcatStartTime = Date.now();
   updateInstanceStatus(instanceId);
   
-  emitLauncherMessage(instanceId, 'napcat', '正在启动 NapCat...', 'info');
+  emitLauncherMessage(instanceId, 'napcat', `正在启动${platformName}适配器...`, 'info');
   
-  // Windows Node 包以 napcatDir 作为根目录，统一使用包内现有 napcat.bat 启动。
-  const napcatRootPath = napcatPath;
-
-  // 使用 PlatformHelper 获取 NapCat 启动命令
-  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatRootPath, instance.qqNumber);
-  
-  if (!napcatStartInfo) {
-    emitLauncherMessage(instanceId, 'napcat', '错误: 未找到 NapCat 启动文件', 'error');
+  if (!platform.runtime || typeof platform.runtime.getStartCommand !== 'function') {
+    emitLauncherMessage(instanceId, 'napcat', `错误: ${platformName}未提供启动命令生成器`, 'error');
     instanceData.napcatStatus = 'error';
     updateInstanceStatus(instanceId);
-    throw new Error('未找到 NapCat 启动文件');
+    throw new Error(`${platformName}未提供启动命令生成器`);
   }
   
-  const napcatCmd = napcatStartInfo.cmd;
-  const napcatArgs = napcatStartInfo.args;
-  emitLauncherMessage(instanceId, 'napcat', `使用启动命令: ${napcatCmd} ${napcatArgs.join(' ')}`, 'info');
+  const platformRootPath = instance.platformRoot || platformPath;
+  const platformStartInfo = platform.runtime.getStartCommand(platformRootPath, instance.qqNumber);
   
-  // PTY 启动 NapCat。NapCat 启动脚本本身可能用 cmd/bash，所以走 shell 包一层。
+  if (!platformStartInfo) {
+    emitLauncherMessage(instanceId, 'napcat', `错误: 未找到${platformName}启动文件`, 'error');
+    instanceData.napcatStatus = 'error';
+    updateInstanceStatus(instanceId);
+    throw new Error(`未找到${platformName}启动文件`);
+  }
+  
+  const platformCmd = platformStartInfo.cmd;
+  const platformArgs = platformStartInfo.args;
+  emitLauncherMessage(instanceId, 'napcat', `使用启动命令: ${platformCmd} ${platformArgs.join(' ')}`, 'info');
+  
+  // PTY 启动平台适配器。启动脚本本身可能用 cmd/bash，所以走 shell 包一层。
   const ptySize = instanceData.ptySize.napcat;
   const ptyEnv = {
     ...process.env,
@@ -1978,26 +2003,26 @@ async function startNapcatProcess(instanceId, instance) {
   try {
     if (process.platform === 'win32') {
       // Windows 下走 ConPTY，直接用 cmd /c 启动批处理
-      napcatProc = pty.spawn(process.env.ComSpec || 'cmd.exe', ['/c', napcatCmd, ...napcatArgs], {
+      napcatProc = pty.spawn(process.env.ComSpec || 'cmd.exe', ['/c', platformCmd, ...platformArgs], {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
-        cwd: napcatStartInfo.cwd || napcatRootPath,
+        cwd: platformStartInfo.cwd || platformRootPath,
         env: ptyEnv,
         encoding: 'utf8',
       });
     } else {
-      napcatProc = pty.spawn(napcatCmd, napcatArgs, {
+      napcatProc = pty.spawn(platformCmd, platformArgs, {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
-        cwd: napcatStartInfo.cwd || napcatRootPath,
+        cwd: platformStartInfo.cwd || platformRootPath,
         env: ptyEnv,
         encoding: 'utf8',
       });
     }
   } catch (err) {
-    emitLauncherMessage(instanceId, 'napcat', `NapCat 启动失败: ${err.message}`, 'error');
+    emitLauncherMessage(instanceId, 'napcat', `${platformName} 启动失败: ${err.message}`, 'error');
     instanceData.napcatStatus = 'error';
     updateInstanceStatus(instanceId);
     throw err;
@@ -2034,7 +2059,7 @@ async function startNapcatProcess(instanceId, instance) {
   napcatProc.onExit(({ exitCode, signal }) => {
     const code = exitCode != null ? exitCode : signal;
     const killedBySignal = exitCode == null && signal != null;
-    emitLauncherMessage(instanceId, 'napcat', `NapCat 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
+    emitLauncherMessage(instanceId, 'napcat', `${platformName} 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
     if (instanceData.napcatGeneration !== currentGeneration) {
       console.log(`[Instance ${instanceId}] 忽略旧 NapCat 进程 close 事件`);
       return;
@@ -2068,28 +2093,28 @@ async function startNapcatProcess(instanceId, instance) {
     if (instanceData.napcatProcess && instanceData.napcatStatus === 'starting') {
       instanceData.napcatStatus = 'running';
       updateInstanceStatus(instanceId);
-      emitLauncherMessage(instanceId, 'napcat', 'NapCat 正在运行', 'success');
+      emitLauncherMessage(instanceId, 'napcat', `${platformName} 正在运行`, 'success');
     }
   }, 3000);
 }
 
 // ── 实例启动核心逻辑（启动全部）──────────────────────────────────────────────
 async function startInstanceInternal(instanceId, instance) {
-  const hasNapcat = !!(instance.platformDir);
+  const hasPlatform = !!(instance.platformDir && instance.platform);
   
   emitLauncherMessage(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
-  if (hasNapcat) {
-    emitLauncherMessage(instanceId, 'napcat', '正在启动 NapCat...', 'info');
+  if (hasPlatform) {
+    emitLauncherMessage(instanceId, 'napcat', '正在启动平台适配器...', 'info');
   } else {
-    emitLauncherMessage(instanceId, 'mofox', '未安装 NapCat，仅启动 MoFox 核心', 'info');
+    emitLauncherMessage(instanceId, 'mofox', '未安装平台适配器，仅启动 MoFox 核心', 'info');
   }
   
   // 调用独立函数启动 MoFox
   await startMoFoxProcess(instanceId, instance);
   
-  // 调用独立函数启动 NapCat（如果安装了）
-  if (hasNapcat) {
-    await startNapcatProcess(instanceId, instance);
+  // 调用独立函数启动平台适配器（如果安装了）
+  if (hasPlatform) {
+    await startPlatformProcess(instanceId, instance);
   }
 }
 
@@ -2147,23 +2172,23 @@ async function stopMoFoxProcess(instanceId) {
   emitLauncherMessage(instanceId, 'mofox', 'MoFox 已停止', 'info');
 }
 
-// ── NapCat 独立停止函数 ──────────────────────────────────────────────────────
-async function stopNapcatProcess(instanceId) {
+// ── 平台适配器独立停止函数 ────────────────────────────────────────────────────
+async function stopPlatformProcess(instanceId) {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData || !instanceData.napcatProcess) {
-    throw new Error('NapCat 未在运行');
+    throw new Error('平台适配器未在运行');
   }
 
   instanceData.napcatStatus = 'stopping';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'napcat', '正在停止 NapCat...', 'info');
+  emitLauncherMessage(instanceId, 'napcat', '正在停止平台适配器...', 'info');
 
-  await stopPtyProcess(instanceData.napcatProcess, 'NapCat');
+  await stopPtyProcess(instanceData.napcatProcess, 'Platform');
 
   instanceData.napcatProcess = null;
   instanceData.napcatStatus = 'stopped';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'napcat', 'NapCat 已停止', 'info');
+  emitLauncherMessage(instanceId, 'napcat', '平台适配器已停止', 'info');
 }
 
 // ── MoFox 独立重启函数 ───────────────────────────────────────────────────────
@@ -2186,29 +2211,29 @@ async function restartMoFoxProcess(instanceId) {
   await startMoFoxProcess(instanceId, instance);
 }
 
-// ── NapCat 独立重启函数 ──────────────────────────────────────────────────────
-async function restartNapcatProcess(instanceId) {
+// ── 平台适配器独立重启函数 ────────────────────────────────────────────────────
+async function restartPlatformProcess(instanceId) {
   const instance = storageService.getInstance(instanceId);
   if (!instance) {
     throw new Error('实例不存在');
   }
 
-  const hasNapcat = !!(instance.platformDir);
-  if (!hasNapcat) {
-    throw new Error('未安装 NapCat');
+  const hasPlatform = !!(instance.platformDir && instance.platform);
+  if (!hasPlatform) {
+    throw new Error('未安装平台适配器');
   }
 
   const instanceData = instanceProcesses.get(instanceId);
   if (instanceData && instanceData.napcatProcess) {
     instanceData.napcatStatus = 'restarting';
     updateInstanceStatus(instanceId);
-    emitLauncherMessage(instanceId, 'napcat', '正在重启 NapCat...', 'info');
+    emitLauncherMessage(instanceId, 'napcat', '正在重启平台适配器...', 'info');
     
-    await stopNapcatProcess(instanceId);
+    await stopPlatformProcess(instanceId);
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  await startNapcatProcess(instanceId, instance);
+  await startPlatformProcess(instanceId, instance);
 }
 
 ipcMain.handle('instance-start', async (event, instanceId) => {
@@ -2275,7 +2300,7 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
       promises.push(stopMoFoxProcess(instanceId).catch(e => console.error('停止 MoFox 失败:', e)));
     }
     if (instanceData.napcatProcess) {
-      promises.push(stopNapcatProcess(instanceId).catch(e => console.error('停止 NapCat 失败:', e)));
+      promises.push(stopPlatformProcess(instanceId).catch(e => console.error('停止平台适配器失败:', e)));
     }
     
     await Promise.all(promises);
@@ -2359,7 +2384,7 @@ ipcMain.handle('instance-start-mofox-only', async (event, instanceId) => {
   }
 });
 
-ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => {
+async function handleStartPlatformOnly(instanceId) {
   try {
     const instance = storageService.getInstance(instanceId);
     if (!instance) {
@@ -2367,20 +2392,22 @@ ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => {
     }
     
     if (!instance.platformDir) {
-      throw new Error('此实例未安装 NapCat');
+      throw new Error('此实例未安装平台适配器');
     }
     
     const instanceData = instanceProcesses.get(instanceId);
     if (instanceData && instanceData.napcatProcess && instanceData.napcatStatus === 'running') {
-      throw new Error('NapCat 已在运行中');
+      throw new Error('平台适配器已在运行中');
     }
     
-    await startNapcatProcess(instanceId, instance);
+    await startPlatformProcess(instanceId, instance);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
-});
+}
+
+ipcMain.handle('instance-start-platform-only', async (event, instanceId) => handleStartPlatformOnly(instanceId));
 
 ipcMain.handle('instance-stop-mofox-only', async (event, instanceId) => {
   try {
@@ -2400,7 +2427,7 @@ ipcMain.handle('instance-stop-mofox-only', async (event, instanceId) => {
   }
 });
 
-ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => {
+async function handleStopPlatformOnly(instanceId) {
   try {
     const instanceData = instanceProcesses.get(instanceId);
     if (!instanceData || !instanceData.napcatProcess) {
@@ -2408,15 +2435,17 @@ ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => {
         instanceData.napcatStatus = 'stopped';
         updateInstanceStatus(instanceId);
       }
-      return { success: true, message: 'NapCat 未在运行' };
+      return { success: true, message: '平台适配器未在运行' };
     }
     
-    await stopNapcatProcess(instanceId);
+    await stopPlatformProcess(instanceId);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
-});
+}
+
+ipcMain.handle('instance-stop-platform-only', async (event, instanceId) => handleStopPlatformOnly(instanceId));
 
 ipcMain.handle('instance-restart-mofox-only', async (event, instanceId) => {
   try {
@@ -2441,7 +2470,7 @@ ipcMain.handle('instance-restart-mofox-only', async (event, instanceId) => {
   }
 });
 
-ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => {
+async function handleRestartPlatformOnly(instanceId) {
   try {
     const instance = storageService.getInstance(instanceId);
     if (!instance) {
@@ -2449,24 +2478,29 @@ ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => {
     }
     
     if (!instance.platformDir) {
-      throw new Error('此实例未安装 NapCat');
+      throw new Error('此实例未安装平台适配器');
     }
     
     const instanceData = instanceProcesses.get(instanceId);
     if (instanceData && instanceData.napcatProcess) {
-      // 停止 NapCat
-      await stopNapcatProcess(instanceId);
+      // 停止平台适配器
+      await stopPlatformProcess(instanceId);
       // 等待进程完全退出
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // 重新启动 NapCat
-    await startNapcatProcess(instanceId, instance);
+    // 重新启动平台适配器
+    await startPlatformProcess(instanceId, instance);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
-});
+}
+
+ipcMain.handle('instance-restart-platform-only', async (event, instanceId) => handleRestartPlatformOnly(instanceId));
+ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => handleStartPlatformOnly(instanceId));
+ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => handleStopPlatformOnly(instanceId));
+ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => handleRestartPlatformOnly(instanceId));
 
 // ─── 获取分离状态 ─────────────────────────────────────────────────────
 
@@ -3245,7 +3279,7 @@ ipcMain.handle('version-get-branches', async () => {
 
 // 获取平台版本列表
 ipcMain.handle('version-get-platform-releases', async (event, platformId, limit) => {
-  return versionService.getPlatformReleases(platformId || platformRegistry.getDefaultPlatformId(), limit || 10);
+  return versionService.getPlatformReleases(platformId, limit || 10);
 });
 
 // 获取 NapCat 版本列表

@@ -623,6 +623,7 @@ class InstallStepExecutor {
       downloadFile: this._downloadFile.bind(this),
       computeFileSha256: this._computeFileSha256.bind(this),
       fetchLatestNapCatRelease: this._fetchLatestNapCatRelease.bind(this),
+      getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
     };
 
     const result = await platform.installer.install({

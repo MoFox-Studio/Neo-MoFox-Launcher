@@ -10,6 +10,7 @@ const path = require('path');
 const { platformHelper } = require('../../utils/PlatformHelper');
 
 const MAX_DOWNLOAD_RETRY = 3;
+const WINDOWS_NODE_ASSET_NAME = 'NapCat.Shell.Windows.Node.zip';
 
 /**
  * 安装 NapCat 平台。
@@ -24,7 +25,7 @@ async function install({ context, helpers, platformDir }) {
   context.emitProgress('platform-install', 5, '正在获取 NapCat 最新版本信息...');
   const release = await helpers.fetchLatestNapCatRelease(context);
 
-  const assetName = platformHelper.napcatAssetName;
+  const assetName = WINDOWS_NODE_ASSET_NAME;
   const asset = release.assets.find((item) => item.name === assetName);
   if (!asset) {
     throw new Error(`在 ${release.tag_name} 中未找到 ${assetName}`);
@@ -40,21 +41,35 @@ async function install({ context, helpers, platformDir }) {
   }
 
   const zipPath = path.join(platformDir, assetName);
+  const downloadUrls = await resolveDownloadUrls(asset.browser_download_url, helpers);
   let downloadSuccess = false;
+  let lastDownloadError = null;
 
   for (let attempt = 1; attempt <= MAX_DOWNLOAD_RETRY; attempt += 1) {
+    const downloadUrl = downloadUrls[(attempt - 1) % downloadUrls.length];
     context.emitProgress(
       'platform-install',
       10,
       `正在下载 NapCat ${release.tag_name}...${attempt > 1 ? ` (第 ${attempt} 次尝试)` : ''}`
     );
+    context.emitOutput(`[napcat] 下载源: ${downloadUrl}`);
 
-    await helpers.downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
-      const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
-      const dlMB = (downloaded / 1024 / 1024).toFixed(1);
-      const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
-      context.emitProgress('platform-install', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
-    });
+    try {
+      await helpers.downloadFile(downloadUrl, zipPath, (downloaded, total) => {
+        const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
+        const dlMB = (downloaded / 1024 / 1024).toFixed(1);
+        const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
+        context.emitProgress('platform-install', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
+      });
+    } catch (error) {
+      lastDownloadError = error;
+      context.emitOutput(`[napcat] 下载失败 (第 ${attempt}/${MAX_DOWNLOAD_RETRY} 次): ${error.message}`);
+      try { fs.unlinkSync(zipPath); } catch (_) {}
+      if (attempt >= MAX_DOWNLOAD_RETRY) {
+        throw new Error(`NapCat 下载失败: ${lastDownloadError.message}`);
+      }
+      continue;
+    }
 
     context.emitOutput(`[napcat] 下载完成: ${zipPath}`);
 
@@ -120,6 +135,19 @@ async function install({ context, helpers, platformDir }) {
 }
 
 /**
+ * 解析下载地址镜像列表。
+ * @param {string} originUrl 原始下载地址
+ * @param {Object} helpers 安装工具函数
+ * @returns {Promise<string[]>} 下载地址列表
+ */
+async function resolveDownloadUrls(originUrl, helpers) {
+  if (typeof helpers.getMirroredUrls !== 'function') {
+    return [originUrl];
+  }
+  return await helpers.getMirroredUrls(originUrl);
+}
+
+/**
  * 获取 NapCat Windows Node 包根目录。
  * @param {string} platformDir 平台安装目录
  * @returns {string|null} Node 包根目录
@@ -136,4 +164,4 @@ function getRootPath(platformDir) {
   }
 }
 
-module.exports = { install, getRootPath };
+module.exports = { install, getRootPath, WINDOWS_NODE_ASSET_NAME };

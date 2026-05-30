@@ -7,7 +7,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { platformHelper } = require('../../utils/PlatformHelper');
 
 /**
  * 写入 Neo-MoFox 的 napcat_adapter 配置。
@@ -110,7 +109,7 @@ async function configure({ context, inputs, platformRoot }) {
   context.emitOutput(`[platform-config] onebot11 配置: ${onebot11Path}`);
   context.emitOutput(`[platform-config] napcat 配置: ${napcatCfgPath}`);
 
-  const launcherPath = platformHelper.writeNapcatLauncherScript(platformRoot, inputs.qqNumber);
+  const launcherPath = writeLauncherScript(platformRoot, inputs.qqNumber);
   if (launcherPath) {
     context.emitOutput(`[platform-config] 启动脚本: ${launcherPath}`);
   }
@@ -128,4 +127,28 @@ function getConfigPath(platformRoot) {
   return path.join(platformRoot, 'napcat', 'config');
 }
 
-module.exports = { configure, getConfigPath, writeAdapterConfig };
+/**
+ * 写入 NapCat 快速启动脚本。
+ * @param {string} platformRoot 平台根目录
+ * @param {string} qq QQ 号
+ * @returns {string|null} 脚本路径
+ */
+function writeLauncherScript(platformRoot, qq) {
+  const sourceBat = path.join(platformRoot, 'napcat.bat');
+  if (!fs.existsSync(sourceBat)) {
+    return null;
+  }
+
+  const content = [
+    '@echo off',
+    'chcp 65001 >nul',
+    `echo 正在启动 NapCat (QQ: ${qq})...`,
+    `call "%~dp0napcat.bat" -q ${qq}`,
+    'pause',
+  ].join('\r\n');
+  const launcherPath = path.join(platformRoot, `start_napcat_${qq}.bat`);
+  fs.writeFileSync(launcherPath, content, 'utf8');
+  return launcherPath;
+}
+
+module.exports = { configure, getConfigPath, writeAdapterConfig, writeLauncherScript };

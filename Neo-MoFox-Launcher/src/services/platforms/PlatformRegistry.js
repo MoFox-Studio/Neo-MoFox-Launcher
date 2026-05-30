@@ -60,7 +60,7 @@ class PlatformRegistry {
    * @returns {string} 默认平台 ID
    */
   getDefaultPlatformId() {
-    return 'napcat';
+    return null;
   }
 
   /**
@@ -96,7 +96,6 @@ class PlatformRegistry {
         systemRequirement: platform.systemRequirement || null,
         available: availability.available,
         unavailableReason: availability.reason || null,
-        recommended: platform.id === this.getDefaultPlatformId(),
       };
     });
   }

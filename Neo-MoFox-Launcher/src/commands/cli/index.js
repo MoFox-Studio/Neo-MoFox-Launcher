@@ -1077,19 +1077,18 @@ async function cmdInstall() {
     }
   }
 
-  // 默认值与 Linux 适配：自动剔除 napcat 步骤（不支持自动安装）
+  // 默认值：平台需要由配置或交互输入显式指定，不再隐式选择 NapCat。
   inputs.channel = inputs.channel || 'main';
   inputs.pythonCmd = inputs.pythonCmd || (sysEnv.platform === 'win32' ? 'python' : 'python3');
   if (inputs.wsPort != null) inputs.wsPort = String(inputs.wsPort);
 
-  if (!Array.isArray(inputs.installSteps) && !platformHelper.supportsNapcatAutoInstall) {
-    // CLI 默认环境（Linux/macOS）下移除 napcat 相关步骤
+  if (!inputs.platform && !Array.isArray(inputs.installSteps)) {
     const ALL = [
       'clone', 'venv', 'deps', 'gen-config', 'write-core', 'write-model',
-      'write-webui-key', 'write-adapter', 'webui', 'register',
+      'write-webui-key', 'webui', 'register',
     ];
     inputs.installSteps = ALL;
-    console.log('[安装] 当前平台不支持自动安装 NapCat，已跳过 napcat / napcat-config 步骤。');
+    console.log('[安装] 未指定安装平台，已跳过平台适配器安装与配置步骤。');
   }
 
   // 校验
