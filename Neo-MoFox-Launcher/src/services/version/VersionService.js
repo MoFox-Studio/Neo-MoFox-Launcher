@@ -12,6 +12,7 @@ const { storageService } = require('../install/StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
 const { downloadFile } = require('../utils/RangeDownloader');
+const { platformRegistry } = require('../platforms/PlatformRegistry');
 
 // ─── VersionService 类 ──────────────────────────────────────────────────
 
@@ -474,167 +475,116 @@ class VersionService {
     }
   }
 
-  // ─── NapCat 版本管理 ────────────────────────────────────────────────────
+  // ─── 平台版本管理 ────────────────────────────────────────────────────────
 
   /**
-   * 获取 NapCat 所有 Release 列表
+   * 构建平台更新器可复用的工具集。
+   * @returns {Object} 平台更新工具集
+   */
+  _buildPlatformUpdateHelpers() {
+    return {
+      mirrorService,
+      httpsGet: this._httpsGet.bind(this),
+      downloadFile: this._downloadFile.bind(this),
+      extractZip: this._extractZip.bind(this),
+    };
+  }
+
+  /**
+   * 获取指定平台的所有 Release 列表。
+   * @param {string} platformId 平台 ID
+   * @param {number} limit 返回数量
+   * @returns {Promise<Array<Object>>} Release 列表
+   */
+  async getPlatformReleases(platformId = platformRegistry.getDefaultPlatformId(), limit = 10) {
+    const platform = platformRegistry.getPlatform(platformId);
+    if (!platform.updater || typeof platform.updater.getReleases !== 'function') {
+      throw new Error(`平台 ${platformId} 未提供版本列表能力`);
+    }
+
+    return await platform.updater.getReleases(this._buildPlatformUpdateHelpers(), limit);
+  }
+
+  /**
+   * 获取 NapCat 所有 Release 列表。
+   * @param {number} limit 返回数量
+   * @returns {Promise<Array<Object>>} Release 列表
    */
   async getNapCatReleases(limit = 10) {
-    const apiUrls = await mirrorService.getNapcatReleasesUrls();
-    let lastError = null;
-
-    for (const apiUrl of apiUrls) {
-      try {
-        const separator = apiUrl.includes('?') ? '&' : '?';
-        const data = await this._httpsGet(`${apiUrl}${separator}per_page=${limit}`, {
-          'User-Agent': 'Neo-MoFox-Launcher',
-          'Accept': 'application/vnd.github.v3+json',
-        });
-        const releases = JSON.parse(data);
-        return releases.map(r => ({
-          version: r.tag_name,
-          name: r.name,
-          publishedAt: r.published_at,
-          prerelease: r.prerelease,
-          assets: r.assets.map(a => ({
-            name: a.name,
-            size: a.size,
-            downloadUrl: a.browser_download_url,
-          })),
-        }));
-      } catch (e) {
-        lastError = e;
-        console.error(`[VersionService] 获取 NapCat Releases 失败 (${apiUrl}):`, e.message);
-      }
-    }
-    throw new Error(`获取 NapCat 版本列表失败: ${lastError?.message}`);
+    return await this.getPlatformReleases('napcat', limit);
   }
 
   /**
-   * 获取实例当前安装的 NapCat 版本
+   * 获取实例当前安装的平台版本。
+   * @param {string} instanceId 实例 ID
+   * @returns {string|null} 平台版本
+   */
+  getCurrentPlatformVersion(instanceId) {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      throw new Error(`实例不存在: ${instanceId}`);
+    }
+
+    return instance.platformVersion || null;
+  }
+
+  /**
+   * 获取实例当前安装的 NapCat 版本。
+   * @param {string} instanceId 实例 ID
+   * @returns {string|null} NapCat 版本
    */
   getCurrentNapCatVersion(instanceId) {
-    const instance = storageService.getInstance(instanceId);
-    if (!instance) {
-      throw new Error(`实例不存在: ${instanceId}`);
-    }
-    
-    // 从实例记录获取版本
-    if (instance.napcatVersion) {
-      return instance.napcatVersion;
-    }
-
-    return null;
+    return this.getCurrentPlatformVersion(instanceId);
   }
 
   /**
-   * 更新 NapCat 到指定版本
+   * 更新实例平台到指定版本。
+   * @param {string} instanceId 实例 ID
+   * @param {string} targetVersion 目标版本
+   * @returns {Promise<Object>} 更新结果
    */
-  async updateNapCat(instanceId, targetVersion = 'latest') {
+  async updatePlatform(instanceId, targetVersion = 'latest') {
     const instance = storageService.getInstance(instanceId);
     if (!instance) {
       throw new Error(`实例不存在: ${instanceId}`);
     }
 
-    const napcatDir = instance.napcatDir;
-    if (!napcatDir) {
-      throw new Error('实例未配置 NapCat 目录');
+    if (!instance.platform) {
+      throw new Error('实例未配置平台 ID');
     }
 
-    this._emitProgress('update-napcat', 0, '获取 NapCat 版本信息...');
+    const platform = platformRegistry.getPlatform(instance.platform);
+    if (!platform.updater || typeof platform.updater.update !== 'function') {
+      throw new Error(`平台 ${instance.platform} 未提供更新能力`);
+    }
 
     try {
-      // 获取版本列表
-      const releases = await this.getNapCatReleases();
-      let targetRelease;
-
-      if (targetVersion === 'latest') {
-        targetRelease = releases.find(r => !r.prerelease) || releases[0];
-      } else {
-        targetRelease = releases.find(r => r.version === targetVersion);
-      }
-
-      if (!targetRelease) {
-        throw new Error(`找不到版本: ${targetVersion}`);
-      }
-
-      // 查找 Windows Node 包下载链接
-      const assetName = platformHelper.napcatAssetName;
-      const asset = targetRelease.assets.find(a => a.name === assetName);
-
-      if (!asset) {
-        throw new Error(`找不到适合 Windows 的 NapCat Node 包: ${assetName}`);
-      }
-
-      this._emitProgress('update-napcat', 10, `准备下载 ${targetRelease.version}...`);
-
-      // 下载到临时目录
-      const tempDir = path.join(require('os').tmpdir(), 'napcat-update');
-      fs.mkdirSync(tempDir, { recursive: true });
-      const zipPath = path.join(tempDir, asset.name);
-
-      this._emitProgress('update-napcat', 20, '下载中...');
-      await this._downloadFile(asset.downloadUrl, zipPath, (downloaded, total) => {
-        const percent = Math.floor(20 + (downloaded / total) * 40);
-        this._emitProgress('update-napcat', percent, `下载中: ${Math.floor(downloaded / 1024 / 1024)}MB / ${Math.floor(total / 1024 / 1024)}MB`);
+      const result = await platform.updater.update({
+        instance,
+        targetVersion,
+        helpers: this._buildPlatformUpdateHelpers(),
+        emitProgress: this._emitProgress.bind(this),
       });
 
-      // 备份旧的 NapCat 配置目录
-      this._emitProgress('update-napcat', 60, '备份配置...');
-      const configBackupDir = path.join(require('os').tmpdir(), `napcat-config-backup-${Date.now()}`);
-      const oldConfigDir = this._getNapCatConfigPath(napcatDir);
-      let hasConfigBackup = false;
-      if (fs.existsSync(oldConfigDir)) {
-        fs.cpSync(oldConfigDir, configBackupDir, { recursive: true });
-        hasConfigBackup = true;
-      }
-
-      // Node 包版本间整体覆盖，避免旧文件残留
-      this._emitProgress('update-napcat', 70, '安装新版本...');
-      if (fs.existsSync(napcatDir)) {
-        fs.rmSync(napcatDir, { recursive: true, force: true });
-      }
-      fs.mkdirSync(napcatDir, { recursive: true });
-      await this._extractZip(zipPath, napcatDir);
-
-      if (!this._getNapCatNodeRootPath(napcatDir)) {
-        throw new Error('NapCat Windows Node 包结构无效，缺少 node.exe、index.js、napcat.bat 或 napcat 目录');
-      }
-
-      // 恢复配置
-      if (hasConfigBackup) {
-        this._emitProgress('update-napcat', 90, '恢复配置...');
-        const newConfigDir = this._getNapCatConfigPath(napcatDir);
-        fs.mkdirSync(newConfigDir, { recursive: true });
-        fs.cpSync(configBackupDir, newConfigDir, { recursive: true });
-      }
-
-      // 清理临时文件
-      try {
-        if (fs.existsSync(zipPath)) {
-          fs.unlinkSync(zipPath);
-        }
-        if (fs.existsSync(tempDir)) {
-          fs.rmSync(tempDir, { recursive: true, force: true });
-        }
-        if (typeof configBackupDir !== 'undefined' && fs.existsSync(configBackupDir)) {
-          fs.rmSync(configBackupDir, { recursive: true, force: true });
-        }
-      } catch (error) {
-        console.warn(`[VersionService] 清理临时文件失败: ${error.message}`);
-      }
-
-      // 更新实例记录
-      storageService.updateInstance(instanceId, { 
-        napcatVersion: targetRelease.version 
+      storageService.updateInstance(instanceId, {
+        platformVersion: result.version || null,
       });
 
-      this._emitProgress('update-napcat', 100, `更新到 ${targetRelease.version} 完成`);
-      return { success: true, version: targetRelease.version };
-    } catch (e) {
-      this._emitProgress('update-napcat', 0, '', e.message);
-      throw new Error(`NapCat 更新失败: ${e.message}`);
+      return result;
+    } catch (error) {
+      this._emitProgress('update-platform', 0, '', error.message);
+      throw new Error(`${platform.displayName || platform.name} 更新失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 更新 NapCat 到指定版本。
+   * @param {string} instanceId 实例 ID
+   * @param {string} targetVersion 目标版本
+   * @returns {Promise<Object>} 更新结果
+   */
+  async updateNapCat(instanceId, targetVersion = 'latest') {
+    return await this.updatePlatform(instanceId, targetVersion);
   }
 
   /**
@@ -679,10 +629,10 @@ class VersionService {
       throw new Error(`实例不存在: ${instanceId}`);
     }
 
-    const [currentBranch, currentCommit, napcatVersion] = await Promise.all([
+    const [currentBranch, currentCommit, platformVersion] = await Promise.all([
       this.getCurrentBranch(instanceId).catch(() => null),
       this.getCurrentCommit(instanceId).catch(() => null),
-      Promise.resolve(this.getCurrentNapCatVersion(instanceId)),
+      Promise.resolve(this.getCurrentPlatformVersion(instanceId)),
     ]);
 
     return {
@@ -692,9 +642,14 @@ class VersionService {
         commit: currentCommit,
         version: instance.neomofoxVersion || null,
       },
+      platform: {
+        id: instance.platform || null,
+        version: platformVersion,
+        dir: instance.platformDir,
+      },
       napcat: {
-        version: napcatVersion,
-        dir: instance.napcatDir,
+        version: platformVersion,
+        dir: instance.platformDir,
       },
     };
   }

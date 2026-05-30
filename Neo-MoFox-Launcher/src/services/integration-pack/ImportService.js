@@ -12,7 +12,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const TOML = require('@iarna/toml');
-const { platformHelper } = require('../utils/PlatformHelper');
+const { platformRegistry } = require('../platforms/PlatformRegistry');
 const { storageService } = require('../install/StorageService');
 const { generateInstanceId } = require('../install/InstanceIdService');
 const { installStepExecutor } = require('../install/InstallStepExecutor');
@@ -180,6 +180,10 @@ class ImportService {
       const installSteps = this._determineInstallSteps(manifest, userInputs);
       this._emitOutput(`安装步骤: ${installSteps.join(', ')}`);
 
+      const platformId = manifest.content.platform?.id || userInputs.platform || platformRegistry.getDefaultPlatformId();
+      const platform = platformRegistry.getPlatform(platformId);
+      const platformDir = path.join(userInputs.installDir, instanceId, platform.directoryName);
+
       instanceData = {
         id: instanceId,
         name: userInputs.instanceName,
@@ -191,7 +195,10 @@ class ImportService {
         channel: userInputs.channel || 'main',
         enabled: false,
         neomofoxDir: neoMofoxDir,
-        napcatDir: path.join(userInputs.installDir, instanceId, 'napcat'),
+        platform: platformId,
+        platformDir,
+        platformRoot: null,
+        platformVersion: null,
         webuiDir: null,
         wsPort: parseInt(userInputs.wsPort, 10),
         installCompleted: false,
@@ -470,13 +477,15 @@ class ImportService {
       this._emitOutput('Neo-MoFox 主程序复制完成');
     }
 
-    // 2. 复制 NapCat
-    if (manifest.content.napcat.included) {
-      this._emitOutput('复制 NapCat...');
-      const srcPath = path.join(tempDir, 'napcat');
-      const destPath = path.join(instanceRoot, 'napcat');
+    // 2. 复制平台目录
+    if (manifest.content.platform.included) {
+      const platformId = manifest.content.platform.id;
+      const platform = platformRegistry.getPlatform(platformId);
+      this._emitOutput(`复制平台 ${platform.displayName || platform.name}...`);
+      const srcPath = path.join(tempDir, 'platforms', platformId);
+      const destPath = path.join(instanceRoot, platform.directoryName);
       await this._copyDirRecursive(srcPath, destPath);
-      this._emitOutput('NapCat 复制完成');
+      this._emitOutput('平台目录复制完成');
     }
 
     // 3. 复制插件
@@ -637,22 +646,16 @@ class ImportService {
     // 写入适配器配置
     steps.push('write-adapter');
 
-    // NapCat 处理（Linux 系统跳过）
-    const isLinux = platformHelper.isLinux;
-    if (isLinux) {
-      // Linux 系统不支持自动安装 NapCat，需要用户手动安装
-      this._emitOutput('检测到 Linux 系统，跳过 NapCat 自动安装（需手动安装）');
-    } else {
-      if (!manifest.content.napcat.included) {
-        // 未包含 NapCat，检查是否需要导入时安装
-        if (manifest.content.napcat.installOnImport && userInputs.installNapcat !== false) {
-          steps.push('napcat');
-        }
+    // 平台处理：一次只允许一个平台。
+    const platformContent = manifest.content.platform;
+    const shouldUsePlatform = userInputs.installPlatform !== false;
+    if (shouldUsePlatform && platformContent) {
+      if (!platformContent.included && platformContent.installOnImport) {
+        steps.push('platform-install');
       }
 
-      // NapCat 配置（如果包含 NapCat 或需要安装）
-      if ((manifest.content.napcat.included && userInputs.installNapcat !== false) || (manifest.content.napcat.installOnImport && userInputs.installNapcat !== false)) {
-        steps.push('napcat-config');
+      if (platformContent.included || platformContent.installOnImport) {
+        steps.push('platform-config');
       }
     }
 
@@ -672,7 +675,8 @@ class ImportService {
    */
   async _executeInstallSteps(installSteps, instanceId, instanceData, userInputs, manifest) {
     const neoMofoxDir = instanceData.neomofoxDir;
-    const napcatDir = instanceData.napcatDir;
+    const platformId = instanceData.platform;
+    const platformDir = instanceData.platformDir;
 
     // 创建执行上下文
     const context = {
@@ -685,7 +689,8 @@ class ImportService {
       ...userInputs,
       instanceId,
       neoMofoxDir,
-      napcatDir,
+      platform: platformId,
+      platformDir,
       qqNumber: userInputs.qqNumber,
       qqNickname: userInputs.qqNickname || '',
       ownerQQNumber: userInputs.ownerQQNumber,
@@ -696,8 +701,8 @@ class ImportService {
       instanceName: userInputs.instanceName,
     };
 
-    let napcatShellPath = null;
-    let napcatVersion = null;
+    let platformRoot = manifest.content.platform?.included ? platformDir : null;
+    let platformVersion = manifest.content.platform?.version || null;
 
     // 执行每个步骤
     this._installStepPhaseActive = true;
@@ -744,15 +749,15 @@ class ImportService {
             await installStepExecutor.executeStep('write-adapter', context, stepInputs);
             break;
 
-          case 'napcat':
-            const napResult = await installStepExecutor.executeStep('napcat', context, stepInputs);
-            napcatShellPath = napResult.shellPath || null;
-            napcatVersion = napResult.version || null;
+          case 'platform-install':
+            const platformResult = await installStepExecutor.executeStep('platform-install', context, stepInputs);
+            platformRoot = platformResult.platformRoot || platformResult.rootPath || platformResult.platformDir || platformDir;
+            platformVersion = platformResult.platformVersion || platformResult.version || null;
+            stepInputs.platformDir = platformResult.platformDir || platformDir;
             break;
 
-          case 'napcat-config':
-            const configTarget = napcatShellPath || napcatDir;
-            await installStepExecutor.executeStep('napcat-config', context, stepInputs, { shellDir: configTarget });
+          case 'platform-config':
+            await installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot: platformRoot || platformDir });
             break;
 
           case 'webui':
@@ -763,9 +768,9 @@ class ImportService {
             const result = await installStepExecutor.executeStep('register', context, stepInputs, {
               instanceId,
               neoMofoxDir,
-              napcatDir,
-              napcatShellPath,
-              napcatVersion,
+              platformDir: stepInputs.platformDir || platformDir,
+              platformRoot: platformRoot || platformDir,
+              platformVersion,
               installSteps,
             });
             break;

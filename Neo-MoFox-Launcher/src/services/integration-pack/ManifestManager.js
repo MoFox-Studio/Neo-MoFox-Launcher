@@ -9,7 +9,7 @@ const { app } = require('electron');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
-const MANIFEST_VERSION = '1.0.0';
+const MANIFEST_VERSION = 2;
 const MANIFEST_FILENAME = 'manifest.json';
 
 // ─── ManifestManager 类 ──────────────────────────────────────────────────
@@ -30,10 +30,11 @@ class ManifestManager {
    * @param {boolean} params.content.neoMofox.included - 是否包含主程序
    * @param {string} [params.content.neoMofox.version] - 主程序版本
    * @param {string} [params.content.neoMofox.commit] - Git commit hash
-   * @param {Object} [params.content.napcat] - NapCat 信息
-   * @param {boolean} params.content.napcat.included - 是否包含 NapCat
-   * @param {string} [params.content.napcat.version] - NapCat 版本
-   * @param {boolean} [params.content.napcat.installOnImport] - 导入时是否安装 NapCat（仅当未包含 NapCat 时有效）
+   * @param {Object} [params.content.platform] - 平台信息
+   * @param {boolean} params.content.platform.included - 是否包含平台
+   * @param {string} [params.content.platform.id] - 平台 ID
+   * @param {string} [params.content.platform.version] - 平台版本
+   * @param {boolean} [params.content.platform.installOnImport] - 导入时是否安装平台
    * @param {Object} [params.content.plugins] - 插件信息
    * @param {boolean} params.content.plugins.included - 是否包含插件
    * @param {string[]} [params.content.plugins.list] - 插件列表
@@ -62,7 +63,7 @@ class ManifestManager {
       launcherVersion,
       content: {
         neoMofox: content.neoMofox || { included: false },
-        napcat: content.napcat || { included: false,installOnImport: false },
+        platform: content.platform || { included: false, id: null, installOnImport: false },
         plugins: content.plugins || { included: false, list: [] },
         config: content.config || { included: false },
         data: content.data || { included: false },
@@ -132,7 +133,7 @@ class ManifestManager {
       errors.push('缺少 content 字段');
     } else {
       // 检查 content 子字段
-      const requiredContentFields = ['neoMofox', 'napcat', 'plugins', 'config', 'data'];
+      const requiredContentFields = ['neoMofox', 'platform', 'plugins', 'config', 'data'];
       requiredContentFields.forEach(field => {
         if (!manifest.content[field]) {
           errors.push(`content.${field} 缺失`);
@@ -140,6 +141,10 @@ class ManifestManager {
           errors.push(`content.${field}.included 必须为布尔值`);
         }
       });
+
+      if (manifest.content.platform && manifest.content.platform.included && !manifest.content.platform.id) {
+        errors.push('content.platform.id 必须为非空字符串');
+      }
 
       // 检查插件列表
       if (manifest.content.plugins && manifest.content.plugins.included) {

@@ -67,6 +67,7 @@ if (process.stderr && typeof process.stderr.setEncoding === 'function') {
 }
 
 const { platformHelper } = require('./services/utils/PlatformHelper');
+const { platformRegistry } = require('./services/platforms/PlatformRegistry');
 const { LauncherLogger, InstanceLogger, LogReader } = require('./services/utils/LoggerService');
 const { storageService } = require('./services/install/StorageService');
 const { generateInstanceId } = require('./services/install/InstanceIdService');
@@ -909,6 +910,10 @@ ipcMain.handle('install-env-check', async () => {
   return await installWizardService.runEnvCheck();
 });
 
+ipcMain.handle('install-get-platforms', () => {
+  return platformRegistry.listPlatforms(platformHelper.detectSystemEnv());
+});
+
 ipcMain.handle('install-validate-inputs', async (event, inputs) => {
   return await installWizardService.validateInputs(inputs);
 });
@@ -1334,9 +1339,12 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       return { success: false, error: 'Neo-MoFox 目录不存在' };
     }
     
-    // 验证 NapCat 路径（如果提供）
-    if (instanceConfig.napcatDir && !fs.existsSync(instanceConfig.napcatDir)) {
-      return { success: false, error: 'NapCat 目录不存在' };
+    const selectedPlatform = instanceConfig.platform || (instanceConfig.platformDir ? 'napcat' : null);
+    const selectedPlatformDir = instanceConfig.platformDir || instanceConfig.napcatDir || null;
+
+    // 验证平台路径（如果提供）
+    if (selectedPlatformDir && !fs.existsSync(selectedPlatformDir)) {
+      return { success: false, error: '平台目录不存在' };
     }
     
     // 获取 Git 信息
@@ -1407,7 +1415,9 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       channel: branch !== 'unknown' ? branch : (instanceConfig.channel || 'dev'),
       enabled: true,
       neomofoxDir: instanceConfig.neomofoxDir,
-      napcatDir: instanceConfig.napcatDir || null,
+      platform: selectedPlatform,
+      platformDir: selectedPlatformDir,
+      platformRoot: selectedPlatformDir,
       wsPort: instanceConfig.wsPort || 8080,
       installCompleted: true, // 手动添加的实例默认安装已完成
       installProgress: null,
@@ -1422,7 +1432,7 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       ],
       createdAt: new Date().toISOString(),
       lastStartedAt: null,
-      napcatVersion: instanceConfig.napcatVersion || null,
+      platformVersion: instanceConfig.platformVersion || instanceConfig.napcatVersion || null,
       neomofoxVersion: neomofoxVersion,
       extra: {
         displayName: instanceConfig.displayName || instanceConfig.qqNumber,
@@ -1890,7 +1900,7 @@ async function startMoFoxProcess(instanceId, instance) {
 }
 // ── NapCat 独立启动函数 ──────────────────────────────────────────────────────
 async function startNapcatProcess(instanceId, instance) {
-  const napcatPath = instance.napcatDir;
+  const napcatPath = instance.platformDir;
   
   if (!napcatPath) {
     throw new Error('未安装 NapCat');
@@ -2065,7 +2075,7 @@ async function startNapcatProcess(instanceId, instance) {
 
 // ── 实例启动核心逻辑（启动全部）──────────────────────────────────────────────
 async function startInstanceInternal(instanceId, instance) {
-  const hasNapcat = !!(instance.napcatDir);
+  const hasNapcat = !!(instance.platformDir);
   
   emitLauncherMessage(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
   if (hasNapcat) {
@@ -2183,7 +2193,7 @@ async function restartNapcatProcess(instanceId) {
     throw new Error('实例不存在');
   }
 
-  const hasNapcat = !!(instance.napcatDir);
+  const hasNapcat = !!(instance.platformDir);
   if (!hasNapcat) {
     throw new Error('未安装 NapCat');
   }
@@ -2356,7 +2366,7 @@ ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => {
       throw new Error('实例不存在');
     }
     
-    if (!instance.napcatDir) {
+    if (!instance.platformDir) {
       throw new Error('此实例未安装 NapCat');
     }
     
@@ -2438,7 +2448,7 @@ ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => {
       throw new Error('实例不存在');
     }
     
-    if (!instance.napcatDir) {
+    if (!instance.platformDir) {
       throw new Error('此实例未安装 NapCat');
     }
     
@@ -2663,8 +2673,8 @@ ipcMain.handle('instance-open-folder', async (event, instanceId, folderType) => 
         folderPath = path.join(mofoxDir, 'plugins');
         break;
       case 'napcat':
-        if (instance.napcatDir) {
-          folderPath = instance.napcatDir;
+        if (instance.platformDir) {
+          folderPath = instance.platformDir;
         } else {
           throw new Error('该实例未安装 NapCat');
         }
@@ -3057,8 +3067,9 @@ ipcMain.handle('instance-get-paths', (event, instanceId) => {
       modelConfig: path.join(mofoxDir, 'config', 'model.toml'),
     };
 
-    if (instance.napcatDir) {
-      paths.napcat = instance.napcatDir;
+    if (instance.platformDir) {
+      paths.napcat = instance.platformDir;
+      paths.platform = instance.platformDir;
     }
 
     // 检查路径存在性
@@ -3232,9 +3243,14 @@ ipcMain.handle('version-get-branches', async () => {
   return versionService.getRemoteBranches();
 });
 
+// 获取平台版本列表
+ipcMain.handle('version-get-platform-releases', async (event, platformId, limit) => {
+  return versionService.getPlatformReleases(platformId || platformRegistry.getDefaultPlatformId(), limit || 10);
+});
+
 // 获取 NapCat 版本列表
 ipcMain.handle('version-get-napcat-releases', async (event, limit) => {
-  return versionService.getNapCatReleases(limit || 10);
+  return versionService.getPlatformReleases('napcat', limit || 10);
 });
 
 // 检查 MoFox 更新
@@ -3252,9 +3268,14 @@ ipcMain.handle('version-update-mofox', async (event, instanceId) => {
   return versionService.updateMofox(instanceId);
 });
 
+// 更新平台
+ipcMain.handle('version-update-platform', async (event, instanceId, version) => {
+  return versionService.updatePlatform(instanceId, version);
+});
+
 // 更新 NapCat
 ipcMain.handle('version-update-napcat', async (event, instanceId, version) => {
-  return versionService.updateNapCat(instanceId, version);
+  return versionService.updatePlatform(instanceId, version);
 });
 
 // 获取 MoFox 提交历史

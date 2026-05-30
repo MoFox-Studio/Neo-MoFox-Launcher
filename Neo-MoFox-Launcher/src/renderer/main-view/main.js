@@ -776,8 +776,9 @@ function openManualAddInstanceDialog() {
       apiKey: '114514',
       wsPort: 8080,
       neomofoxDir,
-      napcatDir: napcatDirInput.value.trim() || null,
-      napcatVersion: napcatVersionInput.value.trim() || null,
+      platform: napcatDirInput.value.trim() ? 'napcat' : null,
+      platformDir: napcatDirInput.value.trim() || null,
+      platformVersion: napcatVersionInput.value.trim() || null,
       displayName: displayNameInput.value.trim() || null,
       description: descInput.value.trim() || null,
     };

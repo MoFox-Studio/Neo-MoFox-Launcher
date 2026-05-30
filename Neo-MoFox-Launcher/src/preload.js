@@ -108,6 +108,7 @@ const api = {
   // ─── 安装向导 ───────────────────────────────────────────────────────────
   installShouldShow: () => ipcRenderer.invoke('install-should-show'),
   installEnvCheck: () => ipcRenderer.invoke('install-env-check'),
+  installGetPlatforms: () => ipcRenderer.invoke('install-get-platforms'),
   installValidateInputs: (inputs) => ipcRenderer.invoke('install-validate-inputs', inputs),
   installCheckPort: (port) => ipcRenderer.invoke('install-check-port', port),
   installRun: (inputs) => ipcRenderer.invoke('install-run', inputs),
@@ -278,10 +279,12 @@ const api = {
   // ─── 版本管理 ───────────────────────────────────────────────────────────────
   versionGetInfo: (instanceId) => ipcRenderer.invoke('version-get-info', instanceId),
   versionGetBranches: () => ipcRenderer.invoke('version-get-branches'),
+  versionGetPlatformReleases: (platformId, limit) => ipcRenderer.invoke('version-get-platform-releases', platformId, limit),
   versionGetNapCatReleases: (limit) => ipcRenderer.invoke('version-get-napcat-releases', limit),
   versionCheckMofoxUpdate: (instanceId) => ipcRenderer.invoke('version-check-mofox-update', instanceId),
   versionSwitchBranch: (instanceId, branch) => ipcRenderer.invoke('version-switch-branch', instanceId, branch),
   versionUpdateMofox: (instanceId) => ipcRenderer.invoke('version-update-mofox', instanceId),
+  versionUpdatePlatform: (instanceId, version) => ipcRenderer.invoke('version-update-platform', instanceId, version),
   versionUpdateNapcat: (instanceId, version) => ipcRenderer.invoke('version-update-napcat', instanceId, version),
   versionGetMofoxCommitHistory: (instanceId, limit) => ipcRenderer.invoke('version-get-mofox-commit-history', instanceId, limit),
   versionCheckoutCommit: (instanceId, commitHash) => ipcRenderer.invoke('version-checkout-commit', instanceId, commitHash),

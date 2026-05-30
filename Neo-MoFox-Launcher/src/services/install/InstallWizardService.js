@@ -10,6 +10,7 @@ const net = require('net');
 const { storageService } = require('./StorageService');
 const { generateInstanceId } = require('./InstanceIdService');
 const { platformHelper } = require('../utils/PlatformHelper');
+const { platformRegistry } = require('../platforms/PlatformRegistry');
 const { installStepExecutor } = require('./InstallStepExecutor');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
@@ -23,9 +24,9 @@ const AVAILABLE_STEPS = [
   'write-core',    // 写入 core.toml
   'write-model',   // 写入 model.toml
   'write-webui-key', // 写入 WebUI API 密钥
-  'write-adapter', // 写入 napcat_adapter 配置
-  'napcat',        // 安装 NapCat
-  'napcat-config', // 写入 NapCat 配置
+  'write-adapter', // 写入平台适配器配置
+  'platform-install', // 安装选择的平台
+  'platform-config', // 写入平台配置
   'webui',         // 安装 WebUI
   'register',      // 注册实例
 ];
@@ -425,9 +426,9 @@ class InstallWizardService {
       errors.push('venv 依赖 clone 步骤');
     }
 
-    // napcat-config 依赖 napcat
-    if (stepSet.has('napcat-config') && !stepSet.has('napcat')) {
-      errors.push('napcat-config 依赖 napcat 步骤');
+    // platform-config 依赖 platform-install
+    if (stepSet.has('platform-config') && !stepSet.has('platform-install')) {
+      errors.push('platform-config 依赖 platform-install 步骤');
     }
 
     if (errors.length > 0) {
@@ -501,6 +502,18 @@ class InstallWizardService {
       return { valid: false, errors };
     }
 
+    if (!inputs.platform) {
+      errors.push({ field: 'platform', error: '必须选择一个安装平台' });
+      return { valid: false, errors };
+    }
+
+    try {
+      platformRegistry.assertInstallable(inputs.platform, this._sysEnv);
+    } catch (error) {
+      errors.push({ field: 'platform', error: error.message });
+      return { valid: false, errors };
+    }
+
     this._emitProgress('collect-inputs', 100, '输入校验通过');
     return { valid: true };
   }
@@ -540,10 +553,10 @@ class InstallWizardService {
     const instanceId = this._resolveInstallInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     
-    // 只在需要安装 NapCat 时定义相关路径
-    let napcatDir = null;
-    let napcatShellPath = null;
-    let napcatVersion = null; // NapCat 版本号
+    // 只在需要安装平台时定义相关路径
+    let platformDir = null;
+    let platformRoot = null;
+    let platformVersion = null; // 平台版本号
 
     const existing = storageService.getInstance(instanceId);
     const isResume = existing && !existing.installCompleted;
@@ -585,7 +598,7 @@ class InstallWizardService {
       channel: inputs.channel || 'main',
       enabled: false,
       neomofoxDir: neoMofoxDir,
-      napcatDir: napcatDir,
+      platform: inputs.platform,
       wsPort: parseInt(inputs.wsPort, 10),
       installCompleted: false,
       installProgress: { step: resumeStep, substep: 0 },
@@ -686,32 +699,30 @@ class InstallWizardService {
         await installStepExecutor.executeStep('write-adapter', context, stepInputs);
       }
 
-      // 3.7 安装 NapCat
-      if (shouldRun('napcat')) {
+      // 3.7 安装平台
+      if (shouldRun('platform-install')) {
         this._checkAborted();
-        if (!napcatDir) {
-          napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
-        }
-        storageService.updateInstance(instanceId, { installProgress: { step: 'napcat', substep: 0 } });
-        const napResult = await installStepExecutor.executeStep('napcat', context, stepInputs);
-        napcatShellPath = napResult.shellPath || null;
-        napcatVersion = napResult.version || null;
-        if (napResult.path) napcatDir = napResult.path;
+        storageService.updateInstance(instanceId, { installProgress: { step: 'platform-install', substep: 0 } });
+        const platformResult = await installStepExecutor.executeStep('platform-install', context, stepInputs);
+        platformDir = platformResult.platformDir || platformResult.path || null;
+        platformRoot = platformResult.platformRoot || platformResult.rootPath || platformDir;
+        platformVersion = platformResult.platformVersion || platformResult.version || null;
+        stepInputs.platformDir = platformDir;
       }
 
-      // 3.8 写入 NapCat 配置
-      if (shouldRun('napcat-config')) {
+      // 3.8 写入平台配置
+      if (shouldRun('platform-config')) {
         this._checkAborted();
-        storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
-        if (!napcatDir) {
-          napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
+        storageService.updateInstance(instanceId, { installProgress: { step: 'platform-config', substep: 0 } });
+        if (!platformDir) {
+          const platform = platformRegistry.getPlatform(inputs.platform);
+          platformDir = path.join(inputs.installDir, instanceId, platform.directoryName);
         }
-        // Resume 时从磁盘重新确认 Node 包根目录
-        if (!napcatShellPath) {
-          napcatShellPath = installStepExecutor._getNapCatNodeRootPath(napcatDir);
+        if (!platformRoot) {
+          platformRoot = platformDir;
         }
-        const configTarget = napcatShellPath || napcatDir;
-        await installStepExecutor.executeStep('napcat-config', context, stepInputs, { shellDir: configTarget });
+        stepInputs.platformDir = platformDir;
+        await installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot });
       }
 
       // 3.9 安装 WebUI
@@ -727,9 +738,10 @@ class InstallWizardService {
       const result = await installStepExecutor.executeStep('register', context, stepInputs, {
         instanceId,
         neoMofoxDir,
-        napcatDir,
+        platformDir,
+        platformRoot,
+        platformVersion,
         installSteps: configuredSteps,
-        napcatVersion,
       });
 
       this._emitProgress('complete', 100, '安装完成！');
@@ -775,8 +787,9 @@ class InstallWizardService {
       dirsToRemove.push({ path: instance.neomofoxDir, name: 'neo-mofox' });
     }
     
-    if (instance.napcatDir && fs.existsSync(instance.napcatDir)) {
-      dirsToRemove.push({ path: instance.napcatDir, name: 'napcat' });
+    const platformDir = instance.platformDir;
+    if (platformDir && fs.existsSync(platformDir)) {
+      dirsToRemove.push({ path: platformDir, name: instance.platform || 'platform' });
     }
 
     // 删除特定目录

@@ -290,7 +290,7 @@ async function loadInstanceData() {
     if (window.mofoxAPI?.getInstance) {
       const instanceData = await window.mofoxAPI.getInstance(state.instanceId);
       if (instanceData) {
-        state.hasNapcat = !!(instanceData.napcatDir);
+        state.hasNapcat = !!(instanceData.platformDir);
         if (!state.hasNapcat) hideNapcatUI();
       }
     }

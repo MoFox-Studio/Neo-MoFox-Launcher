@@ -23,7 +23,7 @@ const TOML = require('@iarna/toml');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
-const INSTANCES_VERSION = 2;
+const INSTANCES_VERSION = 3;
 const INSTANCES_FILE = 'instances.json';
 const APP_NAME = 'Neo-MoFox-Launcher';
 
@@ -234,13 +234,16 @@ class StorageService {
         try {
           // 检查根目录下的内容
           const items = fs.readdirSync(instanceRootDir);
-          const allowedItems = ['neo-mofox', 'napcat'];
+          const platformDir = instance.platformDir || null;
+          const platformDirName = platformDir ? path.basename(platformDir) : null;
+          const allowedItems = ['neo-mofox'];
+          if (platformDirName) allowedItems.push(platformDirName);
           const extraItems = items.filter(item => !allowedItems.includes(item));
           
           if (extraItems.length > 0) {
-            // 如果有其他内容，只删除 neo-mofox 和 napcat 文件夹
+            // 如果有其他内容，只删除 neo-mofox 和平台文件夹
             console.log(`[StorageService] 检测到实例根目录包含其他内容: ${extraItems.join(', ')}`);
-            console.log(`[StorageService] 仅删除 neo-mofox 和 napcat 文件夹，保留根目录`);
+            console.log(`[StorageService] 仅删除 neo-mofox 和平台文件夹，保留根目录`);
             
             // 删除 neo-mofox
             if (fs.existsSync(instance.neomofoxDir)) {
@@ -248,13 +251,13 @@ class StorageService {
               console.log(`[StorageService] neo-mofox 文件夹删除成功`);
             }
             
-            // 删除 napcat（如果存在）
-            if (instance.napcatDir && fs.existsSync(instance.napcatDir)) {
-              fs.rmSync(instance.napcatDir, { recursive: true, force: true });
-              console.log(`[StorageService] napcat 文件夹删除成功`);
+            // 删除平台目录（如果存在）
+            if (platformDir && fs.existsSync(platformDir)) {
+              fs.rmSync(platformDir, { recursive: true, force: true });
+              console.log(`[StorageService] 平台文件夹删除成功`);
             }
           } else {
-            // 如果只有 neo-mofox 和/或 napcat，删除整个根目录
+            // 如果只有 neo-mofox 和/或平台目录，删除整个根目录
             console.log(`[StorageService] 删除实例根目录: ${instanceRootDir}`);
             fs.rmSync(instanceRootDir, { recursive: true, force: true });
             console.log(`[StorageService] 实例根目录删除成功`);
@@ -391,33 +394,54 @@ class StorageService {
     console.log('[StorageService] 实例数据迁移，旧版本:', oldData.version);
     
     const instances = (oldData.instances || []).map(instance => {
+      let migrated = instance;
+
       // 从版本 1 迁移到版本 2：将 displayName 和 description 移到 extra 对象
       if (oldData.version === 1) {
-        const { displayName, description, ...rest } = instance;
-        return {
+        const { displayName, description, ...rest } = migrated;
+        migrated = {
           ...rest,
           extra: {
-            displayName: displayName || instance.qqNumber || 'Unknown',
-            description: description || '',
-            isLike: false, // 默认不收藏
-          },
-        };
-      }
-      
-      // 对于更早版本或未知版本，确保 extra 对象存在
-      if (!instance.extra) {
-        const { displayName, description, ...rest } = instance;
-        return {
-          ...rest,
-          extra: {
-            displayName: displayName || instance.qqNumber || 'Unknown',
+            displayName: displayName || migrated.qqNumber || 'Unknown',
             description: description || '',
             isLike: false,
           },
         };
       }
       
-      return instance;
+      // 对于更早版本或未知版本，确保 extra 对象存在
+      if (!migrated.extra) {
+        const { displayName, description, ...rest } = migrated;
+        migrated = {
+          ...rest,
+          extra: {
+            displayName: displayName || migrated.qqNumber || 'Unknown',
+            description: description || '',
+            isLike: false,
+          },
+        };
+      }
+
+      // 从版本 2 迁移到版本 3：一次仅安装一个平台，现有实例均迁移为 NapCat。
+      const platformDir = migrated.platformDir || migrated.napcatDir || (
+        migrated.neomofoxDir ? path.join(path.dirname(migrated.neomofoxDir), 'napcat') : null
+      );
+      const platformVersion = migrated.platformVersion || migrated.napcatVersion || null;
+      const migratedSteps = Array.isArray(migrated.installSteps)
+        ? migrated.installSteps.map((step) => {
+            if (step === 'napcat') return 'platform-install';
+            if (step === 'napcat-config') return 'platform-config';
+            return step;
+          })
+        : migrated.installSteps;
+
+      return {
+        ...migrated,
+        platform: migrated.platform || 'napcat',
+        platformDir,
+        platformVersion,
+        installSteps: migratedSteps,
+      };
     });
     
     console.log(`[StorageService] 迁移完成：${instances.length} 个实例`);

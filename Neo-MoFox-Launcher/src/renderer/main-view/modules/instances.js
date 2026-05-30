@@ -76,7 +76,9 @@ export async function loadInstances() {
         extra: instance.extra, // 保留 extra 对象用于编辑
         qqNumber: instance.qqNumber,
         wsPort: instance.wsPort,
-        napcatDir: instance.napcatDir,
+        napcatDir: instance.platformDir,
+        platform: instance.platform,
+        platformDir: instance.platformDir,
         installCompleted: instance.installCompleted,
         createdAt: instance.createdAt,
         lastStartedAt: instance.lastStartedAt,

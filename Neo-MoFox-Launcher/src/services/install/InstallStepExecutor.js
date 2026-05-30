@@ -13,6 +13,7 @@ const http = require('http');
 const { storageService } = require('./StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
+const { platformRegistry } = require('../platforms/PlatformRegistry');
 const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
@@ -574,233 +575,92 @@ class InstallStepExecutor {
    * @param {string} inputs.wsPort - WebSocket 端口
    */
   async executeWriteAdapter(context, inputs, options = {}) {
-    context.emitProgress('write-adapter', 0, '正在写入适配器配置...');
-
-    const adapterDir = path.join(inputs.neoMofoxDir, 'config', 'plugins', 'napcat_adapter');
-    const adapterTomlPath = path.join(adapterDir, 'config.toml');
-
-    try {
-      fs.mkdirSync(adapterDir, { recursive: true });
-
-      let data = {};
-      if (fs.existsSync(adapterTomlPath)) {
-        data = storageService.readToml(adapterTomlPath);
-      }
-
-      if (!data.plugin) data.plugin = {};
-      data.plugin.enabled = true;
-      if (!data.plugin.config_version) data.plugin.config_version = '2.0.0';
-
-      if (!data.bot) data.bot = {};
-      data.bot.qq_id = String(inputs.qqNumber);
-      data.bot.qq_nickname = String(inputs.qqNickname || '');
-
-      if (!data.napcat_server) data.napcat_server = {};
-      if (!data.napcat_server.mode) data.napcat_server.mode = 'reverse';
-      if (!data.napcat_server.host) data.napcat_server.host = 'localhost';
-      data.napcat_server.port = parseInt(inputs.wsPort, 10) || 8095;
-
-      storageService.writeToml(adapterTomlPath, data);
-
-      context.emitOutput(`[write-adapter] 配置路径: ${adapterTomlPath}`);
-      context.emitOutput(`[write-adapter] qq_id: ${inputs.qqNumber}`);
-      context.emitOutput(`[write-adapter] qq_nickname: ${inputs.qqNickname}`);
-      context.emitOutput(`[write-adapter] ws port: ${inputs.wsPort}`);
-
-      context.emitProgress('write-adapter', 100, '适配器配置写入完成');
-      return { success: true };
-    } catch (e) {
-      throw new Error(`写入适配器配置失败: ${e.message}`);
+    if (!inputs.platform) {
+      throw new Error('写入适配器配置失败: 缺少平台 ID');
     }
+
+    const platform = platformRegistry.getPlatform(inputs.platform);
+    if (!platform.config || typeof platform.config.writeAdapterConfig !== 'function') {
+      throw new Error(`平台 ${inputs.platform} 未提供适配器配置写入器`);
+    }
+
+    return await platform.config.writeAdapterConfig({
+      context,
+      inputs,
+      options,
+      storageService,
+    });
   }
 
   /**
-   * 步骤9：安装 NapCat
+   * 步骤9：安装选定平台。
    * @param {Object} context - 执行上下文
    * @param {Object} inputs - 用户输入
+   * @param {string} inputs.platform - 平台 ID
    * @param {string} inputs.installDir - 安装根目录
-   * @param {string} inputs.qqNumber - QQ 号
    */
-  async executeNapcat(context, inputs, options = {}) {
+  async executePlatformInstall(context, inputs, options = {}) {
     const instanceId = inputs.instanceId;
     if (!instanceId) {
-      throw new Error('安装 NapCat 失败: 缺少实例 ID');
+      throw new Error('安装平台失败: 缺少实例 ID');
     }
-    const napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
-    this._removeExistingInstallDirectory(napcatDir, 'napcat', context);
-    fs.mkdirSync(napcatDir, { recursive: true });
-
-    if (!platformHelper.supportsNapcatAutoInstall) {
-      context.emitProgress('napcat', 100, `${platformHelper.label} 暂不支持 NapCat 自动安装，请手动安装`);
-      return { success: true, path: napcatDir, shellPath: null };
+    if (!inputs.platform) {
+      throw new Error('安装平台失败: 缺少平台 ID');
     }
 
-    return await this._installNapCatWindows(context, napcatDir);
+    const platform = platformRegistry.assertInstallable(inputs.platform, this._sysEnv);
+    const platformDir = path.join(inputs.installDir, instanceId, platform.directoryName);
+
+    context.emitOutput(`[platform-install] 安装平台: ${platform.displayName || platform.name}`);
+    context.emitOutput(`[platform-install] 支持系统: ${platform.systemRequirement?.label || '未声明'}`);
+    context.emitOutput(`[platform-install] 当前系统: ${this._sysEnv.platformLabel} ${this._sysEnv.arch}`);
+
+    this._removeExistingInstallDirectory(platformDir, platform.id, context);
+    fs.mkdirSync(platformDir, { recursive: true });
+
+    const helpers = {
+      execCommand: this._execCommand.bind(this),
+      downloadFile: this._downloadFile.bind(this),
+      computeFileSha256: this._computeFileSha256.bind(this),
+      fetchLatestNapCatRelease: this._fetchLatestNapCatRelease.bind(this),
+    };
+
+    const result = await platform.installer.install({
+      context,
+      inputs,
+      options,
+      helpers,
+      platformDir,
+    });
+
+    return {
+      ...result,
+      platform: platform.id,
+      platformDir: result.path || platformDir,
+      platformRoot: result.rootPath || result.platformRoot || platformDir,
+      platformVersion: result.version || null,
+    };
   }
 
   /**
-   * Windows 下安装 NapCat（内部方法）
-   */
-  async _installNapCatWindows(context, napcatDir) {
-    context.emitProgress('napcat', 5, '正在获取 NapCat 最新版本信息...');
-    const release = await this._fetchLatestNapCatRelease(context);
-
-    const ASSET_NAME = platformHelper.napcatAssetName;
-    const asset = release.assets.find((a) => a.name === ASSET_NAME);
-    if (!asset) {
-      throw new Error(`在 ${release.tag_name} 中未找到 ${ASSET_NAME}`);
-    }
-
-    context.emitOutput(`[napcat] 版本: ${release.tag_name}`);
-    context.emitOutput(`[napcat] 资源: ${asset.name} (${(asset.size / 1024 / 1024).toFixed(1)} MB)`);
-
-    // 从 asset.digest 中提取期望的 SHA-256 校验值
-    let expectedSha256 = null;
-    if (asset.digest && asset.digest.startsWith('sha256:')) {
-      expectedSha256 = asset.digest.slice('sha256:'.length).toLowerCase();
-      context.emitOutput(`[napcat] 期望校验值: ${expectedSha256}`);
-    }
-
-    const zipPath = path.join(napcatDir, ASSET_NAME);
-    const maxDownloadRetries = 3;
-    let downloadSuccess = false;
-
-    for (let attempt = 1; attempt <= maxDownloadRetries; attempt++) {
-      context.emitProgress('napcat', 10, `正在下载 NapCat ${release.tag_name}...${attempt > 1 ? ` (第 ${attempt} 次尝试)` : ''}`);
-
-      await this._downloadFile(asset.browser_download_url, zipPath, (downloaded, total) => {
-        const pct = total > 0 ? Math.floor(10 + (downloaded / total) * 55) : 10;
-        const dlMB = (downloaded / 1024 / 1024).toFixed(1);
-        const totalMB = total > 0 ? (total / 1024 / 1024).toFixed(1) : '?';
-        context.emitProgress('napcat', pct, `下载中... ${dlMB} MB / ${totalMB} MB`);
-      });
-
-      context.emitOutput(`[napcat] 下载完成: ${zipPath}`);
-
-      // 校验 SHA-256
-      if (expectedSha256) {
-        context.emitProgress('napcat', 66, '正在校验文件完整性...');
-        const actualSha256 = await this._computeFileSha256(zipPath);
-        context.emitOutput(`[napcat] 实际校验值: ${actualSha256}`);
-
-        if (actualSha256 === expectedSha256) {
-          context.emitOutput('[napcat] 校验通过');
-          downloadSuccess = true;
-          break;
-        } else {
-          context.emitOutput(`[napcat] 校验失败 (第 ${attempt}/${maxDownloadRetries} 次)`);
-          context.emitOutput(`[napcat]   期望: ${expectedSha256}`);
-          context.emitOutput(`[napcat]   实际: ${actualSha256}`);
-          // 删除损坏的文件
-          try { fs.unlinkSync(zipPath); } catch (_) {}
-
-          if (attempt >= maxDownloadRetries) {
-            throw new Error(
-              `NapCat 下载校验失败，已重试 ${maxDownloadRetries} 次仍不一致。` +
-              `\n期望: ${expectedSha256}` +
-              `\n实际: ${actualSha256}` +
-              `\n请检查网络环境后重试。`
-            );
-          }
-        }
-      } else {
-        // 没有校验值信息，跳过校验
-        context.emitOutput('[napcat] 未找到校验值信息，跳过完整性校验');
-        downloadSuccess = true;
-        break;
-      }
-    }
-
-    if (!downloadSuccess) {
-      throw new Error('NapCat 下载失败');
-    }
-
-    context.emitProgress('napcat', 68, '正在解压...');
-    const unzipInfo = platformHelper.getUnzipCommand(zipPath, napcatDir);
-    await this._execCommand(
-      unzipInfo.cmd,
-      unzipInfo.args,
-      { onStderr: (d) => context.emitOutput(d) }
-    );
-    context.emitOutput('[napcat] 解压完成');
-
-    try { fs.unlinkSync(zipPath); } catch (_) {}
-
-    const napcatRoot = this._getNapCatNodeRootPath(napcatDir);
-    if (!napcatRoot) {
-      throw new Error('NapCat Windows Node 包结构无效，缺少 node.exe、index.js、napcat.bat 或 napcat 目录');
-    }
-
-    context.emitOutput(`[napcat] Node 包根目录: ${napcatRoot}`);
-    context.emitOutput(`[napcat] 启动脚本: ${path.join(napcatRoot, 'napcat.bat')}`);
-
-    context.emitProgress('napcat', 100, 'NapCat 安装完成');
-    return { success: true, path: napcatDir, shellPath: napcatRoot, version: release.tag_name };
-  }
-
-  /**
-   * 步骤10：写入 NapCat 配置
+   * 步骤10：写入平台自身配置。
    * @param {Object} context - 执行上下文
    * @param {Object} inputs - 用户输入
    * @param {Object} options - 可选参数
-   * @param {string} options.shellDir - NapCat Shell 目录
    */
-  async executeNapcatConfig(context, inputs, options = {}) {
-    context.emitProgress('napcat-config', 0, '正在写入 NapCat 配置...');
-
-    const napcatRoot = options.shellDir || inputs.napcatDir;
-    if (!napcatRoot) {
-      throw new Error('写入 NapCat 配置失败: 缺少 NapCat Node 包根目录');
+  async executePlatformConfig(context, inputs, options = {}) {
+    if (!inputs.platform) {
+      throw new Error('写入平台配置失败: 缺少平台 ID');
     }
+    const platform = platformRegistry.getPlatform(inputs.platform);
+    const platformRoot = options.platformRoot || options.shellDir || inputs.platformDir;
 
-    const configDir = this._getNapCatConfigPath(napcatRoot);
-    fs.mkdirSync(configDir, { recursive: true });
-
-    const onebot11Config = {
-      network: {
-        httpServers: [],
-        httpClients: [],
-        websocketServers: [],
-        websocketClients: [
-          {
-            name: 'neo-mofox-ws-client',
-            enable: true,
-            url: `ws://127.0.0.1:${inputs.wsPort}`,
-            messagePostFormat: 'array',
-            reportSelfMessage: false,
-            reconnectInterval: 3000,
-            token: '',
-          },
-        ],
-      },
-      musicSignUrl: '',
-      enableLocalFile2Url: false,
-      parseMultMsg: false,
-    };
-
-    const napcatConfig = {
-      fileLog: true,
-      consoleLog: true,
-      fileLogLevel: 'info',
-      consoleLogLevel: 'info',
-    };
-
-    const onebot11Path = path.join(configDir, `onebot11_${inputs.qqNumber}.json`);
-    const napcatCfgPath = path.join(configDir, `napcat_${inputs.qqNumber}.json`);
-
-    fs.writeFileSync(onebot11Path, JSON.stringify(onebot11Config, null, 2));
-    fs.writeFileSync(napcatCfgPath, JSON.stringify(napcatConfig, null, 2));
-
-    context.emitOutput(`[napcat-config] onebot11 配置: ${onebot11Path}`);
-    context.emitOutput(`[napcat-config] napcat 配置: ${napcatCfgPath}`);
-
-    const launcherPath = platformHelper.writeNapcatLauncherScript(napcatRoot, inputs.qqNumber);
-    if (launcherPath) {
-      context.emitOutput(`[napcat-config] 启动脚本: ${launcherPath}`);
-    }
-
-    context.emitProgress('napcat-config', 100, 'NapCat 配置写入完成');
-    return { success: true };
+    return await platform.config.configure({
+      context,
+      inputs,
+      options,
+      platformRoot,
+    });
   }
 
   /**
@@ -872,15 +732,21 @@ class InstallStepExecutor {
     if (!instanceId) {
       throw new Error('注册实例失败: 缺少实例 ID');
     }
-    const { neoMofoxDir, napcatDir, installSteps, napcatVersion } = options;
+    const {
+      neoMofoxDir,
+      platformDir,
+      platformRoot,
+      platformVersion,
+      installSteps,
+    } = options;
 
     const neomofoxVersion = await this._getGitCommitId(neoMofoxDir);
     context.emitOutput(`Neo-MoFox 版本: ${neomofoxVersion || '未知'}`);
-    if (napcatVersion) {
-      context.emitOutput(`NapCat 版本: ${napcatVersion}`);
+    if (platformVersion) {
+      context.emitOutput(`平台版本: ${platformVersion}`);
     }
 
-    const hasNapcat = installSteps ? (installSteps.includes('napcat') || installSteps.includes('napcat-config')) : false;
+    const hasPlatform = installSteps ? (installSteps.includes('platform-install') || installSteps.includes('platform-config')) : false;
 
     const updates = {
       qqNumber: inputs.qqNumber,
@@ -891,9 +757,11 @@ class InstallStepExecutor {
       channel: inputs.channel || 'main',
       enabled: true,
       neomofoxDir: neoMofoxDir,
-      napcatDir: hasNapcat ? napcatDir : null,
+      platform: inputs.platform,
+      platformDir: hasPlatform ? platformDir : null,
+      platformRoot: hasPlatform ? platformRoot : null,
+      platformVersion: platformVersion,
       wsPort: parseInt(inputs.wsPort, 10),
-      napcatVersion: napcatVersion,
       extra: {
         displayName: inputs.instanceName,
         description: '',
@@ -933,8 +801,8 @@ class InstallStepExecutor {
       'write-model': 'executeWriteModel',
       'write-webui-key': 'executeWriteWebuiKey',
       'write-adapter': 'executeWriteAdapter',
-      'napcat': 'executeNapcat',
-      'napcat-config': 'executeNapcatConfig',
+      'platform-install': 'executePlatformInstall',
+      'platform-config': 'executePlatformConfig',
       'webui': 'executeWebui',
       'register': 'executeRegister',
     };

@@ -16,10 +16,12 @@ const state = {
     wsPort: 8095,
     channel: 'main',
     installDir: '',
+    platform: '',
     installNapcat: true,
     installWebui: true,
     webuiApiKey: '',
   },
+  availablePlatforms: [],
   installing: false,
   activeInstanceId: null,
   pythonCmd: null,
@@ -40,7 +42,7 @@ function parseUrlParams() {
 
 /**
  * 根据安装选项构建安装步骤列表。
- * @param {{installNapcat: boolean, installWebui: boolean}} options 安装选项
+ * @param {{platform: string, installWebui: boolean}} options 安装选项
  * @returns {string[]} 安装步骤列表
  */
 function buildInstallSteps(options) {
@@ -56,8 +58,8 @@ function buildInstallSteps(options) {
     'write-adapter',
   ];
 
-  if (options.installNapcat) {
-    installSteps.push('napcat', 'napcat-config');
+  if (options.platform) {
+    installSteps.push('platform-install', 'platform-config');
   }
 
   if (installWebui) {
@@ -100,7 +102,8 @@ async function loadResumeInstance(instanceId) {
       wsPort: instance.wsPort || 8095,
       channel: instance.channel || 'main',
       installDir: instance.neomofoxDir ? instance.neomofoxDir.replace(/[\\\/]neo-mofox$/, '').replace(/[\\\/][^\\\/]+$/, '') : '',
-      installNapcat: resumeInstallSteps.includes('napcat'),
+      platform: instance.platform || '',
+      installNapcat: resumeInstallSteps.includes('platform-install'),
       installWebui: resumeInstallSteps.includes('webui'),
       webuiApiKey: instance.webuiApiKey || '',
       installSteps: resumeInstallSteps,
@@ -672,7 +675,8 @@ function collectInputs() {
     wsPort: parseInt(el.inputWsPort.value, 10) || 8095,
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
-    installNapcat: el.inputInstallNapcat.checked,
+    platform: state.inputs.platform || (state.availablePlatforms?.find(p => p.available)?.id || ''),
+    installNapcat: !!(state.inputs.platform || state.availablePlatforms?.find(p => p.available)),
     installWebui,
     webuiApiKey: el.inputWebuiApiKey.value.trim(),
   };
@@ -728,6 +732,7 @@ function validateInputs() {
   if (!state.inputs.qqNickname) errors.push('Bot QQ 昵称不能为空');
   if (!state.inputs.ownerQQNumber || !/^\d{5,12}$/.test(state.inputs.ownerQQNumber)) errors.push('主人 QQ 号格式错误');
   if (!state.inputs.apiKey) errors.push('API Key 不能为空');
+  if (!state.inputs.platform) errors.push('请选择一个可安装平台');
   if (!state.inputs.installDir) errors.push('安装目录不能为空');
   
   if (errors.length > 0) {
@@ -777,8 +782,9 @@ async function startInstall() {
     'write-core': {name: '写入 core.toml', progress: 70},
     'write-model': {name: '写入 model.toml', progress: 75},
     'write-webui-key': {name: '写入 WebUI 密钥', progress: 78},
-    'write-adapter': {name: '写入适配器配置', progress: 82},
-    'napcat': {name: '配置 NapCat', progress: 87},
+    'write-adapter': {name: '写入平台适配器配置', progress: 82},
+    'platform-install': {name: '安装平台', progress: 87},
+    'platform-config': {name: '配置平台', progress: 90},
     'webui': {name: '安装 WebUI', progress: 92},
     'register': {name: '注册实例', progress: 96},
   };
@@ -1150,32 +1156,44 @@ function bindEvents() {
   });
 }
 
-async function init() {
-  bindEvents();
-  
-  // 检查系统类型并根据情况禁用 NapCat
+async function loadInstallPlatforms() {
   try {
-    const platformInfo = await window.mofoxAPI.getPlatformInfo();
-    console.log('平台信息:', platformInfo);
-    if (platformInfo && platformInfo.platform === 'linux') {
-      const checkbox = document.getElementById('input-install-napcat');
-      if (checkbox) {
-        checkbox.checked = false;
-        checkbox.disabled = true;
-        const formGroup = checkbox.closest('.form-group');
-        if (formGroup) {
-          formGroup.style.opacity = '0.5';
-          formGroup.style.pointerEvents = 'none';
-          const textSpan = formGroup.querySelector('.checkbox-label');
-          if (textSpan) {
-            textSpan.textContent += ' (Linux 系统暂不支持通过本向导安装)';
-          }
-        }
+    const platforms = await window.mofoxAPI.installGetPlatforms();
+    state.availablePlatforms = Array.isArray(platforms) ? platforms : [];
+    const selected = state.availablePlatforms.find((platform) => platform.available) || null;
+    state.inputs.platform = selected ? selected.id : '';
+
+    const checkbox = document.getElementById('input-install-napcat');
+    if (checkbox) {
+      checkbox.checked = !!selected;
+      checkbox.disabled = true;
+      const formGroup = checkbox.closest('.form-group');
+      const label = formGroup?.querySelector('.checkbox-label');
+      const hint = formGroup?.querySelector('.form-hint');
+      if (label) {
+        label.textContent = selected ? `安装平台：${selected.displayName || selected.name}` : '没有可安装平台';
+      }
+      if (hint) {
+        const unavailable = state.availablePlatforms.find((platform) => !platform.available);
+        hint.textContent = selected
+          ? `${selected.description || ''}（${selected.systemRequirement?.label || '系统要求未声明'}）`
+          : (unavailable?.unavailableReason || '当前系统没有可安装平台');
+      }
+      if (formGroup && !selected) {
+        formGroup.style.opacity = '0.5';
+        formGroup.style.pointerEvents = 'none';
       }
     }
   } catch (error) {
-    console.error('获取系统信息失败:', error);
+    console.error('加载安装平台失败:', error);
+    state.availablePlatforms = [];
+    state.inputs.platform = '';
   }
+}
+
+async function init() {
+  bindEvents();
+  await loadInstallPlatforms();
   
   // 检查是否为续装模式
   const urlParams = parseUrlParams();

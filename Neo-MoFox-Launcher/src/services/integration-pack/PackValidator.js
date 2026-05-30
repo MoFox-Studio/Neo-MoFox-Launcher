@@ -285,11 +285,12 @@ class PackValidator {
         }
       }
 
-      // 检查 NapCat
-      if (manifest.content.napcat.included) {
-        const napcatEntry = zip.getEntry('napcat/');
-        if (!napcatEntry) {
-          errors.push('manifest 声明包含 NapCat，但未找到 napcat/ 目录');
+      // 检查平台目录
+      if (manifest.content.platform.included) {
+        const platformId = manifest.content.platform.id;
+        const platformEntry = zip.getEntry(`platforms/${platformId}/`);
+        if (!platformEntry) {
+          errors.push(`manifest 声明包含平台 ${platformId}，但未找到 platforms/${platformId}/ 目录`);
         }
       }
 

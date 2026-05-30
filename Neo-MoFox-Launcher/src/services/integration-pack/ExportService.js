@@ -28,9 +28,9 @@ const TEMP_EXPORT_DIR = 'export-temp';
  */
 class ExportService {
   /**
-   * 检查实例是否包含 NapCat
+   * 检查实例是否包含平台目录。
    * @param {string} instanceId - 实例 ID
-   * @returns {Promise<boolean>} 是否存在 NapCat
+   * @returns {Promise<boolean>} 是否存在平台目录
    */
   static async checkNapcatExists(instanceId) {
     const instances = storageService.getInstances();
@@ -40,11 +40,13 @@ class ExportService {
       return false;
     }
 
-    const instanceRoot = path.dirname(instance.neomofoxDir);
-    const napcatDir = path.join(instanceRoot, 'napcat');
+    const platformDir = instance.platformDir;
+    if (!platformDir) {
+      return false;
+    }
     
     try {
-      await fsPromises.access(napcatDir);
+      await fsPromises.access(platformDir);
       return true;
     } catch (err) {
       return false;
@@ -158,7 +160,7 @@ class ExportService {
    * @param {boolean} [options.includePluginConfigs=false] - 是否包含插件配置文件
    * @param {string[]} [options.selectedPluginConfigs=[]] - 选中的插件配置列表（配置文件名称数组）
    * @param {boolean} [options.includeData=false] - 是否包含数据文件
-   * @param {boolean} [options.installNapcatOnImport=false] - 导入时是否安装 NapCat（仅当未包含 NapCat 时有效，将存储在 content.napcat.installOnImport）
+   * @param {boolean} [options.installNapcatOnImport=false] - 导入时是否安装平台（仅当未包含平台时有效，将存储在 content.platform.installOnImport）
    * @param {string} destPath - 导出目标路径（完整文件路径，包含文件名）
    * @param {Function} [onProgress] - 进度回调 (percent, message)
    * @param {Function} [onOutput] - 输出回调 (message)
@@ -267,11 +269,11 @@ class ExportService {
         progress += 25;
       }
 
-      // 2. 复制 NapCat
+      // 2. 复制平台目录
       if (options.includeNapcat) {
-        this._emitProgress(onProgress, progress, '打包 NapCat...');
-        this._emitOutput(onOutput, '复制 NapCat...');
-        await this._copyNapcat(installPath, tempDir);
+        this._emitProgress(onProgress, progress, '打包平台...');
+        this._emitOutput(onOutput, '复制平台目录...');
+        await this._copyPlatform(instance, tempDir);
         progress += 15;
       }
 
@@ -304,10 +306,11 @@ class ExportService {
             included: options.includeNeoMofox,
             ...(options.includeNeoMofox && versions.neoMofox),
           },
-          napcat: {
+          platform: {
+            id: instance.platform || 'napcat',
             included: options.includeNapcat,
             installOnImport: options.installNapcatOnImport || false,
-            ...(options.includeNapcat && versions.napcat),
+            ...(options.includeNapcat && versions.platform),
           },
           plugins: {
             included: options.includePlugins && exportedPlugins.length > 0,
@@ -402,21 +405,17 @@ class ExportService {
     }
 
     if (options.includeNapcat) {
-      // 从实例配置读取 NapCat 版本
+      // 从实例配置读取平台版本
       try {
-        if (instance.napcatVersion) {
-          versions.napcat = {
-            version: instance.napcatVersion
-          };
-        } else {
-          versions.napcat = {
-            version: 'unknown'
-          };
-        }
+        versions.platform = {
+          id: instance.platform || 'napcat',
+          version: instance.platformVersion || 'unknown',
+        };
       } catch (err) {
-        console.warn('[ExportService] 无法读取 NapCat 版本:', err.message);
-        versions.napcat = {
-          version: 'unknown'
+        console.warn('[ExportService] 无法读取平台版本:', err.message);
+        versions.platform = {
+          id: instance.platform || 'napcat',
+          version: 'unknown',
         };
       }
     }
@@ -470,12 +469,19 @@ class ExportService {
   }
 
   /**
-   * 复制 NapCat（使用系统命令避免 asar 文件访问问题）
+   * 复制平台目录（使用系统命令避免 asar 文件访问问题）。
+   * @param {Object} instance 实例对象
+   * @param {string} tempDir 临时导出目录
    */
-  static async _copyNapcat(installPath, tempDir) {
-    const srcPath = path.join(installPath, 'napcat');
-    const destPath = path.join(tempDir, 'napcat');
+  static async _copyPlatform(instance, tempDir) {
+    const platformId = instance.platform || 'napcat';
+    const srcPath = instance.platformDir;
+    const destPath = path.join(tempDir, 'platforms', platformId);
     
+    if (!srcPath) {
+      return;
+    }
+
     try {
       await fsPromises.access(srcPath);
     } catch (err) {
