@@ -51,7 +51,12 @@ const PLATFORM_CONFIG = {
       args: ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`],
     }),
     napcatAsset: 'NapCat.Shell.Windows.Node.zip',
-    napcatStartCmd: (shellDir, qq) => {
+    napcatStartCmd(shellDir, qq) {
+      const launcher = path.join(shellDir, `start_napcat_${qq}.bat`);
+      if (fs.existsSync(launcher)) {
+        return { cmd: launcher, args: [], cwd: shellDir };
+      }
+
       const bat = path.join(shellDir, 'napcat.bat');
       if (fs.existsSync(bat)) {
         return { cmd: bat, args: ['-q', String(qq)], cwd: shellDir };
