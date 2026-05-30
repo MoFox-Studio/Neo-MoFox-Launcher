@@ -20,6 +20,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const TOML = require('@iarna/toml');
+const { removePathSafeSync } = require('../utils/NativeFileRemover');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -285,19 +286,28 @@ class StorageService {
             
             // 删除 neo-mofox
             if (fs.existsSync(instance.neomofoxDir)) {
-              fs.rmSync(instance.neomofoxDir, { recursive: true, force: true });
+              removePathSafeSync(instance.neomofoxDir, {
+                label: 'neo-mofox 文件夹',
+                onOutput: (message) => console.warn(`[StorageService] ${message}`),
+              });
               console.log(`[StorageService] neo-mofox 文件夹删除成功`);
             }
             
             // 删除平台目录（如果存在）
             if (platformDir && fs.existsSync(platformDir)) {
-              fs.rmSync(platformDir, { recursive: true, force: true });
+              removePathSafeSync(platformDir, {
+                label: '平台文件夹',
+                onOutput: (message) => console.warn(`[StorageService] ${message}`),
+              });
               console.log(`[StorageService] 平台文件夹删除成功`);
             }
           } else {
             // 如果只有 neo-mofox 和/或平台目录，删除整个根目录
             console.log(`[StorageService] 删除实例根目录: ${instanceRootDir}`);
-            fs.rmSync(instanceRootDir, { recursive: true, force: true });
+            removePathSafeSync(instanceRootDir, {
+              label: '实例根目录',
+              onOutput: (message) => console.warn(`[StorageService] ${message}`),
+            });
             console.log(`[StorageService] 实例根目录删除成功`);
           }
         } catch (e) {
@@ -312,7 +322,10 @@ class StorageService {
       const logDir = path.join(this.getDataDir(), 'logs', 'instances', instanceId);
       if (fs.existsSync(logDir)) {
         console.log(`[StorageService] 删除实例日志: ${logDir}`);
-        fs.rmSync(logDir, { recursive: true, force: true });
+        removePathSafeSync(logDir, {
+          label: '实例日志',
+          onOutput: (message) => console.warn(`[StorageService] ${message}`),
+        });
         console.log(`[StorageService] 实例日志删除成功`);
       }
     } catch (e) {

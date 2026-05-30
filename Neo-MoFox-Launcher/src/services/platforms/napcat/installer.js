@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { platformHelper } = require('../../utils/PlatformHelper');
 const { fetchLatestNapCatRelease } = require('./helpers');
+const { removePathSafe } = require('../../utils/NativeFileRemover');
 
 const MAX_DOWNLOAD_RETRY = 3;
 const WINDOWS_NODE_ASSET_NAME = 'NapCat.Shell.Windows.Node.zip';
@@ -65,7 +66,7 @@ async function install({ context, helpers, platformDir }) {
     } catch (error) {
       lastDownloadError = error;
       context.emitOutput(`[napcat] 下载失败 (第 ${attempt}/${MAX_DOWNLOAD_RETRY} 次): ${error.message}`);
-      try { fs.unlinkSync(zipPath); } catch (_) {}
+      await cleanupDownloadPath(zipPath, context);
       if (attempt >= MAX_DOWNLOAD_RETRY) {
         throw new Error(`NapCat 下载失败: ${lastDownloadError.message}`);
       }
@@ -88,7 +89,7 @@ async function install({ context, helpers, platformDir }) {
       context.emitOutput(`[napcat] 校验失败 (第 ${attempt}/${MAX_DOWNLOAD_RETRY} 次)`);
       context.emitOutput(`[napcat]   期望: ${expectedSha256}`);
       context.emitOutput(`[napcat]   实际: ${actualSha256}`);
-      try { fs.unlinkSync(zipPath); } catch (_) {}
+      await cleanupDownloadPath(zipPath, context);
 
       if (attempt >= MAX_DOWNLOAD_RETRY) {
         throw new Error(
@@ -116,7 +117,7 @@ async function install({ context, helpers, platformDir }) {
   });
   context.emitOutput('[napcat] 解压完成');
 
-  try { fs.unlinkSync(zipPath); } catch (_) {}
+  await cleanupDownloadPath(zipPath, context);
 
   const platformRoot = getRootPath(platformDir);
   if (!platformRoot) {
@@ -133,6 +134,23 @@ async function install({ context, helpers, platformDir }) {
     rootPath: platformRoot,
     version: release.tag_name,
   };
+}
+
+/**
+ * 清理下载包文件。
+ * @param {string} targetPath 需要清理的下载包路径
+ * @param {Object} context 安装上下文
+ * @returns {Promise<void>}
+ */
+async function cleanupDownloadPath(targetPath, context) {
+  try {
+    await removePathSafe(targetPath, {
+      label: 'NapCat 下载包',
+      onOutput: (message) => context.emitOutput(message),
+    });
+  } catch (error) {
+    context.emitOutput(`[napcat] 清理下载包失败: ${error.message}`);
+  }
 }
 
 /**

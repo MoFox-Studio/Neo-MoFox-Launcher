@@ -18,6 +18,7 @@ const { generateInstanceId } = require('../install/InstanceIdService');
 const { installStepExecutor } = require('../install/InstallStepExecutor');
 const { PackValidator } = require('./PackValidator');
 const { ManifestManager, MANIFEST_FILENAME } = require('./ManifestManager');
+const { removePathSafe } = require('../utils/NativeFileRemover');
 
 // ─── 工具函数 ───────────────────────────────────────────────────────────
 
@@ -333,8 +334,10 @@ class ImportService {
               if (fs.existsSync(instanceRootDir)) {
                 this._emitOutput(`正在删除未注册的失败实例目录: ${instanceRootDir}`);
                 
-                // 同步删除目录（使用 force 和 recursive 选项）
-                fs.rmSync(instanceRootDir, { recursive: true, force: true });
+                await removePathSafe(instanceRootDir, {
+                  label: `未注册实例目录 ${instanceId}`,
+                  onOutput: (message) => this._emitOutput(message),
+                });
                 this._emitOutput(`实例目录已删除: ${instanceId}`);
               } else {
                 this._emitOutput(`实例目录不存在，无需删除: ${instanceRootDir}`);
@@ -852,7 +855,10 @@ class ImportService {
 
     for (const dir of dirsToRemove) {
       try {
-        fs.rmSync(dir.path, { recursive: true, force: true });
+        await removePathSafe(dir.path, {
+          label: dir.name,
+          onOutput: (message) => this._emitOutput(message),
+        });
         this._emitOutput(`已删除: ${dir.name}`);
       } catch (error) {
         this._emitOutput(`删除 ${dir.name} 失败: ${error.message}`);

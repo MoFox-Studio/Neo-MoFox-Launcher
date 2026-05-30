@@ -12,6 +12,7 @@ const { generateInstanceId } = require('./InstanceIdService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { platformRegistry } = require('../platforms/PlatformRegistry');
 const { installStepExecutor } = require('./InstallStepExecutor');
+const { removePathSafe } = require('../utils/NativeFileRemover');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -849,7 +850,10 @@ class InstallWizardService {
     // 删除特定目录
     for (const dir of dirsToRemove) {
       try {
-        fs.rmSync(dir.path, { recursive: true, force: true });
+        await removePathSafe(dir.path, {
+          label: dir.name,
+          onOutput: (message) => this._emitOutput(message),
+        });
         console.log(`[Cleanup] 已删除: ${dir.name}`);
       } catch (err) {
         console.warn(`[Cleanup] 删除 ${dir.name} 失败:`, err.message);

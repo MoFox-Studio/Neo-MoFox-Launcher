@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { getRootPath, fetchSnowLumaReleases, selectAssetForCurrentSystem } = require('./helpers');
+const { removePathSafe } = require('../../utils/NativeFileRemover');
 
 /**
  * 获取 SnowLuma 远程版本列表。
@@ -108,7 +109,10 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
 
   emitProgress('update-platform', 70, '安装新版本...');
   if (fs.existsSync(platformDir)) {
-    fs.rmSync(platformDir, { recursive: true, force: true });
+    await removePathSafe(platformDir, {
+      label: 'SnowLuma 旧平台目录',
+      onOutput: (message) => console.warn(`[SnowLumaUpdater] ${message}`),
+    });
   }
   fs.mkdirSync(platformDir, { recursive: true });
   await extractArchive(archivePath, platformDir, helpers);
@@ -123,7 +127,7 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
     restorePersistentEntries(newRoot, backupDir, backupEntries);
   }
 
-  cleanupTempPaths([archivePath, tempDir, backupDir]);
+  await cleanupTempPaths([archivePath, tempDir, backupDir]);
   ensureExecutableLauncher(newRoot);
 
   emitProgress('update-platform', 100, `更新到 ${targetRelease.tag_name} 完成`);
@@ -200,15 +204,16 @@ function ensureExecutableLauncher(platformRoot) {
 /**
  * 清理临时路径。
  * @param {string[]} paths 路径列表
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function cleanupTempPaths(paths) {
+async function cleanupTempPaths(paths) {
   for (const itemPath of paths) {
     try {
       if (!fs.existsSync(itemPath)) continue;
-      const stat = fs.statSync(itemPath);
-      if (stat.isDirectory()) fs.rmSync(itemPath, { recursive: true, force: true });
-      else fs.unlinkSync(itemPath);
+      await removePathSafe(itemPath, {
+        label: itemPath,
+        onOutput: (message) => console.warn(`[SnowLumaUpdater] ${message}`),
+      });
     } catch (error) {
       console.warn(`[SnowLumaUpdater] 清理临时文件失败 (${itemPath}): ${error.message}`);
     }

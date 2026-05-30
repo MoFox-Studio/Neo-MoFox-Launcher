@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { platformHelper } = require('../../utils/PlatformHelper');
 const { fetchLatestSnowLumaRelease, getRootPath, selectAssetForCurrentSystem } = require('./helpers');
+const { removePathSafe } = require('../../utils/NativeFileRemover');
 
 const MAX_DOWNLOAD_RETRY = 3;
 
@@ -58,7 +59,7 @@ async function install({ context, helpers, platformDir }) {
     } catch (error) {
       lastDownloadError = error;
       context.emitOutput(`[snowluma] 下载失败 (第 ${attempt}/${MAX_DOWNLOAD_RETRY} 次): ${error.message}`);
-      try { fs.unlinkSync(archivePath); } catch (_) {}
+      await cleanupDownloadPath(archivePath, context);
       if (attempt >= MAX_DOWNLOAD_RETRY) {
         throw new Error(`SnowLuma 下载失败: ${lastDownloadError.message}`);
       }
@@ -81,7 +82,7 @@ async function install({ context, helpers, platformDir }) {
       context.emitOutput(`[snowluma] 校验失败 (第 ${attempt}/${MAX_DOWNLOAD_RETRY} 次)`);
       context.emitOutput(`[snowluma]   期望: ${expectedSha256}`);
       context.emitOutput(`[snowluma]   实际: ${actualSha256}`);
-      try { fs.unlinkSync(archivePath); } catch (_) {}
+      await cleanupDownloadPath(archivePath, context);
 
       if (attempt >= MAX_DOWNLOAD_RETRY) {
         throw new Error(
@@ -106,7 +107,7 @@ async function install({ context, helpers, platformDir }) {
   await extractArchive(archivePath, platformDir, helpers, context);
   context.emitOutput('[snowluma] 解压完成');
 
-  try { fs.unlinkSync(archivePath); } catch (_) {}
+  await cleanupDownloadPath(archivePath, context);
 
   const platformRoot = getRootPath(platformDir);
   if (!platformRoot) {
@@ -168,6 +169,23 @@ function ensureExecutableLauncher(platformRoot, context) {
     context.emitOutput(`[snowluma] 已设置启动脚本可执行: ${launcher}`);
   } catch (error) {
     context.emitOutput(`[snowluma] 设置启动脚本权限失败: ${error.message}`);
+  }
+}
+
+/**
+ * 清理下载包文件。
+ * @param {string} targetPath 需要清理的下载包路径
+ * @param {Object} context 安装上下文
+ * @returns {Promise<void>}
+ */
+async function cleanupDownloadPath(targetPath, context) {
+  try {
+    await removePathSafe(targetPath, {
+      label: 'SnowLuma 下载包',
+      onOutput: (message) => context.emitOutput(message),
+    });
+  } catch (error) {
+    context.emitOutput(`[snowluma] 清理下载包失败: ${error.message}`);
   }
 }
 

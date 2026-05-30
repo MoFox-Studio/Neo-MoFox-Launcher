@@ -10,6 +10,7 @@ const os = require('os');
 const path = require('path');
 const { WINDOWS_NODE_ASSET_NAME, getRootPath } = require('./installer');
 const { getConfigPath } = require('./config');
+const { removePathSafe } = require('../../utils/NativeFileRemover');
 
 /**
  * 获取 NapCat 远程版本列表。
@@ -123,7 +124,10 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
 
   emitProgress('update-platform', 70, '安装新版本...');
   if (fs.existsSync(platformDir)) {
-    fs.rmSync(platformDir, { recursive: true, force: true });
+    await removePathSafe(platformDir, {
+      label: 'NapCat 旧平台目录',
+      onOutput: (message) => console.warn(`[NapCatUpdater] ${message}`),
+    });
   }
   fs.mkdirSync(platformDir, { recursive: true });
   await helpers.extractZip(zipPath, platformDir);
@@ -140,15 +144,31 @@ async function update({ instance, targetVersion = 'latest', helpers, emitProgres
   }
 
   try {
-    if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-    if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
-    if (fs.existsSync(configBackupDir)) fs.rmSync(configBackupDir, { recursive: true, force: true });
+    await cleanupPath(zipPath);
+    await cleanupPath(tempDir);
+    await cleanupPath(configBackupDir);
   } catch (error) {
     console.warn(`[NapCatUpdater] 清理临时文件失败: ${error.message}`);
   }
 
   emitProgress('update-platform', 100, `更新到 ${targetRelease.version} 完成`);
   return { success: true, version: targetRelease.version };
+}
+
+/**
+ * 清理临时路径。
+ * @param {string} targetPath 需要清理的路径
+ * @returns {Promise<void>}
+ */
+async function cleanupPath(targetPath) {
+  if (!targetPath || !fs.existsSync(targetPath)) {
+    return;
+  }
+
+  await removePathSafe(targetPath, {
+    label: targetPath,
+    onOutput: (message) => console.warn(`[NapCatUpdater] ${message}`),
+  });
 }
 
 /**

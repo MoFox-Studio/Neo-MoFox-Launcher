@@ -11,6 +11,7 @@ const { storageService } = require('./StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
 const { platformRegistry } = require('../platforms/PlatformRegistry');
+const { removePathSafe } = require('../utils/NativeFileRemover');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ class InstallStepExecutor {
    * @param {string} label - 用于日志输出的组件名称
    * @param {Object} context - 执行上下文
    */
-  _removeExistingInstallDirectory(dirPath, label, context) {
+  async _removeExistingInstallDirectory(dirPath, label, context) {
     if (!fs.existsSync(dirPath)) {
       return;
     }
@@ -100,7 +101,10 @@ class InstallStepExecutor {
     }
 
     context.emitOutput(`[${label}] 检测到已存在的安装目录，正在删除: ${dirPath}`);
-    fs.rmSync(dirPath, { recursive: true, force: true });
+    await removePathSafe(dirPath, {
+      label: `${label} 安装目录`,
+      onOutput: (message) => context.emitOutput(message),
+    });
     context.emitOutput(`[${label}] 已删除旧目录`);
   }
 
@@ -161,7 +165,7 @@ class InstallStepExecutor {
       throw new Error('克隆仓库失败: 缺少实例 ID');
     }
     const targetDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
-    this._removeExistingInstallDirectory(targetDir, 'clone', context);
+    await this._removeExistingInstallDirectory(targetDir, 'clone', context);
 
     const urls = await mirrorService.getRepoUrls();
     const branch = inputs.channel === 'dev' ? 'dev' : 'main';
@@ -529,7 +533,7 @@ class InstallStepExecutor {
     context.emitOutput(`[platform-install] 支持系统: ${platform.systemRequirement?.label || '未声明'}`);
     context.emitOutput(`[platform-install] 当前系统: ${this._sysEnv.platformLabel} ${this._sysEnv.arch}`);
 
-    this._removeExistingInstallDirectory(platformDir, platform.id, context);
+    await this._removeExistingInstallDirectory(platformDir, platform.id, context);
     fs.mkdirSync(platformDir, { recursive: true });
 
     const result = await platformRegistry.installPlatform(platform.id, {
@@ -582,7 +586,7 @@ class InstallStepExecutor {
     const webuiDir = path.join(pluginsDir, 'webui_backend');
 
     fs.mkdirSync(pluginsDir, { recursive: true });
-    this._removeExistingInstallDirectory(webuiDir, 'webui', context);
+    await this._removeExistingInstallDirectory(webuiDir, 'webui', context);
 
     const WEBUI_BRANCH = 'webui-dist';
     const webuiRepoUrls = await mirrorService.getWebuiRepoUrls();
@@ -610,7 +614,10 @@ class InstallStepExecutor {
         
         if (fs.existsSync(webuiDir)) {
           try {
-            fs.rmSync(webuiDir, { recursive: true, force: true });
+            await removePathSafe(webuiDir, {
+              label: 'webui 克隆残留目录',
+              onOutput: (message) => context.emitOutput(message),
+            });
           } catch (_) {}
         }
         
