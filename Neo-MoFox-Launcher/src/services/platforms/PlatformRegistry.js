@@ -14,8 +14,9 @@ const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
 const { downloadFile } = require('../utils/RangeDownloader');
 const { napcatPlatform } = require('./napcat');
+const { snowlumaPlatform } = require('./snowluma');
 
-const PLATFORM_MODULES = [napcatPlatform];
+const PLATFORM_MODULES = [napcatPlatform, snowlumaPlatform];
 const REQUIRED_PLATFORM_FIELDS = [
   'id',
   'name',
@@ -52,11 +53,12 @@ class PlatformRegistry {
    */
   _execCommand(command, args, options = {}) {
     return new Promise((resolve, reject) => {
-      const proc = spawn(command, args, {
-        shell: platformHelper.config.shell,
-        env: platformHelper.buildSpawnEnv(),
+      const spawnOptions = {
         ...options,
-      });
+        shell: options.shell ?? platformHelper.config.shell,
+        env: platformHelper.buildSpawnEnv(options.env || {}),
+      };
+      const proc = spawn(command, args, spawnOptions);
 
       let stdout = '';
       let stderr = '';
@@ -176,7 +178,9 @@ class PlatformRegistry {
     return {
       mirrorService,
       httpsGet: this._httpsGet.bind(this),
+      execCommand: this._execCommand.bind(this),
       downloadFile: this._downloadFile.bind(this),
+      computeFileSha256: this._computeFileSha256.bind(this),
       extractZip: this._extractZip.bind(this),
       getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
     };

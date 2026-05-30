@@ -924,7 +924,7 @@ async function collectInstallInputsTUI() {
     { key: 'apiKey', title: 'LLM API Key', prompt: '大模型 API Key（必填）', mask: true,
       validator: (v) => v && v.trim() ? null : 'API Key 不能为空' },
     { key: 'webuiApiKey', title: 'WebUI API Key', prompt: 'WebUI 访问密钥（可留空）', defaultValue: '' },
-    { key: 'wsPort', title: 'WebSocket 端口', prompt: 'NapCat 反向 WS 端口（1024-65535）',
+    { key: 'wsPort', title: 'WebSocket 端口', prompt: '平台反向 WS 端口（1024-65535）',
       defaultValue: '8095',
       validator: (v) => {
         const n = parseInt(v, 10);

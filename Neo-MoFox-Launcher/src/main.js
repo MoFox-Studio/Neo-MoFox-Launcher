@@ -1995,6 +1995,7 @@ async function startPlatformProcess(instanceId, instance) {
   const ptySize = instanceData.ptySize.platform;
   const ptyEnv = {
     ...process.env,
+    ...(platformStartInfo.env || {}),
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     FORCE_COLOR: '1',

@@ -82,6 +82,8 @@ const ORIGIN_URLS = {
   api: {
     napcatReleases: 'https://api.github.com/repos/NapNeko/NapCatQQ/releases',
     napcatLatest: 'https://api.github.com/repos/NapNeko/NapCatQQ/releases/latest',
+    snowlumaReleases: 'https://api.github.com/repos/SnowLuma/SnowLuma/releases',
+    snowlumaLatest: 'https://api.github.com/repos/SnowLuma/SnowLuma/releases/latest',
     mofoxBranches: 'https://api.github.com/repos/MoFox-Studio/Neo-MoFox/branches',
     launcherReleases: 'https://api.github.com/repos/MoFox-Studio/Neo-MoFox-Launcher/releases?per_page=1',
   },
@@ -254,6 +256,31 @@ class MirrorService {
    */
   async getNapcatReleasesUrls() {
     return await this.getUrls(ORIGIN_URLS.api.napcatReleases);
+  }
+
+  /**
+   * 获取 SnowLuma API 的 URL 列表。
+   * @param {string} [originUrl] 指定原始 URL，默认使用 SnowLuma Releases API
+   * @returns {Promise<string[]>}
+   */
+  async getSnowLumaUrls(originUrl = ORIGIN_URLS.api.snowlumaReleases) {
+    return await this.getUrls(originUrl);
+  }
+
+  /**
+   * 获取 SnowLuma 最新 Release API 的 URL 列表。
+   * @returns {Promise<string[]>}
+   */
+  async getSnowLumaLatestUrls() {
+    return await this.getUrls(ORIGIN_URLS.api.snowlumaLatest);
+  }
+
+  /**
+   * 获取 SnowLuma Releases API 的 URL 列表。
+   * @returns {Promise<string[]>}
+   */
+  async getSnowLumaReleasesUrls() {
+    return await this.getUrls(ORIGIN_URLS.api.snowlumaReleases);
   }
 
   /**

@@ -637,6 +637,7 @@ class InstallWizardService {
       wsPort: inputs.wsPort,
       channel: inputs.channel || 'main',
       instanceName: inputs.instanceName,
+      platform: inputs.platform,
     };
 
     try {
