@@ -1,3 +1,9 @@
+const INSTALL_LOG_FLUSH_INTERVAL_MS = 100;
+const MAX_INSTALL_LOG_LINES = 800;
+
+let pendingInstallLogLines = [];
+let installLogFlushTimer = null;
+
 const state = {
   currentStep: 1,
   totalSteps: 11,
@@ -768,8 +774,21 @@ function updateProgress(percent, step) {
 }
 
 function appendLog(message) {
-  el.installLogContent.textContent += message + '\n';
-  el.installLogContent.scrollTop = el.installLogContent.scrollHeight;
+  pendingInstallLogLines.push(message);
+  if (installLogFlushTimer) return;
+
+  installLogFlushTimer = setTimeout(() => {
+    const lines = pendingInstallLogLines;
+    pendingInstallLogLines = [];
+    installLogFlushTimer = null;
+
+    const currentLines = el.installLogContent.textContent
+      ? el.installLogContent.textContent.split('\n').filter(Boolean)
+      : [];
+    const nextLines = currentLines.concat(lines).slice(-MAX_INSTALL_LOG_LINES);
+    el.installLogContent.textContent = `${nextLines.join('\n')}\n`;
+    el.installLogContent.scrollTop = el.installLogContent.scrollHeight;
+  }, INSTALL_LOG_FLUSH_INTERVAL_MS);
 }
 
 async function startInstall() {
@@ -795,7 +814,10 @@ async function startInstall() {
     if (instanceId) state.activeInstanceId = instanceId;
 
     const stepInfo = stepMap[step] || {name: step, progress: 0};
-    updateProgress(stepInfo.progress, message || stepInfo.name);
+    const displayPercent = step === 'platform-install' && typeof percent === 'number'
+      ? Math.min(stepMap['platform-config'].progress - 1, stepInfo.progress + Math.floor((percent / 100) * 2))
+      : stepInfo.progress;
+    updateProgress(displayPercent, message || stepInfo.name);
     if (message) appendLog(`[${step}] ${message}`);
   });
   

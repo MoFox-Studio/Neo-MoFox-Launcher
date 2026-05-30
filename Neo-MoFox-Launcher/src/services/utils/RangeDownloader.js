@@ -12,6 +12,8 @@ const DEFAULT_USER_AGENT = 'Neo-MoFox-Launcher';
 const DEFAULT_CONCURRENCY = 8;
 const DEFAULT_MIN_RANGE_SIZE = 32 * 1024 * 1024;
 const DEFAULT_MAX_REDIRECTS = 5;
+const DEFAULT_PROGRESS_INTERVAL_MS = 200;
+const MIN_PROGRESS_PERCENT_DELTA = 1;
 
 /**
  * 解析正整数配置值。
@@ -22,6 +24,41 @@ const DEFAULT_MAX_REDIRECTS = 5;
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(String(value), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * 创建带节流的下载进度回调，避免高频 data chunk 事件淹没 IPC 与渲染进程。
+ * @param {(downloaded: number, total: number) => void} [onProgress] - 原始进度回调。
+ * @param {number} intervalMs - 最小回调间隔毫秒数。
+ * @returns {(downloaded: number, total: number, force?: boolean) => void} 节流后的进度回调。
+ */
+function createProgressReporter(onProgress, intervalMs) {
+  if (typeof onProgress !== 'function') {
+    return () => {};
+  }
+
+  const safeInterval = Math.max(0, Number(intervalMs) || 0);
+  let lastEmitAt = 0;
+  let lastDownloaded = -1;
+  let lastPercent = -1;
+
+  return (downloaded, total, force = false) => {
+    const now = Date.now();
+    const completed = total > 0 && downloaded >= total;
+    const percent = total > 0 ? Math.floor((downloaded / total) * 100) : -1;
+    const percentChanged = percent < 0 || lastPercent < 0 || percent - lastPercent >= MIN_PROGRESS_PERCENT_DELTA;
+    if (!force && !completed && now - lastEmitAt < safeInterval && !percentChanged) {
+      return;
+    }
+    if (!force && downloaded === lastDownloaded) {
+      return;
+    }
+
+    lastEmitAt = now;
+    lastDownloaded = downloaded;
+    lastPercent = percent;
+    onProgress(downloaded, total);
+  };
 }
 
 /**
@@ -257,6 +294,7 @@ function cleanupParts(partsDir) {
  * @param {number} [options.minRangeSize] - 启用分片的最小文件大小。
  * @param {number} [options.maxRedirects] - 最大重定向次数。
  * @param {string} [options.userAgent] - User-Agent。
+ * @param {number} [options.progressIntervalMs] - 进度回调最小间隔毫秒数。
  * @returns {Promise<void>} 下载完成 Promise。
  */
 async function downloadFile(url, destPath, onProgress, options = {}) {
@@ -265,7 +303,12 @@ async function downloadFile(url, destPath, onProgress, options = {}) {
     minRangeSize: parsePositiveInteger(options.minRangeSize, DEFAULT_MIN_RANGE_SIZE),
     maxRedirects: parsePositiveInteger(options.maxRedirects, DEFAULT_MAX_REDIRECTS),
     userAgent: options.userAgent || DEFAULT_USER_AGENT,
+    progressIntervalMs: parsePositiveInteger(
+      options.progressIntervalMs || process.env.NEO_MOFOX_DOWNLOAD_PROGRESS_INTERVAL_MS,
+      DEFAULT_PROGRESS_INTERVAL_MS
+    ),
   };
+  const reportProgress = createProgressReporter(onProgress, normalizedOptions.progressIntervalMs);
 
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
 
@@ -273,12 +316,12 @@ async function downloadFile(url, destPath, onProgress, options = {}) {
   try {
     meta = await getDownloadMeta(url, normalizedOptions);
   } catch (_) {
-    await downloadSingle(url, destPath, onProgress, normalizedOptions);
+    await downloadSingle(url, destPath, reportProgress, normalizedOptions);
     return;
   }
 
   if (!meta.acceptRanges || meta.total < normalizedOptions.minRangeSize || normalizedOptions.concurrency <= 1) {
-    await downloadSingle(meta.url, destPath, onProgress, normalizedOptions);
+    await downloadSingle(meta.url, destPath, reportProgress, normalizedOptions);
     return;
   }
 
@@ -297,7 +340,7 @@ async function downloadFile(url, destPath, onProgress, options = {}) {
   const state = {
     total: meta.total,
     downloadedBytes: 0,
-    onProgress,
+    onProgress: reportProgress,
     maxRedirects: normalizedOptions.maxRedirects,
     userAgent: normalizedOptions.userAgent,
   };
@@ -306,7 +349,7 @@ async function downloadFile(url, destPath, onProgress, options = {}) {
     await Promise.all(parts.map((part) => downloadPart(meta.url, part, state)));
     try { fs.unlinkSync(destPath); } catch (_) {}
     await mergeParts(parts, destPath);
-    if (onProgress) onProgress(meta.total, meta.total);
+    reportProgress(meta.total, meta.total, true);
   } catch (error) {
     try { fs.unlinkSync(destPath); } catch (_) {}
     throw error;
