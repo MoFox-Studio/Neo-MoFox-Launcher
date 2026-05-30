@@ -440,7 +440,7 @@ function openManualAddInstanceDialog() {
       <div class="dialog-content manual-instance-content">
         <div class="form-warning">
           <span class="material-symbols-rounded">info</span>
-          <span>填写实例路径信息即可添加，其他配置项将使用默认值。</span>
+          <span>填写实例路径信息即可添加。平台适配器可按需选择，也可以保持“不导入平台”。</span>
         </div>
         
         <div class="form-group">
@@ -468,25 +468,44 @@ function openManualAddInstanceDialog() {
 
         <div class="form-group">
           <label class="form-label">
+            <span class="material-symbols-rounded">extension</span>
+            平台适配器
+          </label>
+          <div class="platform-select" id="instance-platform" data-value="">
+            <button class="platform-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span class="platform-select-value">不导入平台</span>
+              <span class="material-symbols-rounded platform-select-arrow">expand_more</span>
+            </button>
+            <div class="platform-select-menu" id="instance-platform-menu" role="listbox">
+              <button class="platform-select-option is-selected" type="button" role="option" data-value="" aria-selected="true">
+                <span class="platform-select-option-label">不导入平台</span>
+              </button>
+            </div>
+          </div>
+          <span class="form-hint" id="instance-platform-hint">可选：选择已有平台适配器类型；不选择也可以添加实例</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
             <span class="material-symbols-rounded">folder</span>
-            NapCat 目录
+            平台目录
           </label>
           <div class="path-input-group">
-            <input type="text" class="form-input" id="instance-napcat-dir" placeholder="例如: D:\\Bots\\MyBot\\napcat">
+            <input type="text" class="form-input" id="instance-napcat-dir" placeholder="例如: D:\\Bots\\MyBot\\napcat 或 D:\\Bots\\MyBot\\snowluma">
             <button class="md3-btn md3-btn-tonal" id="browse-napcat-dir">
               <span class="material-symbols-rounded">folder_open</span>
             </button>
           </div>
-          <span class="form-hint">NapCat 目录（可选）</span>
+          <span class="form-hint">平台适配器目录（不导入平台时留空）</span>
         </div>
 
         <div class="form-group">
           <label class="form-label">
             <span class="material-symbols-rounded">tag</span>
-            NapCat 版本
+            平台版本
           </label>
           <input type="text" class="form-input" id="instance-napcat-version" placeholder="例如: 1.0.0">
-          <span class="form-hint">NapCat 版本号（可选）</span>
+          <span class="form-hint">平台适配器版本号（可选）</span>
         </div>
 
         <div class="form-group">
@@ -655,6 +674,128 @@ function openManualAddInstanceDialog() {
         min-height: 60px;
         font-family: inherit;
       }
+      .platform-select {
+        position: relative;
+      }
+      .platform-select-trigger {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px 12px 16px;
+        border: 1px solid var(--md-sys-color-outline);
+        border-radius: 8px;
+        background: var(--md-sys-color-surface);
+        color: var(--md-sys-color-on-surface);
+        font-size: 0.875rem;
+        font-family: inherit;
+        line-height: 1.4;
+        cursor: pointer;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      }
+      .platform-select-trigger:hover {
+        border-color: var(--md-sys-color-primary);
+        background: var(--md-sys-color-surface-container-low, var(--md-sys-color-surface));
+      }
+      .platform-select.is-open .platform-select-trigger,
+      .platform-select-trigger:focus-visible {
+        border-color: var(--md-sys-color-primary);
+        box-shadow: 0 0 0 2px rgba(var(--md-sys-color-primary-rgb), 0.2);
+      }
+      .platform-select-value {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .platform-select-arrow {
+        color: var(--md-sys-color-on-surface-variant);
+        font-size: 20px;
+        transition: transform 0.2s ease, color 0.2s ease;
+      }
+      .platform-select.is-open .platform-select-arrow {
+        color: var(--md-sys-color-primary);
+        transform: rotate(180deg);
+      }
+      .platform-select-menu {
+        position: fixed;
+        top: var(--platform-select-menu-top, 16px);
+        left: var(--platform-select-menu-left, 16px);
+        width: var(--platform-select-menu-width, 240px);
+        z-index: 10003;
+        display: grid;
+        gap: 4px;
+        max-height: 220px;
+        padding: 8px;
+        overflow-y: auto;
+        background: var(--md-sys-color-surface-container-high, var(--md-sys-color-surface));
+        border: 1px solid var(--md-sys-color-outline-variant);
+        border-radius: 12px;
+        box-shadow:
+          rgba(0, 0, 0, 0.01) 0px 1px 3px,
+          rgba(0, 0, 0, 0.02) 0px 3px 7px,
+          rgba(0, 0, 0, 0.02) 0px 7px 15px,
+          rgba(0, 0, 0, 0.04) 0px 14px 28px,
+          rgba(0, 0, 0, 0.05) 0px 23px 52px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-6px) scale(0.98);
+        transform-origin: top center;
+        transition: opacity 0.16s ease, transform 0.16s ease;
+      }
+      .platform-select.is-open .platform-select-menu,
+      .platform-select-menu.is-open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0) scale(1);
+      }
+      .platform-select-option {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--md-sys-color-on-surface);
+        font-size: 0.875rem;
+        font-family: inherit;
+        line-height: 1.35;
+        text-align: left;
+        cursor: pointer;
+        transition: background 0.16s ease, color 0.16s ease;
+      }
+      .platform-select-option:hover,
+      .platform-select-option:focus-visible {
+        background: rgba(var(--md-sys-color-primary-rgb), 0.1);
+        color: var(--md-sys-color-primary);
+        outline: none;
+      }
+      .platform-select-option.is-selected {
+        background: var(--md-sys-color-primary-container, rgba(var(--md-sys-color-primary-rgb), 0.14));
+        color: var(--md-sys-color-primary);
+        font-weight: 600;
+      }
+      .platform-select-option.is-selected::after {
+        content: 'check';
+        flex-shrink: 0;
+        font-family: 'Material Symbols Rounded';
+        font-size: 18px;
+        font-weight: normal;
+        line-height: 1;
+      }
+      .platform-select-option-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .form-hint {
         font-size: 0.75rem;
         color: var(--md-sys-color-on-surface-variant);
@@ -682,6 +823,11 @@ function openManualAddInstanceDialog() {
 
   const displayNameInput = dialogOverlay.querySelector('#instance-display-name');
   const neomofoxDirInput = dialogOverlay.querySelector('#instance-neomofox-dir');
+  const platformSelect = dialogOverlay.querySelector('#instance-platform');
+  const platformTrigger = dialogOverlay.querySelector('.platform-select-trigger');
+  const platformValue = dialogOverlay.querySelector('.platform-select-value');
+  const platformMenu = dialogOverlay.querySelector('#instance-platform-menu');
+  const platformHint = dialogOverlay.querySelector('#instance-platform-hint');
   const napcatDirInput = dialogOverlay.querySelector('#instance-napcat-dir');
   const napcatVersionInput = dialogOverlay.querySelector('#instance-napcat-version');
   const descInput = dialogOverlay.querySelector('#instance-description');
@@ -689,37 +835,133 @@ function openManualAddInstanceDialog() {
   const browseNeomofoxDirBtn = dialogOverlay.querySelector('#browse-neomofox-dir');
   const browseNapcatDirBtn = dialogOverlay.querySelector('#browse-napcat-dir');
 
-  // Linux 下禁用 NapCat 相关字段
+  document.body.appendChild(platformMenu);
+
+  const platformMap = new Map();
+  const getPlatformLabel = (platform) => platform?.displayName || platform?.name || platform?.id || '未知平台';
+  const getSelectedPlatformValue = () => platformSelect.dataset.value || '';
+  const syncPlatformMenuPosition = () => {
+    const triggerRect = platformTrigger.getBoundingClientRect();
+    const viewportPadding = 16;
+    const menuMaxHeight = 220;
+    const menuHeight = Math.min(platformMenu.scrollHeight || menuMaxHeight, menuMaxHeight) + 18;
+    const preferredTop = triggerRect.bottom + 8;
+    const top = Math.max(
+      viewportPadding,
+      Math.min(preferredTop, window.innerHeight - menuHeight - viewportPadding)
+    );
+
+    platformMenu.style.setProperty('--platform-select-menu-top', `${top}px`);
+    platformMenu.style.setProperty('--platform-select-menu-left', `${triggerRect.left}px`);
+    platformMenu.style.setProperty('--platform-select-menu-width', `${triggerRect.width}px`);
+  };
+  const closePlatformMenu = () => {
+    platformSelect.classList.remove('is-open');
+    platformMenu.classList.remove('is-open');
+    platformTrigger.setAttribute('aria-expanded', 'false');
+  };
+  const openPlatformMenu = () => {
+    syncPlatformMenuPosition();
+    platformSelect.classList.add('is-open');
+    platformMenu.classList.add('is-open');
+    platformTrigger.setAttribute('aria-expanded', 'true');
+  };
+  const updatePlatformHint = () => {
+    const selectedValue = getSelectedPlatformValue();
+    const selectedPlatform = platformMap.get(selectedValue);
+    if (!selectedValue) {
+      platformHint.textContent = '可选：不导入平台时，实例只注册 Neo-MoFox 目录';
+      return;
+    }
+
+    const requirement = selectedPlatform?.systemRequirement?.label || '系统要求未声明';
+    const unavailable = selectedPlatform?.available === false && selectedPlatform?.unavailableReason
+      ? `；当前系统提示：${selectedPlatform.unavailableReason}`
+      : '';
+    platformHint.textContent = `${selectedPlatform?.description || getPlatformLabel(selectedPlatform)}（${requirement}${unavailable}）`;
+  };
+  const setSelectedPlatform = (value, label) => {
+    platformSelect.dataset.value = value;
+    platformValue.textContent = label;
+    platformMenu.querySelectorAll('.platform-select-option').forEach((option) => {
+      const isSelected = option.dataset.value === value;
+      option.classList.toggle('is-selected', isSelected);
+      option.setAttribute('aria-selected', String(isSelected));
+    });
+    updatePlatformHint();
+    closePlatformMenu();
+  };
+  const addPlatformOption = (value, label) => {
+    const option = document.createElement('button');
+    option.className = 'platform-select-option';
+    option.type = 'button';
+    option.role = 'option';
+    option.dataset.value = value;
+    option.setAttribute('aria-selected', 'false');
+    option.innerHTML = `<span class="platform-select-option-label"></span>`;
+    option.querySelector('.platform-select-option-label').textContent = label;
+    option.addEventListener('click', () => setSelectedPlatform(value, label));
+    platformMenu.appendChild(option);
+  };
+
+  platformMenu.querySelector('.platform-select-option')?.addEventListener('click', () => {
+    setSelectedPlatform('', '不导入平台');
+  });
+
+  platformTrigger.addEventListener('click', () => {
+    if (platformSelect.classList.contains('is-open')) {
+      closePlatformMenu();
+    } else {
+      openPlatformMenu();
+    }
+  });
+
+  const handlePlatformOutsideClick = (event) => {
+    if (!platformSelect.contains(event.target) && !platformMenu.contains(event.target)) {
+      closePlatformMenu();
+    }
+  };
+  const handlePlatformViewportChange = () => {
+    if (platformSelect.classList.contains('is-open')) {
+      syncPlatformMenuPosition();
+    }
+  };
+
+  document.addEventListener('click', handlePlatformOutsideClick);
+  window.addEventListener('resize', handlePlatformViewportChange);
+  dialogOverlay.querySelector('.manual-instance-content')?.addEventListener('scroll', handlePlatformViewportChange);
+
+  platformSelect.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closePlatformMenu();
+      platformTrigger.focus();
+    }
+  });
+
   (async () => {
     try {
-      const platformInfo = await window.mofoxAPI.getPlatformInfo();
-      if (platformInfo && platformInfo.platform === 'linux') {
-        napcatDirInput.disabled = true;
-        napcatDirInput.placeholder = 'Linux 系统不支持此选项';
-        browseNapcatDirBtn.disabled = true;
-        const napcatDirGroup = napcatDirInput.closest('.form-group');
-        if (napcatDirGroup) {
-          napcatDirGroup.style.opacity = '0.5';
-          const hint = napcatDirGroup.querySelector('.form-hint');
-          if (hint) hint.textContent = 'Linux 系统下无需配置 NapCat 目录';
+      const platforms = await window.mofoxAPI.installGetPlatforms?.() || [];
+      platforms.forEach((platform) => {
+        platformMap.set(platform.id, platform);
+        let optionLabel = getPlatformLabel(platform);
+        if (platform.available === false && platform.unavailableReason) {
+          optionLabel += `（${platform.unavailableReason}）`;
         }
-
-        napcatVersionInput.disabled = true;
-        napcatVersionInput.placeholder = 'Linux 系统不支持此选项';
-        const napcatVersionGroup = napcatVersionInput.closest('.form-group');
-        if (napcatVersionGroup) {
-          napcatVersionGroup.style.opacity = '0.5';
-          const hint = napcatVersionGroup.querySelector('.form-hint');
-          if (hint) hint.textContent = 'Linux 系统下无需配置 NapCat 版本';
-        }
-      }
+        addPlatformOption(platform.id, optionLabel);
+      });
+      updatePlatformHint();
     } catch (e) {
-      console.warn('[main] 获取平台信息失败', e);
+      console.warn('[main] 加载平台列表失败', e);
+      platformHint.textContent = '平台列表加载失败；仍可选择不导入平台并添加实例';
     }
   })();
 
   // 关闭对话框
   const closeDialog = () => {
+    document.removeEventListener('click', handlePlatformOutsideClick);
+    window.removeEventListener('resize', handlePlatformViewportChange);
+    dialogOverlay.querySelector('.manual-instance-content')?.removeEventListener('scroll', handlePlatformViewportChange);
+    platformMenu.remove();
     dialogOverlay.remove();
   };
 
@@ -739,11 +981,12 @@ function openManualAddInstanceDialog() {
     }
   });
 
-  // 浏览 NapCat 目录
+  // 浏览平台目录
   browseNapcatDirBtn.addEventListener('click', async () => {
+    const selectedPlatform = platformMap.get(getSelectedPlatformValue());
     const currentPath = napcatDirInput.value.trim();
     const selected = await window.mofoxAPI.selectDirectory({
-      title: '选择 NapCat 目录',
+      title: `选择${selectedPlatform ? getPlatformLabel(selectedPlatform) : '平台'}目录`,
       defaultPath: currentPath || undefined,
     });
     if (selected) napcatDirInput.value = selected;
@@ -752,10 +995,22 @@ function openManualAddInstanceDialog() {
   // 确认添加
   confirmBtn.addEventListener('click', async () => {
     const neomofoxDir = neomofoxDirInput.value.trim();
+    const selectedPlatform = getSelectedPlatformValue().trim() || null;
+    const platformDir = napcatDirInput.value.trim() || null;
 
     // 验证必填字段
     if (!neomofoxDir) {
       await window.customAlert('请填写 Neo-MoFox 目录路径', '信息不完整');
+      return;
+    }
+
+    if (selectedPlatform && !platformDir) {
+      await window.customAlert('已选择平台适配器，请填写对应的平台目录；或改选“不导入平台”。', '信息不完整');
+      return;
+    }
+
+    if (!selectedPlatform && platformDir) {
+      await window.customAlert('已填写平台目录，请先选择平台适配器；或清空平台目录后不导入平台。', '信息不完整');
       return;
     }
 
@@ -776,9 +1031,9 @@ function openManualAddInstanceDialog() {
       apiKey: '114514',
       wsPort: 8080,
       neomofoxDir,
-      platform: napcatDirInput.value.trim() ? 'napcat' : null,
-      platformDir: napcatDirInput.value.trim() || null,
-      platformVersion: napcatVersionInput.value.trim() || null,
+      platform: selectedPlatform,
+      platformDir,
+      platformVersion: selectedPlatform ? (napcatVersionInput.value.trim() || null) : null,
       displayName: displayNameInput.value.trim() || null,
       description: descInput.value.trim() || null,
     };
@@ -907,3 +1162,4 @@ function initCreditsPanel() {
 }
 
 initCreditsPanel();
+
