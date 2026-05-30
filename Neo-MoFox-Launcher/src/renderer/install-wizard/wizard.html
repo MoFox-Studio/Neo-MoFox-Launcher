@@ -379,11 +379,14 @@
           </div>
           <form class="config-form">
             <div class="form-group">
-              <label class="checkbox-group">
-                <input type="checkbox" id="input-install-napcat" checked>
-                <span class="checkbox-label">安装 NapCat（QQ 连接适配器）</span>
-              </label>
-              <span class="form-hint">QQ 平台消息收发所需组件</span>
+              <label for="input-install-platform">安装平台</label>
+              <div class="custom-select" id="custom-select-platform">
+                <div class="select-selected" id="selected-platform">加载中...</div>
+                <div class="select-items select-hide" id="options-platform">
+                </div>
+                <input type="hidden" id="input-install-platform" value="">
+              </div>
+              <span class="form-hint" id="platform-hint">平台消息收发所需组件</span>
             </div>
             <div class="form-group">
               <label class="checkbox-group">
@@ -490,8 +493,8 @@
               </div>
               <div class="summary-item">
                 <span class="summary-item-icon"><span class="material-symbols-rounded">extension</span></span>
-                <span class="summary-item-label">安装 NapCat</span>
-                <span class="summary-item-value" id="summary-install-napcat"></span>
+                <span class="summary-item-label">安装平台</span>
+                <span class="summary-item-value" id="summary-install-platform"></span>
               </div>
               <div class="summary-item">
                 <span class="summary-item-icon"><span class="material-symbols-rounded">dashboard</span></span>

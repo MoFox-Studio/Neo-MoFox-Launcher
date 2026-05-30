@@ -159,7 +159,7 @@ const el = {
   btnGenerateApiKey: document.getElementById('btn-generate-api-key'),
   strengthFill: document.getElementById('strength-fill'),
   strengthText: document.getElementById('strength-text'),
-  inputInstallNapcat: document.getElementById('input-install-napcat'),
+  inputInstallPlatform: document.getElementById('input-install-platform'),
   inputInstallWebui: document.getElementById('input-install-webui'),
   inputInstallDir: document.getElementById('input-install-dir'),
   btnBrowseDir: document.getElementById('btn-browse-dir'),
@@ -709,7 +709,8 @@ function updateSummary() {
     apiKey === '(未设置)' ? apiKey : '•'.repeat(Math.min(apiKey.length, 16));
   
   // 安装选项
-  document.getElementById('summary-install-napcat').textContent = state.inputs.installNapcat ? '是' : '否';
+  const platform = state.availablePlatforms?.find(p => p.id === state.inputs.platform);
+  document.getElementById('summary-install-platform').textContent = platform ? (platform.displayName || platform.name) : '无';
   document.getElementById('summary-install-webui').textContent = state.inputs.installWebui ? '是' : '否';
   
   // 安装目录 - 智能截断长路径
@@ -1110,37 +1111,52 @@ function bindEvents() {
     if (path) el.inputInstallDir.value = path;
   });
   
-  const customSelect = document.getElementById('custom-select-channel');
-  if (customSelect) {
+  const customSelects = document.querySelectorAll('.custom-select');
+  customSelects.forEach(customSelect => {
     const selected = customSelect.querySelector('.select-selected');
     const items = customSelect.querySelector('.select-items');
     const input = customSelect.querySelector('input');
     
     selected.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Close other open selects
+      document.querySelectorAll('.select-items').forEach(el => {
+        if (el !== items) el.classList.add('select-hide');
+      });
+      document.querySelectorAll('.select-selected').forEach(el => {
+        if (el !== selected) el.classList.remove('select-arrow-active');
+      });
+      
       items.classList.toggle('select-hide');
       selected.classList.toggle('select-arrow-active');
     });
     
-    items.querySelectorAll('div').forEach(item => {
-      item.addEventListener('click', () => {
-        const val = item.getAttribute('data-value');
-        input.value = val;
-        selected.textContent = item.textContent;
-        items.querySelectorAll('div').forEach(i => i.classList.remove('same-as-selected'));
-        item.classList.add('same-as-selected');
-        items.classList.add('select-hide');
-        selected.classList.remove('select-arrow-active');
-      });
+    // Use event delegation for dynamically added items
+    items.addEventListener('click', (e) => {
+      const item = e.target.closest('div');
+      if (!item) return;
+      
+      const val = item.getAttribute('data-value');
+      input.value = val;
+      selected.textContent = item.textContent;
+      items.querySelectorAll('div').forEach(i => i.classList.remove('same-as-selected'));
+      item.classList.add('same-as-selected');
+      items.classList.add('select-hide');
+      selected.classList.remove('select-arrow-active');
+      
+      // Trigger change event on input
+      input.dispatchEvent(new Event('change'));
     });
-    
-    document.addEventListener('click', (e) => {
-      if (!customSelect.contains(e.target)) {
-        items.classList.add('select-hide');
-        selected.classList.remove('select-arrow-active');
-      }
+  });
+  
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('.select-items').forEach(items => {
+      items.classList.add('select-hide');
     });
-  }
+    document.querySelectorAll('.select-selected').forEach(selected => {
+      selected.classList.remove('select-arrow-active');
+    });
+  });
   
   el.btnToggleLog?.addEventListener('click', () => {
     const log = el.installLogContent.closest('.install-log');
@@ -1163,31 +1179,80 @@ async function loadInstallPlatforms() {
     const selected = state.availablePlatforms.find((platform) => platform.available) || null;
     state.inputs.platform = selected ? selected.id : '';
 
-    const checkbox = document.getElementById('input-install-napcat');
-    if (checkbox) {
-      checkbox.checked = !!selected;
-      checkbox.disabled = true;
-      const formGroup = checkbox.closest('.form-group');
-      const label = formGroup?.querySelector('.checkbox-label');
-      const hint = formGroup?.querySelector('.form-hint');
-      if (label) {
-        label.textContent = selected ? `安装平台：${selected.displayName || selected.name}` : '没有可安装平台';
-      }
-      if (hint) {
-        const unavailable = state.availablePlatforms.find((platform) => !platform.available);
-        hint.textContent = selected
-          ? `${selected.description || ''}（${selected.systemRequirement?.label || '系统要求未声明'}）`
-          : (unavailable?.unavailableReason || '当前系统没有可安装平台');
-      }
-      if (formGroup && !selected) {
-        formGroup.style.opacity = '0.5';
-        formGroup.style.pointerEvents = 'none';
+    const optionsPlatform = document.getElementById('options-platform');
+    const selectedPlatform = document.getElementById('selected-platform');
+    const inputPlatform = document.getElementById('input-install-platform');
+    const platformHint = document.getElementById('platform-hint');
+    const formGroup = document.getElementById('custom-select-platform')?.closest('.form-group');
+
+    if (optionsPlatform && selectedPlatform && inputPlatform) {
+      optionsPlatform.innerHTML = '';
+      
+      if (state.availablePlatforms.length > 0) {
+        let hasSelected = false;
+        state.availablePlatforms.forEach(platform => {
+          const div = document.createElement('div');
+          div.setAttribute('data-value', platform.id);
+          div.textContent = platform.displayName || platform.name;
+          
+          if (!platform.available) {
+            div.classList.add('disabled');
+            div.style.color = '#999';
+            div.style.cursor = 'not-allowed';
+            div.title = platform.unavailableReason || '当前系统不支持';
+            // Prevent selection of disabled items
+            div.addEventListener('click', (e) => {
+              e.stopPropagation();
+            });
+          } else if (platform.id === state.inputs.platform) {
+            div.classList.add('same-as-selected');
+            selectedPlatform.textContent = platform.displayName || platform.name;
+            inputPlatform.value = platform.id;
+            hasSelected = true;
+            if (platformHint) {
+              platformHint.textContent = `${platform.description || ''}（${platform.systemRequirement?.label || '系统要求未声明'}）`;
+            }
+          }
+          
+          optionsPlatform.appendChild(div);
+        });
+        
+        if (!hasSelected) {
+          selectedPlatform.textContent = '没有可安装平台';
+          inputPlatform.value = '';
+          if (platformHint) {
+            platformHint.textContent = '当前系统没有可安装平台';
+          }
+        }
+        
+        // Handle change event to update hint
+        inputPlatform.addEventListener('change', () => {
+          const selectedId = inputPlatform.value;
+          const platform = state.availablePlatforms.find(p => p.id === selectedId);
+          if (platform && platformHint) {
+            platformHint.textContent = `${platform.description || ''}（${platform.systemRequirement?.label || '系统要求未声明'}）`;
+          }
+        });
+        
+      } else {
+        selectedPlatform.textContent = '没有可安装平台';
+        if (platformHint) {
+          platformHint.textContent = '当前系统没有可安装平台';
+        }
+        if (formGroup) {
+          formGroup.style.opacity = '0.5';
+          formGroup.style.pointerEvents = 'none';
+        }
       }
     }
   } catch (error) {
     console.error('加载安装平台失败:', error);
     state.availablePlatforms = [];
     state.inputs.platform = '';
+    const selectedPlatform = document.getElementById('selected-platform');
+    if (selectedPlatform) {
+      selectedPlatform.textContent = '加载失败';
+    }
   }
 }
 
