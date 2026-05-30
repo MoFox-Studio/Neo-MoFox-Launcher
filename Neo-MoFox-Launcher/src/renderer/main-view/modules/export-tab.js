@@ -10,7 +10,7 @@ import { state } from './instances.js';
 // ─── Constants ────────────────────────────────────────────────────────
 
 // 系统原生插件列表（必须导出以保证正常运行）
-const SYSTEM_PLUGINS = ['default_chatter', 'napcat_adapter', 'booku_memory', 'emoji_sender', 'perm_plugin'];
+const SYSTEM_PLUGINS = ['default_chatter', 'onebot_adapter', 'booku_memory', 'emoji_sender', 'perm_plugin'];
 
 // ─── State ────────────────────────────────────────────────────────────
 

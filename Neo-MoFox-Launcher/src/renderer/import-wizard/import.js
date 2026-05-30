@@ -384,7 +384,7 @@ async function goNext() {
     state.inputs.installWebui = el.checkInstallWebui?.checked ?? true;
     state.inputs.installNapcat = el.checkInstallNapcat?.checked ?? true;
     state.inputs.installPlatform = state.inputs.installNapcat;
-    state.inputs.platform = el.selectInstallPlatform?.value || state.packManifest?.content?.platform?.id || '';
+    state.inputs.platform = state.packManifest?.content?.platform?.id || state.packManifest?.content?.napcat?.id || '';
   }
   
   goToStep(state.currentStep + 1);
@@ -983,55 +983,76 @@ async function initComponentSelection() {
 
   if (!platformContent?.installOnImport) {
     el.cardNapcat.style.display = 'none';
+    state.inputs.installNapcat = false;
+    state.inputs.installPlatform = false;
+    state.inputs.platform = platformContent?.id || '';
     return;
   }
 
   el.cardNapcat.style.display = '';
-  if (state.isLinux) {
-    el.cardNapcat.style.opacity = '0.5';
-    el.checkInstallNapcat.disabled = true;
-    el.checkInstallNapcat.checked = false;
-    el.descNapcat.textContent = 'Linux 不支持自动安装平台';
-    if (el.selectInstallPlatform) el.selectInstallPlatform.style.display = 'none';
-    return;
-  }
-
   el.cardNapcat.style.opacity = '1';
   el.checkInstallNapcat.disabled = false;
   el.checkInstallNapcat.checked = true;
+  el.descNapcat.textContent = '将按整合包指定的平台自动安装，无需手动选择。';
 
-  el.descNapcat.textContent = '整合包提供导入时自动下载，可选择要安装的平台。';
-  await loadImportPlatforms(platformContent.id);
+  const selectedPlatform = await loadImportPlatform(platformContent.id);
+  state.inputs.platform = platformContent.id || '';
+
+  if (!selectedPlatform) {
+    el.cardNapcat.style.opacity = '0.5';
+    el.checkInstallNapcat.disabled = true;
+    el.checkInstallNapcat.checked = false;
+    el.descNapcat.textContent = state.isLinux
+      ? '当前整合包指定的平台不支持 Linux 自动安装，已禁用平台安装'
+      : '当前系统不支持自动安装该整合包指定的平台，已禁用平台安装';
+    state.inputs.installNapcat = false;
+    state.inputs.installPlatform = false;
+    return;
+  }
+
+  state.inputs.installNapcat = true;
+  state.inputs.installPlatform = true;
 }
 
 
 /**
- * 加载导入时可安装平台列表。
- * @param {string} preferredPlatformId 整合包建议的平台 ID
- * @returns {Promise<void>}
+ * 加载整合包指定的平台安装状态。
+ * @param {string} preferredPlatformId 整合包指定的平台 ID
+ * @returns {Promise<Object|null>} 当前系统可安装的整合包平台；不可安装时返回 null
  */
-async function loadImportPlatforms(preferredPlatformId) {
+async function loadImportPlatform(preferredPlatformId) {
   const select = el.selectInstallPlatform;
-  if (!select) return;
+  if (!select) return null;
 
   try {
     const platforms = await window.mofoxAPI.installGetPlatforms?.() || [];
-    const installable = platforms.filter(platform => platform.available);
-    select.style.display = 'block';
-    select.disabled = installable.length === 0;
-    select.innerHTML = installable.length > 0
-      ? installable.map(platform => `<option value="${platform.id}">${platform.displayName || platform.name}</option>`).join('')
-      : '<option value="">当前系统没有可安装平台</option>';
+    const preferred = platforms.find(platform => platform.id === preferredPlatformId) || null;
+    const optionLabel = preferred
+      ? (preferred.displayName || preferred.name || preferred.id)
+      : (preferredPlatformId || '未知平台');
 
-    const preferred = installable.find(platform => platform.id === preferredPlatformId);
-    select.value = preferred?.id || installable[0]?.id || '';
-    state.inputs.platform = select.value;
-    select.onchange = () => { state.inputs.platform = select.value; };
-  } catch (error) {
-    console.error('[ImportWizard] 加载平台列表失败:', error);
     select.style.display = 'block';
     select.disabled = true;
-    select.innerHTML = '<option value="">平台列表加载失败</option>';
+    select.innerHTML = `<option value="${preferredPlatformId || ''}">${optionLabel}</option>`;
+    select.value = preferredPlatformId || '';
+    state.inputs.platform = preferredPlatformId || '';
+    select.onchange = null;
+
+    if (preferred?.available) {
+      return preferred;
+    }
+
+    if (preferred?.unavailableReason) {
+      select.innerHTML = `<option value="${preferredPlatformId || ''}">${optionLabel}（${preferred.unavailableReason}）</option>`;
+    }
+    return null;
+  } catch (error) {
+    console.error('[ImportWizard] 加载平台状态失败:', error);
+    select.style.display = 'block';
+    select.disabled = true;
+    select.innerHTML = `<option value="${preferredPlatformId || ''}">${preferredPlatformId || '平台'}（状态加载失败）</option>`;
+    state.inputs.platform = preferredPlatformId || '';
+    return null;
   }
 }
 
@@ -1053,7 +1074,7 @@ function updateSummary() {
   if (content.neoMofox?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">widgets</span>Neo-MoFox</div>');
   
   const platformContent = content.platform || content.napcat;
-  if (platformContent?.installOnImport && !state.isLinux) {
+  if (platformContent?.installOnImport) {
     if (inputs.installNapcat) {
       contentTags.push(`<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 ${inputs.platform || '平台'}</div>`);
     } else {
@@ -1107,7 +1128,7 @@ function generateInstallSteps(content) {
   steps.push('write-model', 'write-adapter');
   
   const platformContent = content.platform || content.napcat;
-  if (!state.isLinux && platformContent?.installOnImport && state.inputs.installNapcat) {
+  if (platformContent?.installOnImport && state.inputs.installNapcat) {
     steps.push('platform-install', 'platform-config');
   }
 

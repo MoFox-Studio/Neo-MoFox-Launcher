@@ -641,10 +641,11 @@ class ImportService {
     // 写入适配器配置
     steps.push('write-adapter');
 
-    // 平台处理：平台只能在导入时下载。
+    // 平台处理：平台只能在导入时下载，并且必须支持当前系统。
     const platformContent = manifest.content.platform || manifest.content.napcat;
     const shouldUsePlatform = userInputs.installPlatform !== false;
     if (shouldUsePlatform && platformContent?.installOnImport) {
+      platformRegistry.assertInstallable(userInputs.platform || platformContent.id);
       steps.push('platform-install', 'platform-config');
     }
 
