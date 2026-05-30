@@ -148,9 +148,11 @@ class StorageService {
     
     const data = this._readJsonFile(instancesPath, defaultData);
     
-    // 版本迁移检查
+    // 版本迁移检查：迁移结果必须持久化，否则下次读取仍会拿到旧数据，表现为“迁移后完全没有变化”。
     if (data.version !== INSTANCES_VERSION) {
-      return this._migrateInstances(data);
+      const migratedData = this._migrateInstances(data);
+      this._writeJsonFile(instancesPath, migratedData);
+      return migratedData;
     }
     
     return data;
@@ -389,35 +391,27 @@ class StorageService {
 
   /**
    * 实例数据迁移
+   * @param {object} oldData - 旧版本 instances.json 数据
+   * @returns {{version: number, instances: object[]}} 迁移后的实例数据
    */
   _migrateInstances(oldData) {
-    console.log('[StorageService] 实例数据迁移，旧版本:', oldData.version);
+    const oldVersion = Number.isInteger(oldData?.version) ? oldData.version : 1;
+    console.log('[StorageService] 实例数据迁移，旧版本:', oldVersion);
     
-    const instances = (oldData.instances || []).map(instance => {
-      let migrated = instance;
+    const instances = (Array.isArray(oldData?.instances) ? oldData.instances : []).map(instance => {
+      let migrated = { ...instance };
 
-      // 从版本 1 迁移到版本 2：将 displayName 和 description 移到 extra 对象
-      if (oldData.version === 1) {
-        const { displayName, description, ...rest } = migrated;
+      // 从版本 1 迁移到版本 2：将 displayName 和 description 移到 extra 对象。
+      // 对于更早版本或未知版本，同样补齐 extra，避免旧数据缺字段。
+      if (oldVersion <= 1 || !migrated.extra) {
+        const { displayName, description, extra, ...rest } = migrated;
         migrated = {
           ...rest,
           extra: {
-            displayName: displayName || migrated.qqNumber || 'Unknown',
-            description: description || '',
-            isLike: false,
-          },
-        };
-      }
-      
-      // 对于更早版本或未知版本，确保 extra 对象存在
-      if (!migrated.extra) {
-        const { displayName, description, ...rest } = migrated;
-        migrated = {
-          ...rest,
-          extra: {
-            displayName: displayName || migrated.qqNumber || 'Unknown',
-            description: description || '',
-            isLike: false,
+            displayName: extra?.displayName || displayName || migrated.qqNumber || 'Unknown',
+            description: extra?.description || description || '',
+            isLike: extra?.isLike ?? false,
+            ...extra,
           },
         };
       }
@@ -435,9 +429,11 @@ class StorageService {
           })
         : migrated.installSteps;
 
+      const { napcatDir, napcatVersion, ...normalizedInstance } = migrated;
+
       return {
-        ...migrated,
-        platform: migrated.platform || 'napcat',
+        ...normalizedInstance,
+        platform: normalizedInstance.platform || 'napcat',
         platformDir,
         platformVersion,
         installSteps: migratedSteps,
