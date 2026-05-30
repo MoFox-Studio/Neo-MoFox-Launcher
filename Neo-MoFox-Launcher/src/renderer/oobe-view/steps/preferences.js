@@ -12,8 +12,8 @@ export async function renderPreferencesStep(container, stepManager) {
       maxArchiveDays: settings.logging?.maxArchiveDays || 7,
       compressArchive: settings.logging?.compressArchive !== false // 默认 true
     },
-    // WebUI 自动打开
-    autoOpenNapcatWebUI: settings.autoOpenNapcatWebUI !== false, // 默认 true
+    // 平台 WebUI 自动打开
+    autoOpenPlatformWebUI: settings.autoOpenPlatformWebUI !== false, // 默认 true
     // 自动检查实例更新
     autoCheckUpdates: settings.autoCheckUpdates !== false, // 默认 true
     // 自动检查启动器更新
@@ -80,10 +80,10 @@ export async function renderPreferencesStep(container, stepManager) {
           
           <div class="form-field">
             <label class="switch-row">
-              <input type="checkbox" class="settings-switch" id="auto-open-webui" ${config.autoOpenNapcatWebUI ? 'checked' : ''}>
-              <span class="switch-label">自动打开 NapCat WebUI</span>
+              <input type="checkbox" class="settings-switch" id="auto-open-webui" ${config.autoOpenPlatformWebUI ? 'checked' : ''}>
+              <span class="switch-label">自动打开平台 WebUI</span>
             </label>
-            <p class="card-desc" style="margin-top: 4px;">实例启动时自动在浏览器中打开管理界面</p>
+            <p class="card-desc" style="margin-top: 4px;">实例启动时自动在浏览器中打开当前平台管理界面</p>
           </div>
         </div>
 
@@ -427,7 +427,7 @@ export async function renderPreferencesStep(container, stepManager) {
   });
 
   toggleWebUI?.addEventListener('change', (e) => {
-    config.autoOpenNapcatWebUI = e.target.checked;
+    config.autoOpenPlatformWebUI = e.target.checked;
     updateConfig();
   });
 
@@ -458,7 +458,7 @@ export async function renderPreferencesStep(container, stepManager) {
   // 更新配置到 stepManager
   function updateConfig() {
     stepManager.config.logging = config.logging;
-    stepManager.config.autoOpenNapcatWebUI = config.autoOpenNapcatWebUI;
+    stepManager.config.autoOpenPlatformWebUI = config.autoOpenPlatformWebUI;
     stepManager.config.autoCheckUpdates = config.autoCheckUpdates;
     stepManager.config.autoCheckLauncherUpdates = config.autoCheckLauncherUpdates;
     stepManager.config.configEditor = config.configEditor;

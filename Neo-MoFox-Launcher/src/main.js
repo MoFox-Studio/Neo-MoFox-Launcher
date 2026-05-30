@@ -2043,11 +2043,13 @@ async function startPlatformProcess(instanceId, instance) {
       if (webuiScanBuffer.length > 8192) {
         webuiScanBuffer = webuiScanBuffer.slice(-4096);
       }
-      const webuiMatch = webuiScanBuffer.match(/WebUI User Panel Url:\s*(https?:\/\/\S+)/i);
+
+      const webuiMatch = webuiScanBuffer.match(/WebUI User Panel Url:\s*(https?:\/\/\S+)/i)
+        || webuiScanBuffer.match(/\blistening\s+(https?:\/\/\S+)/i);
       if (webuiMatch) {
-        const url = webuiMatch[1];
+        const url = webuiMatch[1].replace(/[\])}>,.;]+$/, '');
         const settings = settingsService.readSettings();
-        if (settings.autoOpenNapcatWebUI) {
+        if (settings.autoOpenPlatformWebUI) {
           instanceData.webuiOpened = true;
           emitLauncherMessage(instanceId, SOURCE_PLATFORM, `自动打开 ${platformName} WebUI: ${url}`, 'info');
           shell.openExternal(url).catch(err => {

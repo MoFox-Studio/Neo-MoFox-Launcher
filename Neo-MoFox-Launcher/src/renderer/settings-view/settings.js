@@ -46,7 +46,7 @@ const el = {
   defaultInstallDir:  $('default-install-dir'),
   btnBrowseInstallDir:$('btn-browse-install-dir'),
   btnResetAll:        $('btn-reset-all'),
-  autoOpenNapcatWebUI:$('auto-open-napcat-webui'),
+  autoOpenPlatformWebUI:$('auto-open-platform-webui'),
   autoCheckUpdates:   $('auto-check-updates'),
   autoCheckLauncherUpdates: $('auto-check-launcher-updates'),
   closeToTray:        $('close-to-tray'),
@@ -99,7 +99,7 @@ function populateUI(settings) {
 
   // 通用
   el.defaultInstallDir.value = settings.defaultInstallDir || '';
-  el.autoOpenNapcatWebUI.checked = settings.autoOpenNapcatWebUI ?? true;
+  el.autoOpenPlatformWebUI.checked = settings.autoOpenPlatformWebUI ?? true;
   el.autoCheckUpdates.checked = settings.autoCheckUpdates ?? true;
   el.autoCheckLauncherUpdates.checked = settings.autoCheckLauncherUpdates ?? true;
   el.closeToTray.checked = settings.closeToTray ?? false;
@@ -254,9 +254,9 @@ function bindEvents() {
     savePartial({ defaultInstallDir: el.defaultInstallDir.value });
   });
 
-  // 自动打开 Napcat WebUI
-  el.autoOpenNapcatWebUI.addEventListener('change', () => {
-    savePartial({ autoOpenNapcatWebUI: el.autoOpenNapcatWebUI.checked });
+  // 自动打开平台 WebUI
+  el.autoOpenPlatformWebUI.addEventListener('change', () => {
+    savePartial({ autoOpenPlatformWebUI: el.autoOpenPlatformWebUI.checked });
   });
 
   // 自动检查更新

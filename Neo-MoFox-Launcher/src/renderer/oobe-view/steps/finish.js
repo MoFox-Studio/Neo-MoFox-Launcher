@@ -25,8 +25,8 @@ export async function renderFinishStep(container, stepManager) {
     },
     {
       icon: 'web',
-      label: 'WebUI 自动打开',
-      value: config.autoOpenNapcatWebUI !== false ? '已启用' : '已禁用'
+      label: '平台 WebUI 自动打开',
+      value: config.autoOpenPlatformWebUI !== false ? '已启用' : '已禁用'
     },
     {
       icon: 'update',

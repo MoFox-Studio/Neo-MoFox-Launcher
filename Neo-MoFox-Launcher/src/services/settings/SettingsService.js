@@ -25,8 +25,8 @@ const DEFAULT_SETTINGS   = {
   theme: 'dark',             // 'dark' | 'light' | 'auto'
   accentColor: '#367BF0',
 
-  // Napcat
-  autoOpenNapcatWebUI: true,  // 实例启动后自动打开 Napcat WebUI
+  // 平台 WebUI
+  autoOpenPlatformWebUI: true, // 实例启动后自动打开当前平台 WebUI
   
   // 更新
   autoCheckUpdates: true,     // 启动时自动检查 MoFox 实例更新
