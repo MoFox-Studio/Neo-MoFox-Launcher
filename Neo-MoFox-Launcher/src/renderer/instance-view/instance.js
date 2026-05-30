@@ -176,6 +176,20 @@ function createTerminal(source, container) {
     }, 80);
   });
 
+  // Ctrl+Shift+C 在终端中用于复制日志，避免被 xterm 当作普通输入转发到 PTY。
+  term.attachCustomKeyEventHandler((event) => {
+    const isCopyShortcut = event.type === 'keydown'
+      && event.ctrlKey
+      && event.shiftKey
+      && event.code === 'KeyC';
+    if (isCopyShortcut) {
+      event.preventDefault();
+      handleCopyLogs();
+      return false;
+    }
+    return true;
+  });
+
   // 用户在终端内键入：转发到 PTY，让 Loguru/读 stdin 的程序能交互
   term.onData((data) => {
     window.mofoxAPI?.writeInstancePty?.(state.instanceId, source, data);
@@ -372,6 +386,12 @@ function setupEventListeners() {
   });
 
   el.btnCopyLogs.addEventListener('click', handleCopyLogs);
+  document.addEventListener('keydown', (event) => {
+    const isCopyShortcut = event.ctrlKey && event.shiftKey && event.code === 'KeyC';
+    if (!isCopyShortcut) return;
+    event.preventDefault();
+    handleCopyLogs();
+  });
   el.btnClearLogs.addEventListener('click', handleClearLogs);
   el.btnExportLogs.addEventListener('click', handleExportLogs);
   el.btnAutoScroll.addEventListener('click', () => {
