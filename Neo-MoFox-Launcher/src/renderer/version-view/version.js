@@ -11,7 +11,7 @@ let hasUpdateAvailable = false;
 let branchSelectValue = '';
 // 侧边栏状态
 let sidebarCollapsed = false;
-let activeTab = 'mofox'; //  'mofox' | 'napcat'
+let activeTab = 'mofox'; //  'mofox' | 'platform'
 let platformInstalled = false;
 
 // ─── DOM 元素 ───────────────────────────────────────────────────────────
@@ -20,12 +20,12 @@ const el = {
   sidebar: document.querySelector('.sidebar'),
   toggleSidebar: document.getElementById('toggleSidebar'),
   tabMofox: document.getElementById('tab-mofox'),
-  tabNapcat: document.getElementById('tab-napcat'),
+  tabPlatform: document.getElementById('tab-platform'),
   
   // Panels
   panelMofox: document.getElementById('panel-mofox'),
-  panelNapcat: document.getElementById('panel-napcat'),
-  panelNapcatEmpty: document.getElementById('panel-napcat-empty'),
+  panelPlatform: document.getElementById('panel-platform'),
+  panelPlatformEmpty: document.getElementById('panel-platform-empty'),
   
   // Header
   btnBack: document.getElementById('btnBack'),
@@ -43,10 +43,16 @@ const el = {
   btnUpdateMofox: document.getElementById('btnUpdateMofox'),
   mofoxCommitList: document.getElementById('mofoxCommitList'),
   
-  // NapCat
-  napcatVersion: document.getElementById('napcatVersion'),
-  napcatPath: document.getElementById('napcatPath'),
-  napcatVersionList: document.getElementById('napcatVersionList'),
+  // Platform
+  platformTabName: document.getElementById('platformTabName'),
+  platformInfoTitle: document.getElementById('platformInfoTitle'),
+  platformVersionListTitle: document.getElementById('platformVersionListTitle'),
+  platformEmptyTitle: document.getElementById('platformEmptyTitle'),
+  platformEmptyDescription: document.getElementById('platformEmptyDescription'),
+  platformEmptyHint: document.getElementById('platformEmptyHint'),
+  platformVersion: document.getElementById('platformVersion'),
+  platformPath: document.getElementById('platformPath'),
+  platformVersionList: document.getElementById('platformVersionList'),
   
   // Progress
   progressOverlay: document.getElementById('progressOverlay'),
@@ -206,7 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载 MoFox 提交历史
   await loadMofoxCommitHistory();
   
-  // 不在初始化时加载 NapCat 版本列表，等用户切换到 NapCat 标签时再加载
+  // 不在初始化时加载 平台版本列表，等用户切换到 平台标签时再加载
   
   // 监听进度事件
   window.mofoxAPI.onVersionProgress((data) => {
@@ -232,12 +238,12 @@ function setupEventListeners() {
     });
   }
   
-  if (el.tabNapcat) {
-    el.tabNapcat.addEventListener('click', () => switchTab('napcat'));
-    el.tabNapcat.addEventListener('keydown', (e) => {
+  if (el.tabPlatform) {
+    el.tabPlatform.addEventListener('click', () => switchTab('platform'));
+    el.tabPlatform.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        switchTab('napcat');
+        switchTab('platform');
       }
     });
   }
@@ -254,8 +260,8 @@ function setupEventListeners() {
     await loadVersionInfo();
     await loadBranches();
     await loadMofoxCommitHistory();
-    if (activeTab === 'napcat') {
-      await loadNapCatVersions();
+    if (activeTab === 'platform') {
+      await loadPlatformVersions();
     }
     if (icon) icon.classList.remove('spinning');
   });
@@ -298,7 +304,7 @@ async function switchTab(target) {
   activeTab = target;
   
   // 更新标签按钮状态
-  [el.tabMofox, el.tabNapcat].forEach(tab => {
+  [el.tabMofox, el.tabPlatform].forEach(tab => {
     if (!tab) return;
     const isActive = tab.dataset.target === target;
     tab.classList.toggle('active', isActive);
@@ -308,23 +314,23 @@ async function switchTab(target) {
   // 切换面板
   if (target === 'mofox') {
     showPanel(el.panelMofox);
-  } else if (target === 'napcat') {
-    // 检查 NapCat 是否安装
+  } else if (target === 'platform') {
+    // 检查平台是否安装
     if (platformInstalled) {
-      showPanel(el.panelNapcat);
-      // 首次切换到 NapCat 时加载数据
-      if (!el.napcatVersionList.querySelector('.version-item')) {
-        await loadNapCatVersions();
+      showPanel(el.panelPlatform);
+      // 首次切换到 平台 时加载数据
+      if (!el.platformVersionList.querySelector('.version-item')) {
+        await loadPlatformVersions();
       }
     } else {
-      showPanel(el.panelNapcatEmpty);
+      showPanel(el.panelPlatformEmpty);
     }
   }
 }
 
 // ─── 显示指定面板 ───────────────────────────────────────────────────────
 function showPanel(targetPanel) {
-  const allPanels = [el.panelMofox, el.panelNapcat, el.panelNapcatEmpty];
+  const allPanels = [el.panelMofox, el.panelPlatform, el.panelPlatformEmpty];
   
   allPanels.forEach(panel => {
     if (!panel) return;
@@ -356,6 +362,23 @@ function setupResponsiveListener() {
   mediaQuery.addEventListener('change', handleResponsive);
 }
 
+function setupPlatformDisplay() {
+  const platform = currentVersionInfo?.platform || {};
+  const displayName = platform.displayName || platform.name || platform.id || '平台';
+  const description = platform.description || `${displayName} 是当前实例配置的平台组件。`;
+
+  if (el.platformTabName) el.platformTabName.textContent = displayName;
+  if (el.platformInfoTitle) el.platformInfoTitle.textContent = `${displayName} 版本信息`;
+  if (el.platformVersionListTitle) el.platformVersionListTitle.textContent = `${displayName} 可用版本`;
+  if (el.platformEmptyTitle) el.platformEmptyTitle.textContent = `${displayName} 未安装`;
+  if (el.platformEmptyDescription) {
+    el.platformEmptyDescription.textContent = `当前实例尚未安装 ${displayName}。${description}`;
+  }
+  if (el.platformEmptyHint) {
+    el.platformEmptyHint.textContent = `您可以在实例配置中安装 ${displayName}，或手动下载安装后重新检测。`;
+  }
+}
+
 // ─── 加载版本信息 ───────────────────────────────────────────────────────
 async function loadVersionInfo() {
   try {
@@ -382,21 +405,22 @@ async function loadVersionInfo() {
       }
     }
     
-    // 更新 NapCat 显示和安装状态
+    // 更新平台显示和安装状态
+    setupPlatformDisplay();
     if (currentVersionInfo.platform) {
-      const { version, dir } = currentVersionInfo.platform;
+      const { id, version, dir } = currentVersionInfo.platform;
       
       // 更新安装状态
-      platformInstalled = !!(version && dir);
+      platformInstalled = !!(id && version && dir);
       
-      const versionEl = el.napcatVersion?.querySelector('span:last-child');
+      const versionEl = el.platformVersion?.querySelector('span:last-child');
       if (versionEl) {
         versionEl.textContent = version || '未安装';
       }
       
-      if (el.napcatPath) {
-        el.napcatPath.textContent = dir || '--';
-        el.napcatPath.title = dir || '';
+      if (el.platformPath) {
+        el.platformPath.textContent = dir || '--';
+        el.platformPath.title = dir || '';
       }
     } else {
       platformInstalled = false;
@@ -447,17 +471,27 @@ async function loadBranches() {
   }
 }
 
-// ─── 加载 NapCat 版本列表 ───────────────────────────────────────────────
-async function loadNapCatVersions() {
+// ─── 加载 平台版本列表 ───────────────────────────────────────────────
+async function loadPlatformVersions() {
   try {
-    const releases = await window.mofoxAPI.versionGetPlatformReleases(currentVersionInfo?.platform?.id || 'napcat');
+    const platformId = currentVersionInfo?.platform?.id;
+    if (!platformId) {
+      el.platformVersionList.innerHTML = `
+        <div class="version-list-loading">
+          <span>当前实例未配置平台</span>
+        </div>
+      `;
+      return;
+    }
+
+    const releases = await window.mofoxAPI.versionGetPlatformReleases(platformId);
     const currentVersion = currentVersionInfo?.platform?.version;
     
     // 更新版本列表
-    el.napcatVersionList.innerHTML = '';
+    el.platformVersionList.innerHTML = '';
     
     if (releases.length === 0) {
-      el.napcatVersionList.innerHTML = `
+      el.platformVersionList.innerHTML = `
         <div class="version-list-loading">
           <span>暂无可用版本</span>
         </div>
@@ -487,15 +521,15 @@ async function loadNapCatVersions() {
       // 绑定安装按钮事件
       if (!isCurrent) {
         const btn = item.querySelector('.version-item-btn');
-        btn.addEventListener('click', () => installNapCatVersion(release.version));
+        btn.addEventListener('click', () => installPlatformVersion(release.version));
       }
       
-      el.napcatVersionList.appendChild(item);
+      el.platformVersionList.appendChild(item);
     });
     
   } catch (error) {
-    console.error('加载 NapCat 版本列表失败:', error);
-    el.napcatVersionList.innerHTML = `
+    console.error('加载 平台版本列表失败:', error);
+    el.platformVersionList.innerHTML = `
       <div class="version-list-loading">
         <span style="color: var(--error);">加载失败: ${error.message}</span>
       </div>
@@ -679,16 +713,17 @@ async function handleUpdateMofox() {
   }
 }
 
-// ─── 安装指定 NapCat 版本 ───────────────────────────────────────────────
-async function installNapCatVersion(version) {
-  showProgress(`安装 NapCat ${version}...`, 0);
+// ─── 安装指定平台版本 ───────────────────────────────────────────────
+async function installPlatformVersion(version) {
+  const platformName = currentVersionInfo?.platform?.displayName || currentVersionInfo?.platform?.name || '平台';
+  showProgress(`安装 ${platformName} ${version}...`, 0);
   
   try {
     await window.mofoxAPI.versionUpdatePlatform(instanceId, version);
     hideProgress();
-    window.showToast?.(`NapCat 已更新到 ${version}`, 'success');
+    window.showToast?.(`${platformName} 已更新到 ${version}`, 'success');
     await loadVersionInfo();
-    await loadNapCatVersions();
+    await loadPlatformVersions();
   } catch (error) {
     hideProgress();
     await window.customAlert(`安装失败: ${error.message}`, '错误');

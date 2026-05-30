@@ -2875,8 +2875,7 @@ ipcMain.handle('scan-instance-plugin-configs', async (event, instanceId) => {
 // export-integration-pack: 导出整合包
 ipcMain.handle('export-integration-pack', async (event, instanceId, options, destPath) => {
   try {
-    const { ExportService } = require('./services/integration-pack/ExportService');
-    
+    const { ExportService } = require('./services/integration-pack/ExportService');    
     // 进度回调
     const onProgress = (percent, message) => {
       console.log(`[IPC] 发送进度事件: ${percent}%, ${message}`);

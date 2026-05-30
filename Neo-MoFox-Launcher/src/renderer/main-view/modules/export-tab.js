@@ -64,7 +64,7 @@ export function initExportTab() {
   
   // 导出选项
   exportElements.includeNeo = document.getElementById('export-include-neo');
-  exportElements.installNapcatOnImport = document.getElementById('export-install-napcat-on-import');
+  exportElements.installPlatformOnImport = document.getElementById('export-install-platform-on-import');
   exportElements.installNapcatOptionItem = document.getElementById('install-napcat-option-item');
   exportElements.installPlatformWrap = document.getElementById('export-install-platform-wrap');
   exportElements.installPlatformSelect = document.getElementById('export-install-platform');
@@ -97,8 +97,8 @@ export function initExportTab() {
   });
 
   // 绑定事件
-  if (exportElements.installNapcatOnImport) {
-    exportElements.installNapcatOnImport.addEventListener('change', toggleInstallPlatformSelector);
+  if (exportElements.installPlatformOnImport) {
+    exportElements.installPlatformOnImport.addEventListener('change', toggleInstallPlatformSelector);
   }
 
   if (exportElements.includePlugins) {
@@ -312,7 +312,7 @@ async function loadInstallablePlatforms() {
  * 切换导入时下载平台选项。
  */
 function toggleInstallPlatformSelector() {
-  if (exportElements.installNapcatOnImport?.checked) {
+  if (exportElements.installPlatformOnImport?.checked) {
     if (exportElements.installPlatformWrap) {
       exportElements.installPlatformWrap.style.display = 'block';
     }
@@ -612,6 +612,20 @@ async function startExport() {
     return;
   }
 
+console.log('[ExportTab] 导出选项:', {  
+  packName,
+  packVersion,
+  packAuthor,
+  packDescription,
+  includeNeoMofox: exportElements.includeNeo.checked,
+  includeConfig: exportElements.includeConfig.checked,
+  includePlugins: exportElements.includePlugins.checked,
+  includeData: exportElements.includeData.checked,
+  installPlatformOnImport: exportElements.installPlatformOnImport?.checked || false,
+  installPlatform,
+  includePluginConfigs: exportElements.includePluginConfigs.checked,
+});
+
   // 收集导出选项
   const options = {
     // 元数据
@@ -624,7 +638,7 @@ async function startExport() {
     includeConfig: exportElements.includeConfig.checked,
     includePlugins: exportElements.includePlugins.checked,
     includeData: exportElements.includeData.checked,
-    installNapcatOnImport: exportElements.installNapcatOnImport?.checked || false,
+    installPlatformOnImport: exportElements.installPlatformOnImport?.checked || false,
     installPlatform,
     includePluginConfigs: exportElements.includePluginConfigs.checked,
     selectedPlugins: [],

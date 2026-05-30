@@ -577,8 +577,8 @@ body {
   min-height: 200px;
 }
 
-/* NapCat Version List - 限制高度并允许滚动 */
-#napcatVersionList.version-list-scroll {
+/* Platform Version List - 限制高度并允许滚动 */
+#platformVersionList.version-list-scroll {
   max-height: 480px;
   overflow-y: auto;
 }
@@ -665,7 +665,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Empty State (NapCat Not Installed)
+   Empty State (Platform Not Installed)
    ═══════════════════════════════════════════════════════════ */
 
 .empty-state {
@@ -1153,7 +1153,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Version Item (Commit History & NapCat Versions)
+   Version Item (Commit History & Platform Versions)
    ═══════════════════════════════════════════════════════════ */
 
 .version-item {

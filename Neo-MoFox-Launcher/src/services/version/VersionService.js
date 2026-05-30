@@ -544,6 +544,9 @@ class VersionService {
       throw new Error(`实例不存在: ${instanceId}`);
     }
 
+    const platform = instance.platform
+      ? platformRegistry.getPlatformOrNull(instance.platform)
+      : null;
     const [currentBranch, currentCommit, platformVersion] = await Promise.all([
       this.getCurrentBranch(instanceId).catch(() => null),
       this.getCurrentCommit(instanceId).catch(() => null),
@@ -559,8 +562,11 @@ class VersionService {
       },
       platform: {
         id: instance.platform || null,
-        version: platformVersion,
+        name: platform?.name || instance.platform || null,
+        displayName: platform?.displayName || platform?.name || instance.platform || '平台',
+        description: platform?.description || null,
         dir: instance.platformDir,
+        version: platformVersion,
       },
     };
   }

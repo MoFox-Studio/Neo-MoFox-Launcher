@@ -89,17 +89,17 @@
           </button>
         </li>
 
-        <!-- NapCat Tab -->
+        <!-- Platform Tab -->
         <li role="presentation">
           <button 
             class="sidebar-nav-item" 
             role="tab" 
             aria-selected="false" 
-            aria-controls="panel-napcat"
-            data-target="napcat"
-            id="tab-napcat">
+            aria-controls="panel-platform"
+            data-target="platform"
+            id="tab-platform">
             <span class="nav-icon material-symbols-rounded">terminal</span>
-            <span class="nav-text">NapCat</span>
+            <span class="nav-text" id="platformTabName">平台</span>
             <span class="nav-indicator"></span>
           </button>
         </li>
@@ -259,13 +259,13 @@
         </section>
 
         <!-- ═══════════════════════════════════════════ -->
-        <!-- Panel 2: NapCat 版本管理（已安装） -->
+        <!-- Panel 2: 平台版本管理（已安装） -->
         <!-- ═══════════════════════════════════════════ -->
         <section 
           class="content-panel" 
-          id="panel-napcat" 
+          id="panel-platform" 
           role="tabpanel" 
-          aria-labelledby="tab-napcat"
+          aria-labelledby="tab-platform"
           hidden>
           
           <div class="panel-inner">
@@ -274,13 +274,13 @@
             <div class="info-card">
               <h2 class="card-title">
                 <span class="material-symbols-rounded">info</span>
-                当前版本信息
+                <span id="platformInfoTitle">当前平台版本信息</span>
               </h2>
               
               <div class="info-grid">
                 <div class="info-item">
                   <span class="info-label">当前版本</span>
-                  <div class="info-value-badge success" id="napcatVersion">
+                  <div class="info-value-badge success" id="platformVersion">
                     <span class="material-symbols-rounded">sell</span>
                     <span>--</span>
                   </div>
@@ -288,7 +288,7 @@
                 
                 <div class="info-item full-width">
                   <span class="info-label">安装路径</span>
-                  <div class="path-box" id="napcatPath" title="">--</div>
+                  <div class="path-box" id="platformPath" title="">--</div>
                 </div>
               </div>
             </div>
@@ -297,10 +297,10 @@
             <div class="action-card flex-grow">
               <h2 class="card-title">
                 <span class="material-symbols-rounded">history</span>
-                可用版本列表
+                <span id="platformVersionListTitle">可用版本列表</span>
               </h2>
               
-              <div class="version-list-scroll" id="napcatVersionList">
+              <div class="version-list-scroll" id="platformVersionList">
                 <div class="loading-placeholder">
                   <span class="material-symbols-rounded spinning">progress_activity</span>
                   <span>加载版本列表...</span>
@@ -312,31 +312,30 @@
         </section>
 
         <!-- ═══════════════════════════════════════════ -->
-        <!-- Panel 3: NapCat 空状态（未安装） -->
+        <!-- Panel 3: 平台空状态（未安装） -->
         <!-- ═══════════════════════════════════════════ -->
         <section 
           class="content-panel" 
-          id="panel-napcat-empty" 
+          id="panel-platform-empty" 
           role="tabpanel" 
-          aria-labelledby="tab-napcat"
+          aria-labelledby="tab-platform"
           hidden>
           
           <div class="empty-state">
             <div class="empty-state-icon">
               <span class="material-symbols-rounded">warning</span>
             </div>
-            <h2 class="empty-state-title">NapCat 未安装</h2>
-            <p class="empty-state-description">
-              当前实例尚未安装 NapCat。NapCat 是用于连接 QQ 的协议框架，
-              是运行 Neo-MoFox 所必需的组件。
+            <h2 class="empty-state-title" id="platformEmptyTitle">平台未安装</h2>
+            <p class="empty-state-description" id="platformEmptyDescription">
+              当前实例尚未安装平台组件。
             </p>
-            <p class="empty-state-hint">
-              您可以在实例配置中安装 NapCat，或手动下载安装后重新检测。
+            <p class="empty-state-hint" id="platformEmptyHint">
+              您可以在实例配置中安装平台组件，或手动下载安装后重新检测。
             </p>
             <!-- 可选：添加快速操作按钮 -->
             <!-- <button class="md3-btn md3-btn-filled">
               <span class="material-symbols-rounded">download</span>
-              <span>前往安装 NapCat</span>
+              <span id="platformInstallButtonText">前往安装平台</span>
             </button> -->
           </div>
         </section>
