@@ -18,6 +18,7 @@ const https = require('https');
 const http  = require('http');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
+const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── 下载链接 & 静默安装参数 ──────────────────────────────────────────────
 
@@ -570,74 +571,18 @@ class OobeService {
   }
 
   /**
-   * 下载文件，支持重定向跟随 & 进度回调
+   * 下载文件，优先使用 HTTP Range 分片并发下载。
    * @param {string} url
    * @param {string} destPath
    * @param {(progress: {percent: number, downloaded: number, total: number}) => void} onProgress
    * @returns {Promise<string>} 下载后的文件路径
    */
-  _downloadFile(url, destPath, onProgress = () => {}) {
-    return new Promise((resolve, reject) => {
-      const doRequest = (reqUrl, redirectCount = 0) => {
-        if (redirectCount > 10) {
-          return reject(new Error('重定向次数过多'));
-        }
-
-        const client = reqUrl.startsWith('https') ? https : http;
-
-        const req = client.get(reqUrl, { headers: { 'User-Agent': 'Neo-MoFox-Launcher' } }, (res) => {
-          // 跟随重定向
-          if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-            const redirectUrl = new URL(res.headers.location, reqUrl).href;
-            console.log(`[OobeService] 重定向到: ${redirectUrl}`);
-            return doRequest(redirectUrl, redirectCount + 1);
-          }
-
-          if (res.statusCode !== 200) {
-            return reject(new Error(`HTTP ${res.statusCode}: ${reqUrl}`));
-          }
-
-          const totalSize = parseInt(res.headers['content-length'] || '0', 10);
-          let downloaded = 0;
-
-          const writer = fs.createWriteStream(destPath);
-
-          res.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (totalSize > 0) {
-              onProgress({
-                percent: Math.round((downloaded / totalSize) * 100),
-                downloaded,
-                total: totalSize,
-              });
-            }
-          });
-
-          res.pipe(writer);
-
-          writer.on('finish', () => {
-            writer.close();
-            resolve(destPath);
-          });
-
-          writer.on('error', (err) => {
-            fs.unlink(destPath, () => {});
-            reject(err);
-          });
-        });
-
-        req.on('error', (err) => {
-          reject(err);
-        });
-
-        req.setTimeout(60000, () => {
-          req.destroy();
-          reject(new Error('下载超时'));
-        });
-      };
-
-      doRequest(url);
-    });
+  async _downloadFile(url, destPath, onProgress = () => {}) {
+    await downloadFile(url, destPath, (downloaded, total) => {
+      const percent = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+      onProgress({ percent, downloaded, total });
+    }, { concurrency: 8 });
+    return destPath;
   }
 
   /**

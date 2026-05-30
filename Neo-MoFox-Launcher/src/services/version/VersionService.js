@@ -11,6 +11,7 @@ const http = require('http');
 const { storageService } = require('../install/StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
+const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── VersionService 类 ──────────────────────────────────────────────────
 
@@ -69,34 +70,10 @@ class VersionService {
   }
 
   /**
-   * 下载文件到本地路径，支持重定向和进度回调
+   * 下载文件到本地路径，优先使用 HTTP Range 分片并发下载。
    */
   _downloadFile(url, destPath, onProgress) {
-    return new Promise((resolve, reject) => {
-      const doDownload = (reqUrl, redirectCount = 0) => {
-        if (redirectCount > 5) return reject(new Error('重定向次数过多'));
-        const client = reqUrl.startsWith('https') ? https : http;
-        client.get(reqUrl, { headers: { 'User-Agent': 'Neo-MoFox-Launcher' } }, (res) => {
-          if (res.statusCode === 301 || res.statusCode === 302) {
-            return doDownload(res.headers.location, redirectCount + 1);
-          }
-          if (res.statusCode !== 200) {
-            return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
-          }
-          const total = parseInt(res.headers['content-length'] || '0', 10);
-          let downloaded = 0;
-          const file = fs.createWriteStream(destPath);
-          res.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress) onProgress(downloaded, total);
-          });
-          res.pipe(file);
-          file.on('finish', () => { file.close(); resolve(); });
-          file.on('error', (err) => { try { fs.unlinkSync(destPath); } catch (_) {} reject(err); });
-        }).on('error', reject);
-      };
-      doDownload(url);
-    });
+    return downloadFile(url, destPath, onProgress, { concurrency: 8 });
   }
 
   /**
@@ -547,19 +524,6 @@ class VersionService {
       return instance.napcatVersion;
     }
 
-    // 尝试从目录名解析版本
-    const napcatDir = instance.napcatDir;
-    if (napcatDir && fs.existsSync(napcatDir)) {
-      const entries = fs.readdirSync(napcatDir);
-      const shellDir = entries.find(e => /^NapCat\..+\.Shell$/i.test(e));
-      if (shellDir) {
-        const match = shellDir.match(/NapCat\.(.+)\.Shell/i);
-        if (match) {
-          return match[1];
-        }
-      }
-    }
-
     return null;
   }
 
@@ -594,13 +558,12 @@ class VersionService {
         throw new Error(`找不到版本: ${targetVersion}`);
       }
 
-      // 查找 Windows Shell 版本的下载链接
-      const asset = targetRelease.assets.find(a => 
-        a.name.includes('Shell') && a.name.endsWith('.zip')
-      );
+      // 查找 Windows Node 包下载链接
+      const assetName = platformHelper.napcatAssetName;
+      const asset = targetRelease.assets.find(a => a.name === assetName);
 
       if (!asset) {
-        throw new Error('找不到适合 Windows 的 NapCat Shell 版本');
+        throw new Error(`找不到适合 Windows 的 NapCat Node 包: ${assetName}`);
       }
 
       this._emitProgress('update-napcat', 10, `准备下载 ${targetRelease.version}...`);
@@ -616,29 +579,34 @@ class VersionService {
         this._emitProgress('update-napcat', percent, `下载中: ${Math.floor(downloaded / 1024 / 1024)}MB / ${Math.floor(total / 1024 / 1024)}MB`);
       });
 
-      // 备份旧的 NapCat 配置
+      // 备份旧的 NapCat 配置目录
       this._emitProgress('update-napcat', 60, '备份配置...');
-      const oldShellPath = this._getNapCatShellPath(napcatDir);
-      let configBackup = null;
-      if (oldShellPath) {
-        const configPath = path.join(oldShellPath, 'config', 'napcat.json');
-        if (fs.existsSync(configPath)) {
-          configBackup = fs.readFileSync(configPath, 'utf8');
-        }
+      const configBackupDir = path.join(require('os').tmpdir(), `napcat-config-backup-${Date.now()}`);
+      const oldConfigDir = this._getNapCatConfigPath(napcatDir);
+      let hasConfigBackup = false;
+      if (fs.existsSync(oldConfigDir)) {
+        fs.cpSync(oldConfigDir, configBackupDir, { recursive: true });
+        hasConfigBackup = true;
       }
 
-      // 直接解压覆盖（不删除旧版本）
+      // Node 包版本间整体覆盖，避免旧文件残留
       this._emitProgress('update-napcat', 70, '安装新版本...');
+      if (fs.existsSync(napcatDir)) {
+        fs.rmSync(napcatDir, { recursive: true, force: true });
+      }
       fs.mkdirSync(napcatDir, { recursive: true });
       await this._extractZip(zipPath, napcatDir);
 
+      if (!this._getNapCatNodeRootPath(napcatDir)) {
+        throw new Error('NapCat Windows Node 包结构无效，缺少 node.exe、index.js、napcat.bat 或 napcat 目录');
+      }
+
       // 恢复配置
-      const newShellPath = this._getNapCatShellPath(napcatDir);
-      if (configBackup && newShellPath) {
+      if (hasConfigBackup) {
         this._emitProgress('update-napcat', 90, '恢复配置...');
-        const newConfigDir = path.join(newShellPath, 'config');
+        const newConfigDir = this._getNapCatConfigPath(napcatDir);
         fs.mkdirSync(newConfigDir, { recursive: true });
-        fs.writeFileSync(path.join(newConfigDir, 'napcat.json'), configBackup);
+        fs.cpSync(configBackupDir, newConfigDir, { recursive: true });
       }
 
       // 清理临时文件
@@ -648,6 +616,9 @@ class VersionService {
         }
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        if (typeof configBackupDir !== 'undefined' && fs.existsSync(configBackupDir)) {
+          fs.rmSync(configBackupDir, { recursive: true, force: true });
         }
       } catch (error) {
         console.warn(`[VersionService] 清理临时文件失败: ${error.message}`);
@@ -676,17 +647,25 @@ class VersionService {
   }
 
   /**
-   * 从 napcatDir 内查找 NapCat Shell 子目录
+   * 获取 NapCat Windows Node 包根目录。
    */
-  _getNapCatShellPath(napcatDir) {
+  _getNapCatNodeRootPath(napcatDir) {
     try {
-      if (!fs.existsSync(napcatDir)) return null;
-      const entries = fs.readdirSync(napcatDir);
-      const shellDir = entries.find(e => /^NapCat\..+\.Shell$/i.test(e));
-      return shellDir ? path.join(napcatDir, shellDir) : null;
+      if (!napcatDir || !fs.existsSync(napcatDir)) return null;
+      const requiredFiles = ['node.exe', 'index.js', 'napcat.bat'];
+      const hasNodeRoot = requiredFiles.every((fileName) => fs.existsSync(path.join(napcatDir, fileName)))
+        && fs.existsSync(path.join(napcatDir, 'napcat'));
+      return hasNodeRoot ? napcatDir : null;
     } catch (_) {
       return null;
     }
+  }
+
+  /**
+   * 获取 NapCat Windows Node 包配置目录。
+   */
+  _getNapCatConfigPath(napcatRoot) {
+    return path.join(napcatRoot, 'napcat', 'config');
   }
 
   // ─── 综合版本信息 ────────────────────────────────────────────────────────

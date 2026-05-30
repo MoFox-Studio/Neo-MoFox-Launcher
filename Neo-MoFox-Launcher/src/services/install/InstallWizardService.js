@@ -706,9 +706,9 @@ class InstallWizardService {
         if (!napcatDir) {
           napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
         }
-        // Resume 时从磁盘重新查找 Shell 目录
+        // Resume 时从磁盘重新确认 Node 包根目录
         if (!napcatShellPath) {
-          napcatShellPath = installStepExecutor._getNapCatShellPath(napcatDir);
+          napcatShellPath = installStepExecutor._getNapCatNodeRootPath(napcatDir);
         }
         const configTarget = napcatShellPath || napcatDir;
         await installStepExecutor.executeStep('napcat-config', context, stepInputs, { shellDir: configTarget });

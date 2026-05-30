@@ -751,7 +751,7 @@ class ImportService {
             break;
 
           case 'napcat-config':
-            const configTarget = napcatShellPath ? path.dirname(napcatShellPath) : napcatDir;
+            const configTarget = napcatShellPath || napcatDir;
             await installStepExecutor.executeStep('napcat-config', context, stepInputs, { shellDir: configTarget });
             break;
 

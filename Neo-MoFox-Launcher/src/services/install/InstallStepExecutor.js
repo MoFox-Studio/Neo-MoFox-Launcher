@@ -13,6 +13,7 @@ const http = require('http');
 const { storageService } = require('./StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
+const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -114,34 +115,10 @@ class InstallStepExecutor {
   }
 
   /**
-   * 下载文件到本地路径，支持重定向和进度回调
+   * 下载文件到本地路径，优先使用 HTTP Range 分片并发下载。
    */
   _downloadFile(url, destPath, onProgress) {
-    return new Promise((resolve, reject) => {
-      const doDownload = (reqUrl, redirectCount = 0) => {
-        if (redirectCount > 5) return reject(new Error('重定向次数过多'));
-        const client = reqUrl.startsWith('https') ? https : http;
-        client.get(reqUrl, { headers: { 'User-Agent': 'Neo-MoFox-Launcher' } }, (res) => {
-          if (res.statusCode === 301 || res.statusCode === 302) {
-            return doDownload(res.headers.location, redirectCount + 1);
-          }
-          if (res.statusCode !== 200) {
-            return reject(new Error(`下载失败 HTTP ${res.statusCode}`));
-          }
-          const total = parseInt(res.headers['content-length'] || '0', 10);
-          let downloaded = 0;
-          const file = fs.createWriteStream(destPath);
-          res.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress) onProgress(downloaded, total);
-          });
-          res.pipe(file);
-          file.on('finish', () => { file.close(); resolve(); });
-          file.on('error', (err) => { try { fs.unlinkSync(destPath); } catch (_) {} reject(err); });
-        }).on('error', reject);
-      };
-      doDownload(url);
-    });
+    return downloadFile(url, destPath, onProgress, { concurrency: 8 });
   }
 
   /**
@@ -196,17 +173,25 @@ class InstallStepExecutor {
   }
 
   /**
-   * 从 napcatDir 内查找 NapCat Shell 子目录
+   * 获取 NapCat Windows Node 包根目录。
    */
-  _getNapCatShellPath(napcatDir) {
+  _getNapCatNodeRootPath(napcatDir) {
     try {
-      if (!fs.existsSync(napcatDir)) return null;
-      const entries = fs.readdirSync(napcatDir);
-      const shellDir = entries.find((e) => /^NapCat\..+\.Shell$/i.test(e));
-      return shellDir ? path.join(napcatDir, shellDir) : null;
+      if (!napcatDir || !fs.existsSync(napcatDir)) return null;
+      const requiredFiles = ['node.exe', 'index.js', 'napcat.bat'];
+      const hasNodeRoot = requiredFiles.every((fileName) => fs.existsSync(path.join(napcatDir, fileName)))
+        && fs.existsSync(path.join(napcatDir, 'napcat'));
+      return hasNodeRoot ? napcatDir : null;
     } catch (_) {
       return null;
     }
+  }
+
+  /**
+   * 获取 NapCat Windows Node 包配置目录。
+   */
+  _getNapCatConfigPath(napcatRoot) {
+    return path.join(napcatRoot, 'napcat', 'config');
   }
 
   /**
@@ -741,29 +726,16 @@ class InstallStepExecutor {
 
     try { fs.unlinkSync(zipPath); } catch (_) {}
 
-    const installerPath = path.join(napcatDir, 'NapCatInstaller.exe');
-    if (fs.existsSync(installerPath)) {
-      context.emitProgress('napcat', 75, '正在运行 NapCatInstaller.exe 自动化配置...');
-      context.emitOutput('[napcat] 启动 NapCatInstaller.exe...');
-      await this._execCommand(
-        'cmd',
-        ['/c', `chcp 65001 >nul && echo.|"${installerPath}"`],
-        {
-          cwd: napcatDir,
-          onStdout: (d) => context.emitOutput(d),
-          onStderr: (d) => context.emitOutput(d),
-        }
-      );
-      context.emitOutput('[napcat] NapCatInstaller.exe 执行完毕');
+    const napcatRoot = this._getNapCatNodeRootPath(napcatDir);
+    if (!napcatRoot) {
+      throw new Error('NapCat Windows Node 包结构无效，缺少 node.exe、index.js、napcat.bat 或 napcat 目录');
     }
 
-    const shellPath = this._getNapCatShellPath(napcatDir);
-    if (shellPath) {
-      context.emitOutput(`[napcat] Shell 目录: ${shellPath}`);
-    }
+    context.emitOutput(`[napcat] Node 包根目录: ${napcatRoot}`);
+    context.emitOutput(`[napcat] 启动脚本: ${path.join(napcatRoot, 'napcat.bat')}`);
 
     context.emitProgress('napcat', 100, 'NapCat 安装完成');
-    return { success: true, path: napcatDir, shellPath: shellPath || napcatDir, version: release.tag_name };
+    return { success: true, path: napcatDir, shellPath: napcatRoot, version: release.tag_name };
   }
 
   /**
@@ -776,8 +748,12 @@ class InstallStepExecutor {
   async executeNapcatConfig(context, inputs, options = {}) {
     context.emitProgress('napcat-config', 0, '正在写入 NapCat 配置...');
 
-    const shellDir = options.shellDir;
-    const configDir = path.join(shellDir, 'config');
+    const napcatRoot = options.shellDir || inputs.napcatDir;
+    if (!napcatRoot) {
+      throw new Error('写入 NapCat 配置失败: 缺少 NapCat Node 包根目录');
+    }
+
+    const configDir = this._getNapCatConfigPath(napcatRoot);
     fs.mkdirSync(configDir, { recursive: true });
 
     const onebot11Config = {
@@ -818,7 +794,7 @@ class InstallStepExecutor {
     context.emitOutput(`[napcat-config] onebot11 配置: ${onebot11Path}`);
     context.emitOutput(`[napcat-config] napcat 配置: ${napcatCfgPath}`);
 
-    const launcherPath = platformHelper.writeNapcatLauncherScript(shellDir, inputs.qqNumber);
+    const launcherPath = platformHelper.writeNapcatLauncherScript(napcatRoot, inputs.qqNumber);
     if (launcherPath) {
       context.emitOutput(`[napcat-config] 启动脚本: ${launcherPath}`);
     }

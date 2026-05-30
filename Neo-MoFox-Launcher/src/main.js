@@ -1938,14 +1938,11 @@ async function startNapcatProcess(instanceId, instance) {
   
   emitLauncherMessage(instanceId, 'napcat', '正在启动 NapCat...', 'info');
   
-  // 在 napcatDir 下查找 NapCat.*.Shell 子目录
-  const napcatShellDirs = fs.readdirSync(napcatPath).filter(name => name.startsWith('NapCat') && name.includes('Shell'));
-  const napcatShellPath = napcatShellDirs.length > 0
-    ? path.join(napcatPath, napcatShellDirs[0])
-    : napcatPath;
+  // Windows Node 包以 napcatDir 作为根目录，统一使用包内现有 napcat.bat 启动。
+  const napcatRootPath = napcatPath;
 
   // 使用 PlatformHelper 获取 NapCat 启动命令
-  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatShellPath, instance.qqNumber);
+  const napcatStartInfo = platformHelper.getNapcatStartCommand(napcatRootPath, instance.qqNumber);
   
   if (!napcatStartInfo) {
     emitLauncherMessage(instanceId, 'napcat', '错误: 未找到 NapCat 启动文件', 'error');
@@ -1975,7 +1972,7 @@ async function startNapcatProcess(instanceId, instance) {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
-        cwd: napcatShellPath,
+        cwd: napcatStartInfo.cwd || napcatRootPath,
         env: ptyEnv,
         encoding: 'utf8',
       });
@@ -1984,7 +1981,7 @@ async function startNapcatProcess(instanceId, instance) {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
-        cwd: napcatShellPath,
+        cwd: napcatStartInfo.cwd || napcatRootPath,
         env: ptyEnv,
         encoding: 'utf8',
       });

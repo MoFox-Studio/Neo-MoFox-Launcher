@@ -50,25 +50,33 @@ const PLATFORM_CONFIG = {
       cmd: 'powershell',
       args: ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`],
     }),
-    napcatAsset: 'NapCat.Shell.Windows.OneKey.zip',
+    napcatAsset: 'NapCat.Shell.Windows.Node.zip',
     napcatStartCmd: (shellDir, qq) => {
-      const bat = path.join(shellDir, `start_napcat_${qq}.bat`);
-      const exe = path.join(shellDir, 'NapCatWinBootMain.exe');
+      const bat = path.join(shellDir, 'napcat.bat');
       if (fs.existsSync(bat)) {
-        return { cmd: 'cmd', args: ['/c', bat], cwd: shellDir };
+        return { cmd: bat, args: ['-q', String(qq)], cwd: shellDir };
       }
-      if (fs.existsSync(exe)) {
-        return { cmd: exe, args: [qq], cwd: shellDir };
+
+      const nodeExe = path.join(shellDir, 'node.exe');
+      const entry = path.join(shellDir, 'index.js');
+      if (fs.existsSync(nodeExe) && fs.existsSync(entry)) {
+        return { cmd: nodeExe, args: [entry, '-q', String(qq)], cwd: shellDir };
       }
+
       return null;
     },
     /** 生成 NapCat 快速启动脚本 */
     writeNapcatLauncher: (shellDir, qq) => {
+      const sourceBat = path.join(shellDir, 'napcat.bat');
+      if (!fs.existsSync(sourceBat)) {
+        return null;
+      }
+
       const content = [
         '@echo off',
         'chcp 65001 >nul',
         `echo 正在启动 NapCat (QQ: ${qq})...`,
-        `NapCatWinBootMain.exe ${qq}`,
+        `call "%~dp0napcat.bat" -q ${qq}`,
         'pause',
       ].join('\r\n');
       const p = path.join(shellDir, `start_napcat_${qq}.bat`);
