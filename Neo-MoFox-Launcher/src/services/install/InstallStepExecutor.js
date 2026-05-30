@@ -7,14 +7,10 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const https = require('https');
-const http = require('http');
 const { storageService } = require('./StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
 const { platformRegistry } = require('../platforms/PlatformRegistry');
-const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
@@ -88,56 +84,6 @@ class InstallStepExecutor {
   }
 
   /**
-   * HTTPS GET 请求（支持重定向）
-   */
-  _httpsGet(url, headers = {}) {
-    return new Promise((resolve, reject) => {
-      const doGet = (reqUrl, redirectCount = 0) => {
-        if (redirectCount > 5) return reject(new Error('重定向次数过多'));
-        const client = reqUrl.startsWith('https') ? https : http;
-        const opts = new URL(reqUrl);
-        client.get(
-          { hostname: opts.hostname, path: opts.pathname + opts.search, headers },
-          (res) => {
-            if (res.statusCode === 301 || res.statusCode === 302) {
-              return doGet(res.headers.location, redirectCount + 1);
-            }
-            if (res.statusCode !== 200) {
-              return reject(new Error(`HTTP ${res.statusCode}: ${reqUrl}`));
-            }
-            let data = '';
-            res.on('data', (chunk) => { data += chunk; });
-            res.on('end', () => resolve(data));
-          }
-        ).on('error', reject);
-      };
-      doGet(url);
-    });
-  }
-
-  /**
-   * 下载文件到本地路径，优先使用 HTTP Range 分片并发下载。
-   */
-  _downloadFile(url, destPath, onProgress) {
-    return downloadFile(url, destPath, onProgress, { concurrency: 8 });
-  }
-
-  /**
-   * 计算文件的 SHA-256 校验值
-   * @param {string} filePath - 文件路径
-   * @returns {Promise<string>} 小写十六进制 SHA-256 哈希值
-   */
-  _computeFileSha256(filePath) {
-    return new Promise((resolve, reject) => {
-      const hash = crypto.createHash('sha256');
-      const stream = fs.createReadStream(filePath);
-      stream.on('data', (chunk) => hash.update(chunk));
-      stream.on('end', () => resolve(hash.digest('hex')));
-      stream.on('error', (err) => reject(err));
-    });
-  }
-
-  /**
    * 删除安装目标目录中已存在的组件文件夹。
    * @param {string} dirPath - 需要删除的目录路径
    * @param {string} label - 用于日志输出的组件名称
@@ -193,38 +139,6 @@ class InstallStepExecutor {
    */
   _getNapCatConfigPath(napcatRoot) {
     return path.join(napcatRoot, 'napcat', 'config');
-  }
-
-  /**
-   * 获取 NapCat 最新 Release 信息
-   */
-  async _fetchLatestNapCatRelease(context) {
-    const apiUrls = await mirrorService.getNapcatLatestUrls();
-
-    let lastError = null;
-    for (const apiUrl of apiUrls) {
-      try {
-        if (context.emitOutput) {
-          context.emitOutput(`[napcat] 正在尝试访问: ${apiUrl}`);
-        }
-        const data = await this._httpsGet(apiUrl, {
-          'User-Agent': 'Neo-MoFox-Launcher',
-          'Accept': 'application/vnd.github.v3+json',
-        });
-        const release = JSON.parse(data);
-        if (!release.assets) throw new Error('Release 数据无效');
-        if (context.emitOutput) {
-          context.emitOutput(`[napcat] 成功获取 Release 信息`);
-        }
-        return release;
-      } catch (e) {
-        lastError = e;
-        if (context.emitOutput) {
-          context.emitOutput(`[napcat] 访问失败: ${e.message}`);
-        }
-      }
-    }
-    throw new Error(`获取 NapCat Release 信息失败: ${lastError?.message}`);
   }
 
   // ───────────────────────────────────────────────────────────────────────
@@ -618,19 +532,10 @@ class InstallStepExecutor {
     this._removeExistingInstallDirectory(platformDir, platform.id, context);
     fs.mkdirSync(platformDir, { recursive: true });
 
-    const helpers = {
-      execCommand: this._execCommand.bind(this),
-      downloadFile: this._downloadFile.bind(this),
-      computeFileSha256: this._computeFileSha256.bind(this),
-      fetchLatestNapCatRelease: this._fetchLatestNapCatRelease.bind(this),
-      getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
-    };
-
-    const result = await platform.installer.install({
+    const result = await platformRegistry.installPlatform(platform.id, {
       context,
       inputs,
       options,
-      helpers,
       platformDir,
     });
 

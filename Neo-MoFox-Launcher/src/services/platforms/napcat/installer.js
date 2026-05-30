@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { platformHelper } = require('../../utils/PlatformHelper');
+const { fetchLatestNapCatRelease } = require('./helpers');
 
 const MAX_DOWNLOAD_RETRY = 3;
 const WINDOWS_NODE_ASSET_NAME = 'NapCat.Shell.Windows.Node.zip';
@@ -23,7 +24,7 @@ const WINDOWS_NODE_ASSET_NAME = 'NapCat.Shell.Windows.Node.zip';
  */
 async function install({ context, helpers, platformDir }) {
   context.emitProgress('platform-install', 5, '正在获取 NapCat 最新版本信息...');
-  const release = await helpers.fetchLatestNapCatRelease(context);
+  const release = await fetchLatestNapCatRelease({ context, helpers });
 
   const assetName = WINDOWS_NODE_ASSET_NAME;
   const asset = release.assets.find((item) => item.name === assetName);

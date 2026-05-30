@@ -444,6 +444,7 @@ class StorageService {
       };
     });
     
+
     console.log(`[StorageService] 迁移完成：${instances.length} 个实例`);
     return {
       version: INSTANCES_VERSION,

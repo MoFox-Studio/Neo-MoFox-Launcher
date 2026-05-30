@@ -11,7 +11,6 @@ const http = require('http');
 const { storageService } = require('../install/StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
-const { downloadFile } = require('../utils/RangeDownloader');
 const { platformRegistry } = require('../platforms/PlatformRegistry');
 
 // ─── VersionService 类 ──────────────────────────────────────────────────
@@ -68,13 +67,6 @@ class VersionService {
       };
       doGet(url);
     });
-  }
-
-  /**
-   * 下载文件到本地路径，优先使用 HTTP Range 分片并发下载。
-   */
-  _downloadFile(url, destPath, onProgress) {
-    return downloadFile(url, destPath, onProgress, { concurrency: 8 });
   }
 
   /**
@@ -478,20 +470,6 @@ class VersionService {
   // ─── 平台版本管理 ────────────────────────────────────────────────────────
 
   /**
-   * 构建平台更新器可复用的工具集。
-   * @returns {Object} 平台更新工具集
-   */
-  _buildPlatformUpdateHelpers() {
-    return {
-      mirrorService,
-      httpsGet: this._httpsGet.bind(this),
-      downloadFile: this._downloadFile.bind(this),
-      extractZip: this._extractZip.bind(this),
-      getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
-    };
-  }
-
-  /**
    * 获取指定平台的所有 Release 列表。
    * @param {string} platformId 平台 ID
    * @param {number} limit 返回数量
@@ -501,12 +479,7 @@ class VersionService {
     if (!platformId) {
       throw new Error('获取平台版本列表失败: 缺少平台 ID');
     }
-    const platform = platformRegistry.getPlatform(platformId);
-    if (!platform.updater || typeof platform.updater.getReleases !== 'function') {
-      throw new Error(`平台 ${platformId} 未提供版本列表能力`);
-    }
-
-    return await platform.updater.getReleases(this._buildPlatformUpdateHelpers(), limit);
+    return await platformRegistry.getPlatformReleases(platformId, limit);
   }
 
   /**
@@ -558,17 +531,13 @@ class VersionService {
     }
 
     const platform = platformRegistry.getPlatform(instance.platform);
-    if (!platform.updater || typeof platform.updater.update !== 'function') {
-      throw new Error(`平台 ${instance.platform} 未提供更新能力`);
-    }
 
     try {
-      const result = await platform.updater.update({
+      const result = await platformRegistry.updatePlatform(
         instance,
         targetVersion,
-        helpers: this._buildPlatformUpdateHelpers(),
-        emitProgress: this._emitProgress.bind(this),
-      });
+        this._emitProgress.bind(this)
+      );
 
       storageService.updateInstance(instanceId, {
         platformVersion: result.version || null,
@@ -589,15 +558,6 @@ class VersionService {
    */
   async updateNapCat(instanceId, targetVersion = 'latest') {
     return await this.updatePlatform(instanceId, targetVersion);
-  }
-
-  /**
-   * 解压 ZIP 文件
-   */
-  async _extractZip(zipPath, destDir) {
-    // 使用 PlatformHelper 获取跨平台解压命令
-    const unzipInfo = platformHelper.getUnzipCommand(zipPath, destDir);
-    await this._execCommand(unzipInfo.cmd, unzipInfo.args);
   }
 
   /**
