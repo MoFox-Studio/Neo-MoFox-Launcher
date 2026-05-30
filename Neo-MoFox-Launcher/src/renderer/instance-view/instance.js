@@ -14,22 +14,22 @@ const state = {
   instanceName: '',
   instanceStatus: 'stopped',
   mofoxStatus: 'stopped',
-  napcatStatus: 'stopped',
-  hasNapcat: true,
+  platformStatus: 'stopped',
+  hasPlatform: true,
   platformName: '平台',
   stats: {
     mofox: { uptime: 0 },
-    napcat: { uptime: 0 },
+    platform: { uptime: 0 },
   },
   // 搜索框开启状态
   searchOpen: false,
 };
 
-// 终端实例集合：每个 source(mofox/napcat) 对应一个独立 xterm.Terminal
+// 终端实例集合：每个 source(mofox/platform) 对应一个独立 xterm.Terminal
 //   { term, fit, search, serialize, container, attached, scrolledUp }
 const terminals = {
   mofox: null,
-  napcat: null,
+  platform: null,
 };
 
 // ─── DOM ──────────────────────────────────────────────────────────────
@@ -43,9 +43,9 @@ const el = {
   btnStartMofox: document.getElementById('btnStartMofox'),
   btnStopMofox: document.getElementById('btnStopMofox'),
   btnRestartMofox: document.getElementById('btnRestartMofox'),
-  btnStartNapcat: document.getElementById('btnStartNapcat'),
-  btnStopNapcat: document.getElementById('btnStopNapcat'),
-  btnRestartNapcat: document.getElementById('btnRestartNapcat'),
+  btnStartPlatform: document.getElementById('btnStartPlatform'),
+  btnStopPlatform: document.getElementById('btnStopPlatform'),
+  btnRestartPlatform: document.getElementById('btnRestartPlatform'),
 
   instanceTitle: document.getElementById('instanceTitle'),
   statusDot: document.getElementById('statusDot'),
@@ -67,14 +67,14 @@ const el = {
 
   // 终端容器
   mofoxTerminal: document.getElementById('mofoxTerminal'),
-  napcatTerminal: document.getElementById('napcatTerminal'),
+  platformTerminal: document.getElementById('platformTerminal'),
 
   mofoxUptime: document.getElementById('mofoxUptime'),
-  napcatUptime: document.getElementById('napcatUptime'),
+  platformUptime: document.getElementById('platformUptime'),
 
   // 计数（这一版用做"行数"提示，可视情况隐藏）
   mofoxLogCount: document.getElementById('mofoxLogCount'),
-  napcatLogCount: document.getElementById('napcatLogCount'),
+  platformLogCount: document.getElementById('platformLogCount'),
 
   // 系统资源
   instCpuBar: document.getElementById('inst-cpu-bar'),
@@ -82,16 +82,16 @@ const el = {
   instMemBar: document.getElementById('inst-mem-bar'),
   instMemVal: document.getElementById('inst-mem-val'),
   instMemDetail: document.getElementById('inst-mem-detail'),
-  instCpuBarNc: document.querySelector('.inst-cpu-bar-nc'),
-  instCpuValNc: document.querySelector('.inst-cpu-val-nc'),
-  instMemBarNc: document.querySelector('.inst-mem-bar-nc'),
-  instMemValNc: document.querySelector('.inst-mem-val-nc'),
-  instMemDetailNc: document.querySelector('.inst-mem-detail-nc'),
+  instCpuBarPlatform: document.querySelector('.inst-cpu-bar-platform'),
+  instCpuValPlatform: document.querySelector('.inst-cpu-val-platform'),
+  instMemBarPlatform: document.querySelector('.inst-mem-bar-platform'),
+  instMemValPlatform: document.querySelector('.inst-mem-val-platform'),
+  instMemDetailPlatform: document.querySelector('.inst-mem-detail-platform'),
 
   settingsDialog: document.getElementById('settingsDialog'),
   btnCloseSettings: document.getElementById('btnCloseSettings'),
-  btnOpenNapcat: document.getElementById('btnOpenNapcat'),
-  platformTabLabel: document.querySelector('.tab-button[data-tab="napcat"] .tab-label'),
+  btnOpenPlatform: document.getElementById('btnOpenPlatform'),
+  platformTabLabel: document.querySelector('.tab-button[data-tab="platform"] .tab-label'),
 };
 
 // ─── xterm 主题：跟暗色面板一致 ───────────────────────────────────────
@@ -204,7 +204,7 @@ function createTerminal(source, container) {
 
 function ensureTerminal(source) {
   if (terminals[source]) return terminals[source];
-  const container = source === 'mofox' ? el.mofoxTerminal : el.napcatTerminal;
+  const container = source === 'mofox' ? el.mofoxTerminal : el.platformTerminal;
   if (!container) return null;
   terminals[source] = createTerminal(source, container);
   return terminals[source];
@@ -217,7 +217,7 @@ function writeToTerminal(source, data) {
 
   // 行数计数（粗略指标，等于终端缓冲区已用行）
   const totalRows = entry.term.buffer.active.length;
-  const countEl = source === 'mofox' ? el.mofoxLogCount : el.napcatLogCount;
+  const countEl = source === 'mofox' ? el.mofoxLogCount : el.platformLogCount;
   if (countEl) countEl.textContent = String(totalRows);
 
   // 自动滚动跟随：如果用户正停在底部，则保持在底部
@@ -236,7 +236,7 @@ async function init() {
 
   // 初始化两个终端实例并先把当前的 ring buffer 灌进去（历史回放）
   ensureTerminal('mofox');
-  if (state.hasNapcat) ensureTerminal('napcat');
+  if (state.hasPlatform) ensureTerminal('platform');
   await replayPtyBuffers();
 
   // 自动滚动按钮默认开启
@@ -248,9 +248,9 @@ async function init() {
       const sep = await window.mofoxAPI.getSeparatedStatus(state.instanceId);
       if (sep) {
         state.mofoxStatus = sep.mofox || 'stopped';
-        state.napcatStatus = sep.napcat || 'stopped';
+        state.platformStatus = sep.platform || 'stopped';
         updateSeparatedButtonStates();
-        if (state.mofoxStatus === 'running' || state.napcatStatus === 'running') {
+        if (state.mofoxStatus === 'running' || state.platformStatus === 'running') {
           const stats = await window.mofoxAPI.getInstanceStats(state.instanceId);
           if (stats) updateStats(stats);
         }
@@ -292,13 +292,10 @@ async function loadInstanceData() {
     if (window.mofoxAPI?.getInstance) {
       const instanceData = await window.mofoxAPI.getInstance(state.instanceId);
       if (instanceData) {
-        state.hasNapcat = !!(instanceData.platformDir);
+        state.hasPlatform = !!(instanceData.platformDir && instanceData.platform);
         state.platformName = instanceData.platformDisplayName || instanceData.platformName || instanceData.platform || '平台';
-        if (el.platformTabLabel) el.platformTabLabel.textContent = state.platformName;
-        if (el.btnStartNapcat) el.btnStartNapcat.title = `启动 ${state.platformName} 适配器`;
-        if (el.btnStopNapcat) el.btnStopNapcat.title = `停止 ${state.platformName} 适配器`;
-        if (el.btnRestartNapcat) el.btnRestartNapcat.title = `重启 ${state.platformName} 适配器`;
-        if (!state.hasNapcat) hideNapcatUI();
+        updatePlatformLabels();
+        if (!state.hasPlatform) hidePlatformUI();
       }
     }
   } catch (error) {
@@ -312,16 +309,30 @@ async function replayPtyBuffers() {
     const buffers = await window.mofoxAPI.getInstancePtyBuffer(state.instanceId);
     if (!buffers) return;
     if (buffers.mofox) writeToTerminal('mofox', buffers.mofox);
-    if (state.hasNapcat && buffers.napcat) writeToTerminal('napcat', buffers.napcat);
+    if (state.hasPlatform && buffers.platform) writeToTerminal('platform', buffers.platform);
   } catch (error) {
     console.warn('[Instance] 加载 PTY 历史 buffer 失败:', error);
   }
 }
 
-function hideNapcatUI() {
-  const napcatTab = document.querySelector('.tab-button[data-tab="napcat"]');
-  if (napcatTab) napcatTab.style.display = 'none';
-  if (state.currentTab === 'napcat') switchTab('mofox');
+function hidePlatformUI() {
+  const platformTab = document.querySelector('.tab-button[data-tab="platform"]');
+  if (platformTab) platformTab.style.display = 'none';
+  if (state.currentTab === 'platform') switchTab('mofox');
+}
+
+function updatePlatformLabels() {
+  const platformName = state.platformName || '平台';
+  if (el.platformTabLabel) el.platformTabLabel.textContent = platformName;
+  if (el.btnStartPlatform) el.btnStartPlatform.title = `启动 ${platformName} 适配器`;
+  if (el.btnStopPlatform) el.btnStopPlatform.title = `停止 ${platformName} 适配器`;
+  if (el.btnRestartPlatform) el.btnRestartPlatform.title = `重启 ${platformName} 适配器`;
+  if (el.btnOpenPlatform) {
+    const titleEl = el.btnOpenPlatform.querySelector('.item-title');
+    const descEl = el.btnOpenPlatform.querySelector('.item-desc');
+    if (titleEl) titleEl.textContent = `打开 ${platformName} 目录`;
+    if (descEl) descEl.textContent = `${platformName} 安装目录`;
+  }
 }
 
 // ─── 事件 & IPC ───────────────────────────────────────────────────────
@@ -337,9 +348,9 @@ function setupEventListeners() {
   el.btnStopMofox?.addEventListener('click', handleStopMofox);
   el.btnRestartMofox?.addEventListener('click', handleRestartMofox);
 
-  el.btnStartNapcat?.addEventListener('click', handleStartPlatform);
-  el.btnStopNapcat?.addEventListener('click', handleStopPlatform);
-  el.btnRestartNapcat?.addEventListener('click', handleRestartPlatform);
+  el.btnStartPlatform?.addEventListener('click', handleStartPlatform);
+  el.btnStopPlatform?.addEventListener('click', handleStopPlatform);
+  el.btnRestartPlatform?.addEventListener('click', handleRestartPlatform);
 
   el.tabButtons.forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
 
@@ -388,8 +399,8 @@ function setupIPCListeners() {
   window.mofoxAPI?.onInstanceStatusChange?.((data) => {
     if (data.instanceId !== state.instanceId) return;
     if (data.mofoxStatus !== undefined) state.mofoxStatus = data.mofoxStatus;
-    if (data.napcatStatus !== undefined) state.napcatStatus = data.napcatStatus;
-    if (data.mofoxStatus !== undefined || data.napcatStatus !== undefined) {
+    if (data.platformStatus !== undefined) state.platformStatus = data.platformStatus;
+    if (data.mofoxStatus !== undefined || data.platformStatus !== undefined) {
       updateSeparatedButtonStates();
     } else {
       updateStatus(data.status);
@@ -504,35 +515,35 @@ async function handleRestartMofox() {
 
 async function handleStartPlatform() {
   try {
-    updateNapcatStatus('starting');
+    updatePlatformStatus('starting');
     const result = await window.mofoxAPI.startPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    updateNapcatStatus('error');
+    updatePlatformStatus('error');
     showError(`启动 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
 
 async function handleStopPlatform() {
-  if (state.napcatStatus === 'stopped') return;
+  if (state.platformStatus === 'stopped') return;
   try {
-    updateNapcatStatus('stopping');
+    updatePlatformStatus('stopping');
     const result = await window.mofoxAPI.stopPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
-    updateNapcatStatus('stopped');
+    updatePlatformStatus('stopped');
   } catch (error) {
-    updateNapcatStatus('error');
+    updatePlatformStatus('error');
     showError(`停止 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
 
 async function handleRestartPlatform() {
   try {
-    updateNapcatStatus('restarting');
+    updatePlatformStatus('restarting');
     const result = await window.mofoxAPI.restartPlatformOnly(state.instanceId);
     if (!result.success) throw new Error(result.error || '未知错误');
   } catch (error) {
-    updateNapcatStatus('error');
+    updatePlatformStatus('error');
     showError(`重启 ${state.platformName} 适配器失败: ${error.message}`);
   }
 }
@@ -540,7 +551,7 @@ async function handleRestartPlatform() {
 // ─── 设置对话框 ───────────────────────────────────────────────────────
 function handleSettings() {
   el.settingsDialog.classList.remove('hidden');
-  if (!state.hasNapcat && el.btnOpenNapcat) el.btnOpenNapcat.style.display = 'none';
+  if (!state.hasPlatform && el.btnOpenPlatform) el.btnOpenPlatform.style.display = 'none';
 }
 
 function closeSettings() {
@@ -559,7 +570,7 @@ async function handleSettingsAction(action) {
       case 'open-data-folder':   await openFolder('data'); break;
       case 'open-logs-folder':   await openFolder('logs'); break;
       case 'open-plugins-folder':await openFolder('plugins'); break;
-      case 'open-napcat':        await openFolder('napcat'); break;
+      case 'open-platform':      await openFolder('platform'); break;
       case 'open-core-config':   await openFile('core-config'); break;
       case 'open-model-config':  await openFile('model-config'); break;
       case 'delete-database':    await handleDeleteDatabase(); break;
@@ -644,7 +655,7 @@ function updateStatus(status) {
 }
 
 function updateMofoxStatus(status) { state.mofoxStatus = status; updateSeparatedButtonStates(); }
-function updateNapcatStatus(status) { state.napcatStatus = status; updateSeparatedButtonStates(); }
+function updatePlatformStatus(status) { state.platformStatus = status; updateSeparatedButtonStates(); }
 
 function updateSeparatedButtonStates() {
   const mofoxRunning = state.mofoxStatus === 'running';
@@ -653,16 +664,16 @@ function updateSeparatedButtonStates() {
   if (el.btnStopMofox)    el.btnStopMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
   if (el.btnRestartMofox) el.btnRestartMofox.disabled = !mofoxRunning && state.mofoxStatus !== 'error';
 
-  const napcatRunning = state.napcatStatus === 'running';
-  const napcatStopped = state.napcatStatus === 'stopped';
-  if (el.btnStartNapcat)   el.btnStartNapcat.disabled = !napcatStopped;
-  if (el.btnStopNapcat)    el.btnStopNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
-  if (el.btnRestartNapcat) el.btnRestartNapcat.disabled = !napcatRunning && state.napcatStatus !== 'error';
+  const platformRunning = state.platformStatus === 'running';
+  const platformStopped = state.platformStatus === 'stopped';
+  if (el.btnStartPlatform)   el.btnStartPlatform.disabled = !state.hasPlatform || !platformStopped;
+  if (el.btnStopPlatform)    el.btnStopPlatform.disabled = !state.hasPlatform || (!platformRunning && state.platformStatus !== 'error');
+  if (el.btnRestartPlatform) el.btnRestartPlatform.disabled = !state.hasPlatform || (!platformRunning && state.platformStatus !== 'error');
 
   const priority = { starting: 6, restarting: 5, running: 4, stopping: 3, error: 2, stopped: 1 };
-  const overall = (priority[state.mofoxStatus] || 0) >= (priority[state.napcatStatus] || 0)
+  const overall = (priority[state.mofoxStatus] || 0) >= (priority[state.platformStatus] || 0)
     ? state.mofoxStatus
-    : state.napcatStatus;
+    : state.platformStatus;
   updateStatus(overall);
 }
 
@@ -729,7 +740,7 @@ function handleClearLogs() {
   entry.term.reset();
   // 通知主进程清空 ring buffer，下次刷新页面也不会再回放
   window.mofoxAPI?.clearInstancePty?.(state.instanceId, state.currentTab);
-  const countEl = state.currentTab === 'mofox' ? el.mofoxLogCount : el.napcatLogCount;
+  const countEl = state.currentTab === 'mofox' ? el.mofoxLogCount : el.platformLogCount;
   if (countEl) countEl.textContent = '0';
 }
 
@@ -753,9 +764,10 @@ function updateStats(stats) {
     state.stats.mofox = stats.mofox;
     el.mofoxUptime.textContent = formatUptime(stats.mofox.uptime);
   }
-  if (state.hasNapcat && stats?.napcat) {
-    state.stats.napcat = stats.napcat;
-    el.napcatUptime.textContent = formatUptime(stats.napcat.uptime);
+  if (state.hasPlatform && stats?.platform) {
+    const platformStats = stats.platform;
+    state.stats.platform = platformStats;
+    el.platformUptime.textContent = formatUptime(platformStats.uptime);
   }
 }
 
@@ -765,9 +777,9 @@ function startStatsUpdate() {
       state.stats.mofox.uptime += 1;
       el.mofoxUptime.textContent = formatUptime(state.stats.mofox.uptime);
     }
-    if (state.hasNapcat && state.napcatStatus === 'running') {
-      state.stats.napcat.uptime += 1;
-      el.napcatUptime.textContent = formatUptime(state.stats.napcat.uptime);
+    if (state.hasPlatform && state.platformStatus === 'running') {
+      state.stats.platform.uptime += 1;
+      el.platformUptime.textContent = formatUptime(state.stats.platform.uptime);
     }
   }, 1000);
 
@@ -782,9 +794,9 @@ async function refreshResourceUsage() {
     applyResourceBar(el.instCpuBar, el.instCpuVal, data.cpuPercent);
     applyResourceBar(el.instMemBar, el.instMemVal, data.memPercent);
     if (el.instMemDetail) el.instMemDetail.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
-    applyResourceBar(el.instCpuBarNc, el.instCpuValNc, data.cpuPercent);
-    applyResourceBar(el.instMemBarNc, el.instMemValNc, data.memPercent);
-    if (el.instMemDetailNc) el.instMemDetailNc.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
+    applyResourceBar(el.instCpuBarPlatform, el.instCpuValPlatform, data.cpuPercent);
+    applyResourceBar(el.instMemBarPlatform, el.instMemValPlatform, data.memPercent);
+    if (el.instMemDetailPlatform) el.instMemDetailPlatform.textContent = `${data.memUsedGB}/${data.memTotalGB} GB`;
   } catch (_) {
     /* 静默 */
   }

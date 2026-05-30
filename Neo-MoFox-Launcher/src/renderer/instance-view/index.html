@@ -90,10 +90,10 @@
           <span class="tab-label">MoFox</span>
           <span class="log-count" id="mofoxLogCount">0</span>
         </button>
-        <button class="tab-button" data-tab="napcat">
+        <button class="tab-button" data-tab="platform">
           <span class="material-symbols-rounded">terminal</span>
-          <span class="tab-label">Napcat</span>
-          <span class="log-count" id="napcatLogCount">0</span>
+          <span class="tab-label">平台</span>
+          <span class="log-count" id="platformLogCount">0</span>
         </button>
         
         <!-- 日志工具栏 -->
@@ -173,46 +173,46 @@
           <div class="terminal-host" id="mofoxTerminal"></div>
         </div>
 
-        <!-- Napcat 日志 -->
-        <div class="tab-pane" data-tab="napcat">
+        <!-- 平台日志 -->
+        <div class="tab-pane" data-tab="platform">
           <div class="log-header">
             <div class="log-control-buttons">
-              <button class="control-button-small start-button" id="btnStartNapcat" title="启动 NapCat">
+              <button class="control-button-small start-button" id="btnStartPlatform" title="启动 平台">
                 <span class="material-symbols-rounded">play_arrow</span>
               </button>
-              <button class="control-button-small stop-button" id="btnStopNapcat" disabled title="停止 NapCat">
+              <button class="control-button-small stop-button" id="btnStopPlatform" disabled title="停止 平台">
                 <span class="material-symbols-rounded">stop</span>
               </button>
-              <button class="control-button-small restart-button" id="btnRestartNapcat" disabled title="重启 NapCat">
+              <button class="control-button-small restart-button" id="btnRestartPlatform" disabled title="重启 平台">
                 <span class="material-symbols-rounded">refresh</span>
               </button>
             </div>
             <div class="log-stats">
               <span class="stat-item">
                 <span class="material-symbols-rounded">schedule</span>
-                运行时间: <span id="napcatUptime">00:00:00</span>
+                运行时间: <span id="platformUptime">00:00:00</span>
               </span>
               <span class="stat-divider-v"></span>
               <span class="stat-item resource-stat">
                 <span class="material-symbols-rounded">memory</span>
                 CPU
                 <span class="resource-bar-mini">
-                  <span class="resource-bar-fill inst-cpu-bar-nc"></span>
+                  <span class="resource-bar-fill inst-cpu-bar-platform"></span>
                 </span>
-                <span class="resource-val inst-cpu-val-nc">0%</span>
+                <span class="resource-val inst-cpu-val-platform">0%</span>
               </span>
               <span class="stat-item resource-stat">
                 <span class="material-symbols-rounded">storage</span>
                 内存
                 <span class="resource-bar-mini">
-                  <span class="resource-bar-fill inst-mem-bar-nc"></span>
+                  <span class="resource-bar-fill inst-mem-bar-platform"></span>
                 </span>
-                <span class="resource-val inst-mem-val-nc">0%</span>
-                <span class="resource-detail inst-mem-detail-nc"></span>
+                <span class="resource-val inst-mem-val-platform">0%</span>
+                <span class="resource-detail inst-mem-detail-platform"></span>
               </span>
             </div>
           </div>
-          <div class="terminal-host" id="napcatTerminal"></div>
+          <div class="terminal-host" id="platformTerminal"></div>
         </div>
 
       </div>
@@ -289,11 +289,11 @@
                 <div class="item-desc">model.toml</div>
               </div>
             </button>
-            <button class="settings-item" data-action="open-napcat" id="btnOpenNapcat">
+            <button class="settings-item" data-action="open-platform" id="btnOpenPlatform">
               <span class="material-symbols-rounded">terminal</span>
               <div class="item-info">
-                <div class="item-title">打开 NapCat 目录</div>
-                <div class="item-desc">NapCat 安装目录</div>
+                <div class="item-title">打开 平台 目录</div>
+                <div class="item-desc">平台 安装目录</div>
               </div>
             </button>
           </div>

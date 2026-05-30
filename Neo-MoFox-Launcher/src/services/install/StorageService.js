@@ -416,11 +416,13 @@ class StorageService {
         };
       }
 
-      // 从版本 2 迁移到版本 3：一次仅安装一个平台，现有实例均迁移为 NapCat。
-      const platformDir = migrated.platformDir || migrated.napcatDir || (
-        migrated.neomofoxDir ? path.join(path.dirname(migrated.neomofoxDir), 'napcat') : null
-      );
-      const platformVersion = migrated.platformVersion || migrated.napcatVersion || null;
+      // 从版本 2 迁移到版本 3：一次仅安装一个平台。
+      // 仅当旧数据原本存在 NapCat / 平台目录时才补齐平台字段；
+      // 如果原本 nc 路径为空，不应凭 neomofoxDir 推导并新增平台目录。
+      const originalPlatformDir = migrated.platformDir || migrated.napcatDir || null;
+      const platformVersion = originalPlatformDir
+        ? (migrated.platformVersion || migrated.napcatVersion || null)
+        : null;
       const migratedSteps = Array.isArray(migrated.installSteps)
         ? migrated.installSteps.map((step) => {
             if (step === 'napcat') return 'platform-install';
@@ -433,8 +435,8 @@ class StorageService {
 
       return {
         ...normalizedInstance,
-        platform: normalizedInstance.platform || 'napcat',
-        platformDir,
+        platform: originalPlatformDir ? (normalizedInstance.platform || 'napcat') : normalizedInstance.platform,
+        platformDir: originalPlatformDir,
         platformVersion,
         installSteps: migratedSteps,
       };

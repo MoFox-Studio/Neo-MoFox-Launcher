@@ -483,15 +483,6 @@ class VersionService {
   }
 
   /**
-   * 获取 NapCat 所有 Release 列表。
-   * @param {number} limit 返回数量
-   * @returns {Promise<Array<Object>>} Release 列表
-   */
-  async getNapCatReleases(limit = 10) {
-    return await this.getPlatformReleases('napcat', limit);
-  }
-
-  /**
    * 获取实例当前安装的平台版本。
    * @param {string} instanceId 实例 ID
    * @returns {string|null} 平台版本
@@ -503,15 +494,6 @@ class VersionService {
     }
 
     return instance.platformVersion || null;
-  }
-
-  /**
-   * 获取实例当前安装的 NapCat 版本。
-   * @param {string} instanceId 实例 ID
-   * @returns {string|null} NapCat 版本
-   */
-  getCurrentNapCatVersion(instanceId) {
-    return this.getCurrentPlatformVersion(instanceId);
   }
 
   /**
@@ -550,37 +532,6 @@ class VersionService {
     }
   }
 
-  /**
-   * 更新 NapCat 到指定版本。
-   * @param {string} instanceId 实例 ID
-   * @param {string} targetVersion 目标版本
-   * @returns {Promise<Object>} 更新结果
-   */
-  async updateNapCat(instanceId, targetVersion = 'latest') {
-    return await this.updatePlatform(instanceId, targetVersion);
-  }
-
-  /**
-   * 获取 NapCat Windows Node 包根目录。
-   */
-  _getNapCatNodeRootPath(napcatDir) {
-    try {
-      if (!napcatDir || !fs.existsSync(napcatDir)) return null;
-      const requiredFiles = ['node.exe', 'index.js', 'napcat.bat'];
-      const hasNodeRoot = requiredFiles.every((fileName) => fs.existsSync(path.join(napcatDir, fileName)))
-        && fs.existsSync(path.join(napcatDir, 'napcat'));
-      return hasNodeRoot ? napcatDir : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /**
-   * 获取 NapCat Windows Node 包配置目录。
-   */
-  _getNapCatConfigPath(napcatRoot) {
-    return path.join(napcatRoot, 'napcat', 'config');
-  }
 
   // ─── 综合版本信息 ────────────────────────────────────────────────────────
 
@@ -608,10 +559,6 @@ class VersionService {
       },
       platform: {
         id: instance.platform || null,
-        version: platformVersion,
-        dir: instance.platformDir,
-      },
-      napcat: {
         version: platformVersion,
         dir: instance.platformDir,
       },

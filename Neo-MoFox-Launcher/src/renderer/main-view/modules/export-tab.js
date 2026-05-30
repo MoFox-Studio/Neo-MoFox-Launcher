@@ -187,7 +187,7 @@ function loadInstanceMetadata(instanceId) {
  */
 async function checkNapcatAvailability(instanceId) {
   try {
-    const napcatExists = await window.mofoxAPI.checkNapcatExists(instanceId);
+    const napcatExists = await window.mofoxAPI.checkPlatformExists(instanceId);
     
     if (napcatExists) {
       // 实例有 NapCat，显示两个选项，允许用户选择

@@ -434,7 +434,7 @@ function saveSettings() {
 function killMofoxProcess() {
   // 多实例进程都是 node-pty 的 IPty 对象，直接 kill 即可，附带平台命令兜底
   for (const [instanceId, data] of instanceProcesses.entries()) {
-    for (const proc of [data.mofoxProcess, data.napcatProcess]) {
+    for (const proc of [data.mofoxProcess, data.platformProcess]) {
       if (!proc) continue;
       try { proc.kill('SIGKILL'); } catch (_) { /* ignore */ }
       try {
@@ -1358,8 +1358,8 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       return { success: false, error: 'Neo-MoFox 目录不存在' };
     }
     
-    const selectedPlatform = instanceConfig.platform || (instanceConfig.platformDir ? 'napcat' : null);
-    const selectedPlatformDir = instanceConfig.platformDir || instanceConfig.napcatDir || null;
+    const selectedPlatform = instanceConfig.platform || null;
+    const selectedPlatformDir = instanceConfig.platformDir || null;
 
     // 验证平台路径（如果提供）
     if (selectedPlatformDir && !fs.existsSync(selectedPlatformDir)) {
@@ -1451,7 +1451,7 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       ],
       createdAt: new Date().toISOString(),
       lastStartedAt: null,
-      platformVersion: instanceConfig.platformVersion || instanceConfig.napcatVersion || null,
+      platformVersion: instanceConfig.platformVersion || null,
       neomofoxVersion: neomofoxVersion,
       extra: {
         displayName: instanceConfig.displayName || instanceConfig.qqNumber,
@@ -1484,7 +1484,7 @@ ipcMain.handle('logs-get-files', async (event, logType, instanceId) => {
     if (logType === 'launcher') {
       logDir = storageService.getLauncherLogDir();
       baseFilename = 'launcher';
-    } else if (logType === 'mofox' || logType === 'napcat') {
+    } else if (logType === 'mofox' || logType === 'platform') {
       logDir = storageService.getInstanceLogDir(instanceId);
       baseFilename = logType;
     } else {
@@ -1522,8 +1522,8 @@ ipcMain.handle('logs-get-stats', async (event) => {
       for (const instanceId of instanceIds) {
         const instanceLogDir = path.join(instancesDir, instanceId);
         const mofoxFiles = LogReader.listLogFiles(instanceLogDir, 'mofox');
-        const napcatFiles = LogReader.listLogFiles(instanceLogDir, 'napcat');
-        instanceFiles = instanceFiles.concat(mofoxFiles, napcatFiles);
+        const platformFiles = LogReader.listLogFiles(instanceLogDir, 'platform');
+        instanceFiles = instanceFiles.concat(mofoxFiles, platformFiles);
       }
     }
     
@@ -1659,27 +1659,82 @@ ipcMain.on('settings-read-sync', (event) => {
 // 全部以 UTF-8 字符串形态写入。带 ANSI 颜色码也会被 xterm 正确渲染。
 //
 // 渲染层进入页面时通过 instance-pty-buffer 一次性拿回历史数据回放。
+const SOURCE_MOFOX = 'mofox';
+const SOURCE_PLATFORM = 'platform';
+const PTY_SOURCES = [SOURCE_MOFOX, SOURCE_PLATFORM];
+
+function normalizePtySource(source) {
+  return source;
+}
+
+function createDefaultInstanceProcessData() {
+  return {
+    status: 'stopped',
+    mofoxProcess: null,
+    platformProcess: null,
+    mofoxStatus: 'stopped',
+    platformStatus: 'stopped',
+    loggers: {},
+    ptyBuffers: { mofox: '', platform: '' },
+    ptySize: {
+      mofox: { cols: 120, rows: 40 },
+      platform: { cols: 120, rows: 40 },
+    },
+    mofoxStartTime: 0,
+    platformStartTime: 0,
+    webuiOpened: false,
+    mofoxGeneration: 0,
+    platformGeneration: 0,
+  };
+}
+
+function ensureInstanceProcessData(instanceId) {
+  if (!instanceProcesses.has(instanceId)) {
+    instanceProcesses.set(instanceId, createDefaultInstanceProcessData());
+  }
+  const instanceData = instanceProcesses.get(instanceId);
+  if (!instanceData.ptyBuffers) instanceData.ptyBuffers = { mofox: '', platform: '' };
+  if (!Object.prototype.hasOwnProperty.call(instanceData.ptyBuffers, SOURCE_PLATFORM)) {
+    instanceData.ptyBuffers.platform = '';
+  }
+  if (!instanceData.ptySize) {
+    instanceData.ptySize = {
+      mofox: { cols: 120, rows: 40 },
+      platform: { cols: 120, rows: 40 },
+    };
+  }
+  if (!instanceData.ptySize.platform) {
+    instanceData.ptySize.platform = { cols: 120, rows: 40 };
+  }
+  return instanceData;
+}
+
 function appendPtyData(instanceId, type, chunk) {
   if (!chunk) return;
+  const source = normalizePtySource(type);
+  if (!PTY_SOURCES.includes(source)) return;
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData) return;
 
   if (!instanceData.ptyBuffers) {
-    instanceData.ptyBuffers = { mofox: '', napcat: '' };
+    instanceData.ptyBuffers = { mofox: '', platform: '' };
+  }
+  if (!Object.prototype.hasOwnProperty.call(instanceData.ptyBuffers, source)) {
+    instanceData.ptyBuffers[source] = '';
   }
 
   // Ring buffer：超过上限时从前面截断
-  const next = instanceData.ptyBuffers[type] + chunk;
-  instanceData.ptyBuffers[type] = next.length > PTY_BUFFER_MAX_SIZE
+  const next = instanceData.ptyBuffers[source] + chunk;
+  instanceData.ptyBuffers[source] = next.length > PTY_BUFFER_MAX_SIZE
     ? next.slice(next.length - PTY_BUFFER_MAX_SIZE)
     : next;
 
   // 同步写入持久化日志文件（去掉 ANSI 控制码后写入，方便人类阅读）
-  if (instanceData.loggers && instanceData.loggers[type]) {
+  if (instanceData.loggers && instanceData.loggers[source]) {
     try {
       const plain = stripAnsi(chunk).replace(/\r(?!\n)/g, '\n');
       if (plain.trim()) {
-        instanceData.loggers[type].log(plain);
+        instanceData.loggers[source].log(plain);
       }
     } catch (e) { /* 忽略日志写入失败，不影响主流程 */ }
   }
@@ -1687,7 +1742,7 @@ function appendPtyData(instanceId, type, chunk) {
   // 广播给所有打开了实例视图的窗口
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
-      win.webContents.send('instance-pty-data', { instanceId, type, data: chunk });
+      win.webContents.send('instance-pty-data', { instanceId, type: source, data: chunk });
     }
   }
 }
@@ -1695,6 +1750,7 @@ function appendPtyData(instanceId, type, chunk) {
 // 启动器自己输出的状态消息（不来自子进程）。
 // 用 ANSI 着色后送入 PTY 流，渲染端会按真终端样式呈现，与子进程日志混排。
 function emitLauncherMessage(instanceId, type, message, level = 'info') {
+  const source = normalizePtySource(type);
   const palette = {
     info:    '\x1b[36m',  // 青
     success: '\x1b[32m',  // 绿
@@ -1706,7 +1762,7 @@ function emitLauncherMessage(instanceId, type, message, level = 'info') {
   const tag = (level || 'info').toUpperCase().padEnd(7, ' ');
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const line = `\x1b[90m${ts}\x1b[0m \x1b[1m${color}[Launcher ${tag}]\x1b[0m ${message}\r\n`;
-  appendPtyData(instanceId, type, line);
+  appendPtyData(instanceId, source, line);
 }
 
 function updateInstanceStatus(instanceId) {
@@ -1714,28 +1770,22 @@ function updateInstanceStatus(instanceId) {
   if (!instanceData) return;
   
   // 计算整体状态：如果任一组件在运行，则整体为运行中
-  let overallStatus = 'stopped';
   const mofoxStatus = instanceData.mofoxStatus || 'stopped';
-  const napcatStatus = instanceData.napcatStatus || 'stopped';
+  const platformStatus = instanceData.platformStatus || 'stopped';
   
   // 转换状态优先级：starting > restarting > running > stopping > error > stopped
   const statusPriority = {
-    'starting': 6,
-    'restarting': 5,
-    'running': 4,
-    'stopping': 3,
-    'error': 2,
-    'stopped': 1
+    starting: 6,
+    restarting: 5,
+    running: 4,
+    stopping: 3,
+    error: 2,
+    stopped: 1,
   };
   
   const mofoxPriority = statusPriority[mofoxStatus] || 0;
-  const napcatPriority = statusPriority[napcatStatus] || 0;
-  
-  if (mofoxPriority >= napcatPriority) {
-    overallStatus = mofoxStatus;
-  } else {
-    overallStatus = napcatStatus;
-  }
+  const platformPriority = statusPriority[platformStatus] || 0;
+  const overallStatus = mofoxPriority >= platformPriority ? mofoxStatus : platformStatus;
   
   // 向后兼容：设置旧的 status 字段
   instanceData.status = overallStatus;
@@ -1745,7 +1795,7 @@ function updateInstanceStatus(instanceId) {
       instanceId, 
       status: overallStatus,
       mofoxStatus,
-      napcatStatus
+      platformStatus,
     });
   }
 }
@@ -1759,17 +1809,17 @@ function updateInstanceStats(instanceId) {
     mofox: {
       uptime: instanceData.mofoxStartTime ? Math.floor((now - instanceData.mofoxStartTime) / 1000) : 0,
       memory: 0,
-      cpu: 0
+      cpu: 0,
     },
-    napcat: {
-      uptime: instanceData.napcatStartTime ? Math.floor((now - instanceData.napcatStartTime) / 1000) : 0,
+    platform: {
+      uptime: instanceData.platformStartTime ? Math.floor((now - instanceData.platformStartTime) / 1000) : 0,
       memory: 0,
-      cpu: 0
-    }
+      cpu: 0,
+    },
   };
   
-  // 向后兼容：使用 mofox 的启动时间作为整体启动时间
-  instanceData.startTime = instanceData.mofoxStartTime || instanceData.napcatStartTime || 0;
+  // 向后兼容：使用首个可用启动时间作为整体启动时间
+  instanceData.startTime = instanceData.mofoxStartTime || instanceData.platformStartTime || 0;
   
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('instance-stats-update', { instanceId, stats });
@@ -1789,43 +1839,21 @@ async function startMoFoxProcess(instanceId, instance) {
     throw new Error('未找到 main.py');
   }
   
-  // 初始化实例数据
-  if (!instanceProcesses.has(instanceId)) {
-    instanceProcesses.set(instanceId, {
-      mofoxProcess: null,
-      napcatProcess: null,
-      mofoxStatus: 'stopped',
-      napcatStatus: 'stopped',
-      loggers: {},
-      ptyBuffers: { mofox: '', napcat: '' },
-      ptySize: { mofox: { cols: 120, rows: 40 }, napcat: { cols: 120, rows: 40 } },
-      mofoxStartTime: 0,
-      napcatStartTime: 0,
-      webuiOpened: false,
-      mofoxGeneration: 0,
-      napcatGeneration: 0
-    });
-  }
-  
-  const instanceData = instanceProcesses.get(instanceId);
+  const instanceData = ensureInstanceProcessData(instanceId);
   instanceData.mofoxGeneration = (instanceData.mofoxGeneration || 0) + 1;
   const currentGeneration = instanceData.mofoxGeneration;
   
   // 初始化 MoFox 日志管理器
   if (!instanceData.loggers.mofox) {
     const logsDir = path.join(storageService.getDataDir(), 'logs');
-    instanceData.loggers.mofox = new InstanceLogger(
-      logsDir,
-      instanceId,
-      'mofox'
-    );
+    instanceData.loggers.mofox = new InstanceLogger(logsDir, instanceId, SOURCE_MOFOX);
   }
   
   instanceData.mofoxStatus = 'starting';
   instanceData.mofoxStartTime = Date.now();
   updateInstanceStatus(instanceId);
   
-  emitLauncherMessage(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
+  emitLauncherMessage(instanceId, SOURCE_MOFOX, '正在启动 MoFox 核心...', 'info');
   
   // 查找 Python 可执行文件
   const pythonExe = platformHelper.findVenvPython(mofoxPath);
@@ -1834,11 +1862,11 @@ async function startMoFoxProcess(instanceId, instance) {
   if (pythonExe) {
     cmd = pythonExe;
     args = [mainPy];
-    emitLauncherMessage(instanceId, 'mofox', `使用 Python: ${pythonExe}`, 'info');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, `使用 Python: ${pythonExe}`, 'info');
   } else {
     cmd = platformHelper.uvBin;
     args = ['run', 'python', 'main.py'];
-    emitLauncherMessage(instanceId, 'mofox', '使用 uv run 启动', 'info');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, '使用 uv run 启动', 'info');
   }
   
   // 用 PTY 启动子进程，让 Rich/Loguru/Textual 等库认为自己接了真终端，
@@ -1863,30 +1891,29 @@ async function startMoFoxProcess(instanceId, instance) {
       encoding: 'utf8',
     });
   } catch (err) {
-    emitLauncherMessage(instanceId, 'mofox', `MoFox 启动失败: ${err.message}`, 'error');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, `MoFox 启动失败: ${err.message}`, 'error');
     instanceData.mofoxStatus = 'error';
     updateInstanceStatus(instanceId);
     throw err;
   }
 
   instanceData.mofoxProcess = mofoxProc;
-  emitLauncherMessage(instanceId, 'mofox', `MoFox PID: ${mofoxProc.pid}`, 'info');
+  emitLauncherMessage(instanceId, SOURCE_MOFOX, `MoFox PID: ${mofoxProc.pid}`, 'info');
   
   mofoxProc.onData((data) => {
-    appendPtyData(instanceId, 'mofox', data);
+    appendPtyData(instanceId, SOURCE_MOFOX, data);
   });
   
   mofoxProc.onExit(({ exitCode, signal }) => {
     const code = exitCode != null ? exitCode : signal;
     const killedBySignal = exitCode == null && signal != null;
-    emitLauncherMessage(instanceId, 'mofox', `MoFox 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, `MoFox 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
     if (instanceData.mofoxGeneration !== currentGeneration) {
       console.log(`[Instance ${instanceId}] 忽略旧 MoFox 进程 close 事件`);
       return;
     }
     instanceData.mofoxProcess = null;
     
-    // 关闭 MoFox 日志管理器
     if (instanceData.loggers && instanceData.loggers.mofox) {
       instanceData.loggers.mofox.close();
       delete instanceData.loggers.mofox;
@@ -1897,12 +1924,7 @@ async function startMoFoxProcess(instanceId, instance) {
     } else if (instanceData.mofoxStatus === 'restarting') {
       console.log(`[Instance ${instanceId}] MoFox 进程在重启期间退出，等待重启流程`);
     } else {
-      // 被信号杀死（SIGINT/SIGTERM/SIGKILL）视为正常停止，不标记为 error
-      if (killedBySignal) {
-        instanceData.mofoxStatus = 'stopped';
-      } else {
-        instanceData.mofoxStatus = code === 0 ? 'stopped' : 'error';
-      }
+      instanceData.mofoxStatus = killedBySignal ? 'stopped' : (code === 0 ? 'stopped' : 'error');
     }
     updateInstanceStatus(instanceId);
   });
@@ -1913,10 +1935,11 @@ async function startMoFoxProcess(instanceId, instance) {
     if (instanceData.mofoxProcess && instanceData.mofoxStatus === 'starting') {
       instanceData.mofoxStatus = 'running';
       updateInstanceStatus(instanceId);
-      emitLauncherMessage(instanceId, 'mofox', 'MoFox 正在运行', 'success');
+      emitLauncherMessage(instanceId, SOURCE_MOFOX, 'MoFox 正在运行', 'success');
     }
   }, 3000);
 }
+
 // ── 平台适配器独立启动函数 ────────────────────────────────────────────────────
 async function startPlatformProcess(instanceId, instance) {
   const platformPath = instance.platformDir;
@@ -1931,47 +1954,25 @@ async function startPlatformProcess(instanceId, instance) {
     throw new Error(`${platformName} 路径无效: ${platformPath}`);
   }
   
-  // 初始化实例数据
-  if (!instanceProcesses.has(instanceId)) {
-    instanceProcesses.set(instanceId, {
-      mofoxProcess: null,
-      napcatProcess: null,
-      mofoxStatus: 'stopped',
-      napcatStatus: 'stopped',
-      loggers: {},
-      ptyBuffers: { mofox: '', napcat: '' },
-      ptySize: { mofox: { cols: 120, rows: 40 }, napcat: { cols: 120, rows: 40 } },
-      mofoxStartTime: 0,
-      napcatStartTime: 0,
-      webuiOpened: false,
-      mofoxGeneration: 0,
-      napcatGeneration: 0
-    });
-  }
-  
-  const instanceData = instanceProcesses.get(instanceId);
-  instanceData.napcatGeneration = (instanceData.napcatGeneration || 0) + 1;
-  const currentGeneration = instanceData.napcatGeneration;
+  const instanceData = ensureInstanceProcessData(instanceId);
+  instanceData.platformGeneration = (instanceData.platformGeneration || 0) + 1;
+  const currentGeneration = instanceData.platformGeneration;
   
   // 初始化平台适配器日志管理器
-  if (!instanceData.loggers.napcat) {
+  if (!instanceData.loggers.platform) {
     const logsDir = path.join(storageService.getDataDir(), 'logs');
-    instanceData.loggers.napcat = new InstanceLogger(
-      logsDir,
-      instanceId,
-      'napcat'
-    );
+    instanceData.loggers.platform = new InstanceLogger(logsDir, instanceId, SOURCE_PLATFORM);
   }
   
-  instanceData.napcatStatus = 'starting';
-  instanceData.napcatStartTime = Date.now();
+  instanceData.platformStatus = 'starting';
+  instanceData.platformStartTime = Date.now();
   updateInstanceStatus(instanceId);
   
-  emitLauncherMessage(instanceId, 'napcat', `正在启动${platformName}适配器...`, 'info');
+  emitLauncherMessage(instanceId, SOURCE_PLATFORM, `正在启动${platformName}适配器...`, 'info');
   
   if (!platform.runtime || typeof platform.runtime.getStartCommand !== 'function') {
-    emitLauncherMessage(instanceId, 'napcat', `错误: ${platformName}未提供启动命令生成器`, 'error');
-    instanceData.napcatStatus = 'error';
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, `错误: ${platformName}未提供启动命令生成器`, 'error');
+    instanceData.platformStatus = 'error';
     updateInstanceStatus(instanceId);
     throw new Error(`${platformName}未提供启动命令生成器`);
   }
@@ -1980,18 +1981,18 @@ async function startPlatformProcess(instanceId, instance) {
   const platformStartInfo = platform.runtime.getStartCommand(platformRootPath, instance.qqNumber);
   
   if (!platformStartInfo) {
-    emitLauncherMessage(instanceId, 'napcat', `错误: 未找到${platformName}启动文件`, 'error');
-    instanceData.napcatStatus = 'error';
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, `错误: 未找到${platformName}启动文件`, 'error');
+    instanceData.platformStatus = 'error';
     updateInstanceStatus(instanceId);
     throw new Error(`未找到${platformName}启动文件`);
   }
   
   const platformCmd = platformStartInfo.cmd;
   const platformArgs = platformStartInfo.args;
-  emitLauncherMessage(instanceId, 'napcat', `使用启动命令: ${platformCmd} ${platformArgs.join(' ')}`, 'info');
+  emitLauncherMessage(instanceId, SOURCE_PLATFORM, `使用启动命令: ${platformCmd} ${platformArgs.join(' ')}`, 'info');
   
   // PTY 启动平台适配器。启动脚本本身可能用 cmd/bash，所以走 shell 包一层。
-  const ptySize = instanceData.ptySize.napcat;
+  const ptySize = instanceData.ptySize.platform;
   const ptyEnv = {
     ...process.env,
     TERM: 'xterm-256color',
@@ -1999,11 +2000,11 @@ async function startPlatformProcess(instanceId, instance) {
     FORCE_COLOR: '1',
   };
 
-  let napcatProc;
+  let platformProc;
   try {
     if (process.platform === 'win32') {
       // Windows 下走 ConPTY，直接用 cmd /c 启动批处理
-      napcatProc = pty.spawn(process.env.ComSpec || 'cmd.exe', ['/c', platformCmd, ...platformArgs], {
+      platformProc = pty.spawn(process.env.ComSpec || 'cmd.exe', ['/c', platformCmd, ...platformArgs], {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
@@ -2012,7 +2013,7 @@ async function startPlatformProcess(instanceId, instance) {
         encoding: 'utf8',
       });
     } else {
-      napcatProc = pty.spawn(platformCmd, platformArgs, {
+      platformProc = pty.spawn(platformCmd, platformArgs, {
         name: 'xterm-256color',
         cols: ptySize.cols,
         rows: ptySize.rows,
@@ -2022,19 +2023,19 @@ async function startPlatformProcess(instanceId, instance) {
       });
     }
   } catch (err) {
-    emitLauncherMessage(instanceId, 'napcat', `${platformName} 启动失败: ${err.message}`, 'error');
-    instanceData.napcatStatus = 'error';
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, `${platformName} 启动失败: ${err.message}`, 'error');
+    instanceData.platformStatus = 'error';
     updateInstanceStatus(instanceId);
     throw err;
   }
 
-  instanceData.napcatProcess = napcatProc;
-  emitLauncherMessage(instanceId, 'napcat', `NapCat PID: ${napcatProc.pid}`, 'info');
+  instanceData.platformProcess = platformProc;
+  emitLauncherMessage(instanceId, SOURCE_PLATFORM, `${platformName} PID: ${platformProc.pid}`, 'info');
   
   // PTY 是单一数据流，按 chunk 接收。WebUI URL 检测在累积的纯文本上做。
   let webuiScanBuffer = '';
-  napcatProc.onData((data) => {
-    appendPtyData(instanceId, 'napcat', data);
+  platformProc.onData((data) => {
+    appendPtyData(instanceId, SOURCE_PLATFORM, data);
 
     if (!instanceData.webuiOpened) {
       webuiScanBuffer += stripAnsi(data);
@@ -2047,53 +2048,47 @@ async function startPlatformProcess(instanceId, instance) {
         const settings = settingsService.readSettings();
         if (settings.autoOpenNapcatWebUI) {
           instanceData.webuiOpened = true;
-          emitLauncherMessage(instanceId, 'napcat', `自动打开 WebUI: ${url}`, 'info');
+          emitLauncherMessage(instanceId, SOURCE_PLATFORM, `自动打开 ${platformName} WebUI: ${url}`, 'info');
           shell.openExternal(url).catch(err => {
-            emitLauncherMessage(instanceId, 'napcat', `打开 WebUI 失败: ${err.message}`, 'error');
+            emitLauncherMessage(instanceId, SOURCE_PLATFORM, `打开 ${platformName} WebUI 失败: ${err.message}`, 'error');
           });
         }
       }
     }
   });
   
-  napcatProc.onExit(({ exitCode, signal }) => {
+  platformProc.onExit(({ exitCode, signal }) => {
     const code = exitCode != null ? exitCode : signal;
     const killedBySignal = exitCode == null && signal != null;
-    emitLauncherMessage(instanceId, 'napcat', `${platformName} 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
-    if (instanceData.napcatGeneration !== currentGeneration) {
-      console.log(`[Instance ${instanceId}] 忽略旧 NapCat 进程 close 事件`);
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, `${platformName} 进程已退出 (code: ${code}, signal: ${signal})`, 'info');
+    if (instanceData.platformGeneration !== currentGeneration) {
+      console.log(`[Instance ${instanceId}] 忽略旧平台进程 close 事件`);
       return;
     }
-    instanceData.napcatProcess = null;
+    instanceData.platformProcess = null;
 
-    // 关闭 NapCat 日志管理器
-    if (instanceData.loggers && instanceData.loggers.napcat) {
-      instanceData.loggers.napcat.close();
-      delete instanceData.loggers.napcat;
+    if (instanceData.loggers && instanceData.loggers.platform) {
+      instanceData.loggers.platform.close();
+      delete instanceData.loggers.platform;
     }
 
-    if (instanceData.napcatStatus === 'stopping') {
-      instanceData.napcatStatus = 'stopped';
-    } else if (instanceData.napcatStatus === 'restarting') {
-      console.log(`[Instance ${instanceId}] NapCat 进程在重启期间退出，等待重启流程`);
+    if (instanceData.platformStatus === 'stopping') {
+      instanceData.platformStatus = 'stopped';
+    } else if (instanceData.platformStatus === 'restarting') {
+      console.log(`[Instance ${instanceId}] 平台进程在重启期间退出，等待重启流程`);
     } else {
-      // 被信号杀死（SIGINT/SIGTERM/SIGKILL）视为正常停止，不标记为 error
-      if (killedBySignal) {
-        instanceData.napcatStatus = 'stopped';
-      } else {
-        instanceData.napcatStatus = code === 0 ? 'stopped' : 'error';
-      }
+      instanceData.platformStatus = killedBySignal ? 'stopped' : (code === 0 ? 'stopped' : 'error');
     }
     updateInstanceStatus(instanceId);
   });
 
   // 延迟检测启动状态：PTY 进程没有 'error' 事件，3 秒后还活着就视为启动成功
   setTimeout(() => {
-    if (instanceData.napcatGeneration !== currentGeneration) return;
-    if (instanceData.napcatProcess && instanceData.napcatStatus === 'starting') {
-      instanceData.napcatStatus = 'running';
+    if (instanceData.platformGeneration !== currentGeneration) return;
+    if (instanceData.platformProcess && instanceData.platformStatus === 'starting') {
+      instanceData.platformStatus = 'running';
       updateInstanceStatus(instanceId);
-      emitLauncherMessage(instanceId, 'napcat', `${platformName} 正在运行`, 'success');
+      emitLauncherMessage(instanceId, SOURCE_PLATFORM, `${platformName} 正在运行`, 'success');
     }
   }, 3000);
 }
@@ -2102,17 +2097,15 @@ async function startPlatformProcess(instanceId, instance) {
 async function startInstanceInternal(instanceId, instance) {
   const hasPlatform = !!(instance.platformDir && instance.platform);
   
-  emitLauncherMessage(instanceId, 'mofox', '正在启动 MoFox 核心...', 'info');
+  emitLauncherMessage(instanceId, SOURCE_MOFOX, '正在启动 MoFox 核心...', 'info');
   if (hasPlatform) {
-    emitLauncherMessage(instanceId, 'napcat', '正在启动平台适配器...', 'info');
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, '正在启动平台适配器...', 'info');
   } else {
-    emitLauncherMessage(instanceId, 'mofox', '未安装平台适配器，仅启动 MoFox 核心', 'info');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, '未安装平台适配器，仅启动 MoFox 核心', 'info');
   }
   
-  // 调用独立函数启动 MoFox
   await startMoFoxProcess(instanceId, instance);
   
-  // 调用独立函数启动平台适配器（如果安装了）
   if (hasPlatform) {
     await startPlatformProcess(instanceId, instance);
   }
@@ -2162,33 +2155,33 @@ async function stopMoFoxProcess(instanceId) {
 
   instanceData.mofoxStatus = 'stopping';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'mofox', '正在停止 MoFox...', 'info');
+  emitLauncherMessage(instanceId, SOURCE_MOFOX, '正在停止 MoFox...', 'info');
 
   await stopPtyProcess(instanceData.mofoxProcess, 'MoFox');
 
   instanceData.mofoxProcess = null;
   instanceData.mofoxStatus = 'stopped';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'mofox', 'MoFox 已停止', 'info');
+  emitLauncherMessage(instanceId, SOURCE_MOFOX, 'MoFox 已停止', 'info');
 }
 
 // ── 平台适配器独立停止函数 ────────────────────────────────────────────────────
 async function stopPlatformProcess(instanceId) {
   const instanceData = instanceProcesses.get(instanceId);
-  if (!instanceData || !instanceData.napcatProcess) {
+  if (!instanceData || !instanceData.platformProcess) {
     throw new Error('平台适配器未在运行');
   }
 
-  instanceData.napcatStatus = 'stopping';
+  instanceData.platformStatus = 'stopping';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'napcat', '正在停止平台适配器...', 'info');
+  emitLauncherMessage(instanceId, SOURCE_PLATFORM, '正在停止平台适配器...', 'info');
 
-  await stopPtyProcess(instanceData.napcatProcess, 'Platform');
+  await stopPtyProcess(instanceData.platformProcess, 'Platform');
 
-  instanceData.napcatProcess = null;
-  instanceData.napcatStatus = 'stopped';
+  instanceData.platformProcess = null;
+  instanceData.platformStatus = 'stopped';
   updateInstanceStatus(instanceId);
-  emitLauncherMessage(instanceId, 'napcat', '平台适配器已停止', 'info');
+  emitLauncherMessage(instanceId, SOURCE_PLATFORM, '平台适配器已停止', 'info');
 }
 
 // ── MoFox 独立重启函数 ───────────────────────────────────────────────────────
@@ -2202,7 +2195,7 @@ async function restartMoFoxProcess(instanceId) {
   if (instanceData && instanceData.mofoxProcess) {
     instanceData.mofoxStatus = 'restarting';
     updateInstanceStatus(instanceId);
-    emitLauncherMessage(instanceId, 'mofox', '正在重启 MoFox...', 'info');
+    emitLauncherMessage(instanceId, SOURCE_MOFOX, '正在重启 MoFox...', 'info');
 
     await stopMoFoxProcess(instanceId);
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -2224,10 +2217,10 @@ async function restartPlatformProcess(instanceId) {
   }
 
   const instanceData = instanceProcesses.get(instanceId);
-  if (instanceData && instanceData.napcatProcess) {
-    instanceData.napcatStatus = 'restarting';
+  if (instanceData && instanceData.platformProcess) {
+    instanceData.platformStatus = 'restarting';
     updateInstanceStatus(instanceId);
-    emitLauncherMessage(instanceId, 'napcat', '正在重启平台适配器...', 'info');
+    emitLauncherMessage(instanceId, SOURCE_PLATFORM, '正在重启平台适配器...', 'info');
     
     await stopPlatformProcess(instanceId);
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -2244,21 +2237,21 @@ ipcMain.handle('instance-start', async (event, instanceId) => {
     }
 
     if (instanceProcesses.has(instanceId)) {
-      const data = instanceProcesses.get(instanceId);
+      const data = ensureInstanceProcessData(instanceId);
       // 检查状态和实际进程引用，防止状态不同步时重复启动
       if (data.status === 'running' || data.status === 'starting' || data.status === 'restarting') {
         throw new Error('实例已在运行中');
       }
       // 即使状态为 stopped，也检查是否有残留进程
-      if (data.mofoxProcess || data.napcatProcess) {
+      if (data.mofoxProcess || data.platformProcess) {
         console.warn(`[Instance ${instanceId}] 状态为 ${data.status} 但仍有残留进程，先清理`);
         if (data.mofoxProcess) {
           await stopPtyProcess(data.mofoxProcess, 'MoFox');
           data.mofoxProcess = null;
         }
-        if (data.napcatProcess) {
-          await stopPtyProcess(data.napcatProcess, 'NapCat');
-          data.napcatProcess = null;
+        if (data.platformProcess) {
+          await stopPtyProcess(data.platformProcess, 'Platform');
+          data.platformProcess = null;
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -2274,22 +2267,20 @@ ipcMain.handle('instance-start', async (event, instanceId) => {
 ipcMain.handle('instance-stop', async (event, instanceId) => {
   try {
     const instanceData = instanceProcesses.get(instanceId);
-    if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {
+    if (!instanceData || (!instanceData.mofoxProcess && !instanceData.platformProcess)) {
       // 即使没有进程引用，也确保状态重置为 stopped
       if (instanceData) {
         instanceData.status = 'stopped';
         instanceData.mofoxStatus = 'stopped';
-        instanceData.napcatStatus = 'stopped';
+        instanceData.platformStatus = 'stopped';
         updateInstanceStatus(instanceId);
-      } else {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('instance-status-change', { 
-            instanceId, 
-            status: 'stopped',
-            mofoxStatus: 'stopped',
-            napcatStatus: 'stopped'
-          });
-        }
+      } else if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('instance-status-change', { 
+          instanceId, 
+          status: 'stopped',
+          mofoxStatus: 'stopped',
+          platformStatus: 'stopped',
+        });
       }
       return { success: true, message: '进程未在运行' };
     }
@@ -2299,7 +2290,7 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
     if (instanceData.mofoxProcess) {
       promises.push(stopMoFoxProcess(instanceId).catch(e => console.error('停止 MoFox 失败:', e)));
     }
-    if (instanceData.napcatProcess) {
+    if (instanceData.platformProcess) {
       promises.push(stopPlatformProcess(instanceId).catch(e => console.error('停止平台适配器失败:', e)));
     }
     
@@ -2314,56 +2305,45 @@ ipcMain.handle('instance-stop', async (event, instanceId) => {
 ipcMain.handle('instance-restart', async (event, instanceId) => {
   try {
     const instanceData = instanceProcesses.get(instanceId);
-    if (instanceData && (instanceData.mofoxProcess || instanceData.napcatProcess)) {
-      updateInstanceStatus(instanceId, 'restarting');
-      emitLauncherMessage(instanceId, 'mofox', '正在重启 MoFox...', 'info');
-      if (instanceData.napcatProcess) {
-        emitLauncherMessage(instanceId, 'napcat', '正在重启 Napcat...', 'info');
+    if (instanceData && (instanceData.mofoxProcess || instanceData.platformProcess)) {
+      updateInstanceStatus(instanceId);
+      emitLauncherMessage(instanceId, SOURCE_MOFOX, '正在重启 MoFox...', 'info');
+      if (instanceData.platformProcess) {
+        emitLauncherMessage(instanceId, SOURCE_PLATFORM, '正在重启平台适配器...', 'info');
       }
 
       // 并行停止两个 PTY 进程
       const stopTasks = [];
       if (instanceData.mofoxProcess) stopTasks.push(stopPtyProcess(instanceData.mofoxProcess, 'MoFox'));
-      if (instanceData.napcatProcess) stopTasks.push(stopPtyProcess(instanceData.napcatProcess, 'NapCat'));
+      if (instanceData.platformProcess) stopTasks.push(stopPtyProcess(instanceData.platformProcess, 'Platform'));
       await Promise.all(stopTasks);
 
       // 清理旧进程引用
       instanceData.mofoxProcess = null;
-      instanceData.napcatProcess = null;
+      instanceData.platformProcess = null;
       
-      // 开始启动新进程
-      const instance = storageService.getInstance(instanceId);
-      if (!instance) {
-        updateInstanceStatus(instanceId, 'error');
-        return { success: false, error: '实例不存在' };
-      }
-      
-      try {
-        await startInstanceInternal(instanceId, instance);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error.message };
-      }
-    } else {
-      // 直接启动
       const instance = storageService.getInstance(instanceId);
       if (!instance) {
         return { success: false, error: '实例不存在' };
       }
       
-      try {
-        await startInstanceInternal(instanceId, instance);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: error.message };
-      }
+      await startInstanceInternal(instanceId, instance);
+      return { success: true };
     }
+
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) {
+      return { success: false, error: '实例不存在' };
+    }
+    
+    await startInstanceInternal(instanceId, instance);
+    return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-// ─── 分离启动控制（单独启动 MoFox 或 NapCat） ──────────────────────
+// ─── 分离启动控制（单独启动 MoFox 或平台适配器） ──────────────────────
 
 ipcMain.handle('instance-start-mofox-only', async (event, instanceId) => {
   try {
@@ -2391,12 +2371,12 @@ async function handleStartPlatformOnly(instanceId) {
       throw new Error('实例不存在');
     }
     
-    if (!instance.platformDir) {
+    if (!instance.platformDir || !instance.platform) {
       throw new Error('此实例未安装平台适配器');
     }
     
     const instanceData = instanceProcesses.get(instanceId);
-    if (instanceData && instanceData.napcatProcess && instanceData.napcatStatus === 'running') {
+    if (instanceData && instanceData.platformProcess && instanceData.platformStatus === 'running') {
       throw new Error('平台适配器已在运行中');
     }
     
@@ -2430,9 +2410,9 @@ ipcMain.handle('instance-stop-mofox-only', async (event, instanceId) => {
 async function handleStopPlatformOnly(instanceId) {
   try {
     const instanceData = instanceProcesses.get(instanceId);
-    if (!instanceData || !instanceData.napcatProcess) {
+    if (!instanceData || !instanceData.platformProcess) {
       if (instanceData) {
-        instanceData.napcatStatus = 'stopped';
+        instanceData.platformStatus = 'stopped';
         updateInstanceStatus(instanceId);
       }
       return { success: true, message: '平台适配器未在运行' };
@@ -2456,13 +2436,10 @@ ipcMain.handle('instance-restart-mofox-only', async (event, instanceId) => {
     
     const instanceData = instanceProcesses.get(instanceId);
     if (instanceData && instanceData.mofoxProcess) {
-      // 停止 MoFox
       await stopMoFoxProcess(instanceId);
-      // 等待进程完全退出
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // 重新启动 MoFox
     await startMoFoxProcess(instanceId, instance);
     return { success: true };
   } catch (error) {
@@ -2477,19 +2454,16 @@ async function handleRestartPlatformOnly(instanceId) {
       throw new Error('实例不存在');
     }
     
-    if (!instance.platformDir) {
+    if (!instance.platformDir || !instance.platform) {
       throw new Error('此实例未安装平台适配器');
     }
     
     const instanceData = instanceProcesses.get(instanceId);
-    if (instanceData && instanceData.napcatProcess) {
-      // 停止平台适配器
+    if (instanceData && instanceData.platformProcess) {
       await stopPlatformProcess(instanceId);
-      // 等待进程完全退出
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // 重新启动平台适配器
     await startPlatformProcess(instanceId, instance);
     return { success: true };
   } catch (error) {
@@ -2498,9 +2472,6 @@ async function handleRestartPlatformOnly(instanceId) {
 }
 
 ipcMain.handle('instance-restart-platform-only', async (event, instanceId) => handleRestartPlatformOnly(instanceId));
-ipcMain.handle('instance-start-napcat-only', async (event, instanceId) => handleStartPlatformOnly(instanceId));
-ipcMain.handle('instance-stop-napcat-only', async (event, instanceId) => handleStopPlatformOnly(instanceId));
-ipcMain.handle('instance-restart-napcat-only', async (event, instanceId) => handleRestartPlatformOnly(instanceId));
 
 // ─── 获取分离状态 ─────────────────────────────────────────────────────
 
@@ -2509,13 +2480,13 @@ ipcMain.handle('instance-status-separated', (event, instanceId) => {
   if (!instanceData) {
     return {
       mofox: 'stopped',
-      napcat: 'stopped'
+      platform: 'stopped',
     };
   }
   
   return {
     mofox: instanceData.mofoxStatus || 'stopped',
-    napcat: instanceData.napcatStatus || 'stopped'
+    platform: instanceData.platformStatus || 'stopped',
   };
 });
 
@@ -2534,10 +2505,10 @@ ipcMain.handle('instance-status-all', () => {
 
 ipcMain.handle('instance-stats', (event, instanceId) => {
   const instanceData = instanceProcesses.get(instanceId);
-  if (!instanceData || (!instanceData.mofoxProcess && !instanceData.napcatProcess)) {
+  if (!instanceData || (!instanceData.mofoxProcess && !instanceData.platformProcess)) {
     return {
       mofox: { uptime: 0, memory: 0, cpu: 0 },
-      napcat: { uptime: 0, memory: 0, cpu: 0 }
+      platform: { uptime: 0, memory: 0, cpu: 0 },
     };
   }
   
@@ -2546,13 +2517,13 @@ ipcMain.handle('instance-stats', (event, instanceId) => {
     mofox: {
       uptime: instanceData.mofoxStartTime ? Math.floor((now - instanceData.mofoxStartTime) / 1000) : 0,
       memory: 0,
-      cpu: 0
+      cpu: 0,
     },
-    napcat: {
-      uptime: instanceData.napcatStartTime ? Math.floor((now - instanceData.napcatStartTime) / 1000) : 0,
+    platform: {
+      uptime: instanceData.platformStartTime ? Math.floor((now - instanceData.platformStartTime) / 1000) : 0,
       memory: 0,
-      cpu: 0
-    }
+      cpu: 0,
+    },
   };
 });
 
@@ -2564,16 +2535,19 @@ ipcMain.handle('instance-pty-resize', (event, instanceId, source, cols, rows) =>
     return;
   }
 
+  const normalizedSource = normalizePtySource(source);
+  if (!PTY_SOURCES.includes(normalizedSource)) return { success: false };
+
   // 更新存储的尺寸
-  instanceData.ptySize[source] = { cols, rows };
+  instanceData.ptySize[normalizedSource] = { cols, rows };
 
   // 调整对应 PTY 进程的尺寸
-  const proc = source === 'mofox' ? instanceData.mofoxProcess : instanceData.napcatProcess;
+  const proc = normalizedSource === SOURCE_MOFOX ? instanceData.mofoxProcess : instanceData.platformProcess;
   if (proc && typeof proc.resize === 'function') {
     try {
       proc.resize(cols, rows);
     } catch (err) {
-      console.error(`[PTY Resize] ${source} 调整失败:`, err);
+      console.error(`[PTY Resize] ${normalizedSource} 调整失败:`, err);
     }
   }
 
@@ -2585,11 +2559,11 @@ ipcMain.handle('instance-pty-resize', (event, instanceId, source, cols, rows) =>
 ipcMain.handle('instance-pty-buffer', (event, instanceId) => {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData || !instanceData.ptyBuffers) {
-    return { mofox: '', napcat: '' };
+    return { mofox: '', platform: '' };
   }
   return {
     mofox: instanceData.ptyBuffers.mofox || '',
-    napcat: instanceData.ptyBuffers.napcat || '',
+    platform: instanceData.ptyBuffers.platform || '',
   };
 });
 
@@ -2597,7 +2571,8 @@ ipcMain.handle('instance-pty-buffer', (event, instanceId) => {
 ipcMain.handle('instance-pty-input', (event, instanceId, source, data) => {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData) return { success: false };
-  const proc = source === 'mofox' ? instanceData.mofoxProcess : instanceData.napcatProcess;
+  const normalizedSource = normalizePtySource(source);
+  const proc = normalizedSource === SOURCE_MOFOX ? instanceData.mofoxProcess : instanceData.platformProcess;
   if (proc && typeof proc.write === 'function') {
     try {
       proc.write(data);
@@ -2613,8 +2588,9 @@ ipcMain.handle('instance-pty-input', (event, instanceId, source, data) => {
 ipcMain.handle('instance-pty-clear', (event, instanceId, source) => {
   const instanceData = instanceProcesses.get(instanceId);
   if (!instanceData) return { success: false };
+  const normalizedSource = normalizePtySource(source);
   if (instanceData.ptyBuffers) {
-    instanceData.ptyBuffers[source] = '';
+    instanceData.ptyBuffers[normalizedSource] = '';
   }
   return { success: true };
 });
@@ -2622,12 +2598,13 @@ ipcMain.handle('instance-pty-clear', (event, instanceId, source) => {
 // ── 日志导出（基于文件）──────────────────────────────────────────────────────
 ipcMain.handle('instance-export-logs', async (event, instanceId, type) => {
   try {
+    const logType = normalizePtySource(type);
     const instanceLogDir = storageService.getInstanceLogDir(instanceId);
     if (!fs.existsSync(instanceLogDir)) {
       throw new Error('实例日志目录不存在');
     }
 
-    const logFiles = LogReader.listLogFiles(instanceLogDir, type);
+    const logFiles = LogReader.listLogFiles(instanceLogDir, logType);
     if (logFiles.length === 0) {
       throw new Error('没有找到任何日志文件');
     }
@@ -2664,7 +2641,7 @@ ipcMain.handle('instance-export-logs', async (event, instanceId, type) => {
     fs.mkdirSync(exportsDir, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-    const filename = `${instanceId}_${type}_${timestamp}.log`;
+    const filename = `${instanceId}_${logType}_${timestamp}.log`;
     const filepath = path.join(exportsDir, filename);
 
     const content = parsedLogs.map(log => log.raw).join('\n');
@@ -2706,11 +2683,11 @@ ipcMain.handle('instance-open-folder', async (event, instanceId, folderType) => 
       case 'plugins':
         folderPath = path.join(mofoxDir, 'plugins');
         break;
-      case 'napcat':
+      case 'platform':
         if (instance.platformDir) {
           folderPath = instance.platformDir;
         } else {
-          throw new Error('该实例未安装 NapCat');
+          throw new Error('该实例未安装平台适配器');
         }
         break;
       default:
@@ -2860,14 +2837,13 @@ ipcMain.handle('dialog-show-save', async (event, options) => {
 
 // ─── 整合包导出相关 IPC Handlers ──────────────────────────────────────
 
-// check-napcat-exists: 检查实例是否包含 NapCat
-ipcMain.handle('check-napcat-exists', async (event, instanceId) => {
+// check-platform-exists: 检查实例是否包含平台适配器
+ipcMain.handle('check-platform-exists', async (event, instanceId) => {
   try {
-    const { ExportService } = require('./services/integration-pack/ExportService');
-    const napcatExists = await ExportService.checkNapcatExists(instanceId);
-    return napcatExists;
+    const instance = storageService.getInstance(instanceId);
+    return !!(instance?.platform && instance?.platformDir && fs.existsSync(instance.platformDir));
   } catch (error) {
-    console.error('[IPC] checkNapcatExists 失败:', error);
+    console.error('[IPC] checkPlatformExists 失败:', error);
     return false;
   }
 });
@@ -3007,7 +2983,7 @@ ipcMain.handle('import-integration-pack', async (event, options) => {
       wsPort: options.wsPort,
       installDir: options.installDir,
       pythonCmd: options.pythonCmd,
-      installNapcat: options.installNapcat,
+      installPlatform: options.installPlatform ?? options.installNapcat,
       installWebui: options.installWebui,
     });
     
@@ -3102,7 +3078,6 @@ ipcMain.handle('instance-get-paths', (event, instanceId) => {
     };
 
     if (instance.platformDir) {
-      paths.napcat = instance.platformDir;
       paths.platform = instance.platformDir;
     }
 
@@ -3282,11 +3257,6 @@ ipcMain.handle('version-get-platform-releases', async (event, platformId, limit)
   return versionService.getPlatformReleases(platformId, limit || 10);
 });
 
-// 获取 NapCat 版本列表
-ipcMain.handle('version-get-napcat-releases', async (event, limit) => {
-  return versionService.getPlatformReleases('napcat', limit || 10);
-});
-
 // 检查 MoFox 更新
 ipcMain.handle('version-check-mofox-update', async (event, instanceId) => {
   return versionService.checkMofoxUpdate(instanceId);
@@ -3307,10 +3277,6 @@ ipcMain.handle('version-update-platform', async (event, instanceId, version) => 
   return versionService.updatePlatform(instanceId, version);
 });
 
-// 更新 NapCat
-ipcMain.handle('version-update-napcat', async (event, instanceId, version) => {
-  return versionService.updatePlatform(instanceId, version);
-});
 
 // 获取 MoFox 提交历史
 ipcMain.handle('version-get-mofox-commit-history', async (event, instanceId, limit) => {

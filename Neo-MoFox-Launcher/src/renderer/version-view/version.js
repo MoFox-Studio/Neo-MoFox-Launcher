@@ -12,7 +12,7 @@ let branchSelectValue = '';
 // 侧边栏状态
 let sidebarCollapsed = false;
 let activeTab = 'mofox'; //  'mofox' | 'napcat'
-let napcatInstalled = false;
+let platformInstalled = false;
 
 // ─── DOM 元素 ───────────────────────────────────────────────────────────
 const el = {
@@ -310,7 +310,7 @@ async function switchTab(target) {
     showPanel(el.panelMofox);
   } else if (target === 'napcat') {
     // 检查 NapCat 是否安装
-    if (napcatInstalled) {
+    if (platformInstalled) {
       showPanel(el.panelNapcat);
       // 首次切换到 NapCat 时加载数据
       if (!el.napcatVersionList.querySelector('.version-item')) {
@@ -383,11 +383,11 @@ async function loadVersionInfo() {
     }
     
     // 更新 NapCat 显示和安装状态
-    if (currentVersionInfo.napcat) {
-      const { version, dir } = currentVersionInfo.napcat;
+    if (currentVersionInfo.platform) {
+      const { version, dir } = currentVersionInfo.platform;
       
       // 更新安装状态
-      napcatInstalled = !!(version && dir);
+      platformInstalled = !!(version && dir);
       
       const versionEl = el.napcatVersion?.querySelector('span:last-child');
       if (versionEl) {
@@ -399,7 +399,7 @@ async function loadVersionInfo() {
         el.napcatPath.title = dir || '';
       }
     } else {
-      napcatInstalled = false;
+      platformInstalled = false;
     }
     
     // 检查 MoFox 更新
@@ -450,8 +450,8 @@ async function loadBranches() {
 // ─── 加载 NapCat 版本列表 ───────────────────────────────────────────────
 async function loadNapCatVersions() {
   try {
-    const releases = await window.mofoxAPI.versionGetNapCatReleases();
-    const currentVersion = currentVersionInfo?.napcat?.version;
+    const releases = await window.mofoxAPI.versionGetPlatformReleases(currentVersionInfo?.platform?.id || 'napcat');
+    const currentVersion = currentVersionInfo?.platform?.version;
     
     // 更新版本列表
     el.napcatVersionList.innerHTML = '';
@@ -684,7 +684,7 @@ async function installNapCatVersion(version) {
   showProgress(`安装 NapCat ${version}...`, 0);
   
   try {
-    await window.mofoxAPI.versionUpdateNapcat(instanceId, version);
+    await window.mofoxAPI.versionUpdatePlatform(instanceId, version);
     hideProgress();
     window.showToast?.(`NapCat 已更新到 ${version}`, 'success');
     await loadVersionInfo();

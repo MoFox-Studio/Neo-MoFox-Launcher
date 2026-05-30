@@ -127,9 +127,6 @@ const api = {
   startPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-start-platform-only', instanceId),
   stopPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-stop-platform-only', instanceId),
   restartPlatformOnly: (instanceId) => ipcRenderer.invoke('instance-restart-platform-only', instanceId),
-  startNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-start-platform-only', instanceId),
-  stopNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-stop-platform-only', instanceId),
-  restartNapCatOnly: (instanceId) => ipcRenderer.invoke('instance-restart-platform-only', instanceId),
   
   getInstanceStatus: (instanceId) => ipcRenderer.invoke('instance-status', instanceId),
   getSeparatedStatus: (instanceId) => ipcRenderer.invoke('instance-status-separated', instanceId),
@@ -203,7 +200,7 @@ const api = {
   },
 
   // ─── 整合包导出/导入 ─────────────────────────────────────────────────────
-  checkNapcatExists: (instanceId) => ipcRenderer.invoke('check-napcat-exists', instanceId),
+  checkPlatformExists: (instanceId) => ipcRenderer.invoke('check-platform-exists', instanceId),
   scanInstancePlugins: (instanceId) => ipcRenderer.invoke('scan-instance-plugins', instanceId),
   scanInstancePluginConfigs: (instanceId) => ipcRenderer.invoke('scan-instance-plugin-configs', instanceId),
   exportIntegrationPack: (instanceId, options, destPath) => ipcRenderer.invoke('export-integration-pack', instanceId, options, destPath),
@@ -283,12 +280,10 @@ const api = {
   versionGetInfo: (instanceId) => ipcRenderer.invoke('version-get-info', instanceId),
   versionGetBranches: () => ipcRenderer.invoke('version-get-branches'),
   versionGetPlatformReleases: (platformId, limit) => ipcRenderer.invoke('version-get-platform-releases', platformId, limit),
-  versionGetNapCatReleases: (limit) => ipcRenderer.invoke('version-get-napcat-releases', limit),
   versionCheckMofoxUpdate: (instanceId) => ipcRenderer.invoke('version-check-mofox-update', instanceId),
   versionSwitchBranch: (instanceId, branch) => ipcRenderer.invoke('version-switch-branch', instanceId, branch),
   versionUpdateMofox: (instanceId) => ipcRenderer.invoke('version-update-mofox', instanceId),
   versionUpdatePlatform: (instanceId, version) => ipcRenderer.invoke('version-update-platform', instanceId, version),
-  versionUpdateNapcat: (instanceId, version) => ipcRenderer.invoke('version-update-napcat', instanceId, version),
   versionGetMofoxCommitHistory: (instanceId, limit) => ipcRenderer.invoke('version-get-mofox-commit-history', instanceId, limit),
   versionCheckoutCommit: (instanceId, commitHash) => ipcRenderer.invoke('version-checkout-commit', instanceId, commitHash),
   onVersionProgress: (callback) => {
