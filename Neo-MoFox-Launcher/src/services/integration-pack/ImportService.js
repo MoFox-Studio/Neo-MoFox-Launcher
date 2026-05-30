@@ -180,7 +180,10 @@ class ImportService {
       const installSteps = this._determineInstallSteps(manifest, userInputs);
       this._emitOutput(`安装步骤: ${installSteps.join(', ')}`);
 
-      const platformId = manifest.content.platform?.id || userInputs.platform;
+      const platformContent = manifest.content.platform || manifest.content.napcat || null;
+      const platformId = platformContent?.included
+        ? platformContent.id
+        : (userInputs.platform || platformContent?.id);
       if (!platformId) {
         throw new Error('整合包导入失败: 缺少平台 ID');
       }
@@ -481,8 +484,9 @@ class ImportService {
     }
 
     // 2. 复制平台目录
-    if (manifest.content.platform.included) {
-      const platformId = manifest.content.platform.id;
+    const platformContent = manifest.content.platform || manifest.content.napcat || null;
+    if (platformContent?.included) {
+      const platformId = platformContent.id || 'napcat';
       const platform = platformRegistry.getPlatform(platformId);
       this._emitOutput(`复制平台 ${platform.displayName || platform.name}...`);
       const srcPath = path.join(tempDir, 'platforms', platformId);
@@ -650,7 +654,7 @@ class ImportService {
     steps.push('write-adapter');
 
     // 平台处理：一次只允许一个平台。
-    const platformContent = manifest.content.platform;
+    const platformContent = manifest.content.platform || manifest.content.napcat;
     const shouldUsePlatform = userInputs.installPlatform !== false;
     if (shouldUsePlatform && platformContent) {
       if (!platformContent.included && platformContent.installOnImport) {
@@ -704,8 +708,9 @@ class ImportService {
       instanceName: userInputs.instanceName,
     };
 
-    let platformRoot = manifest.content.platform?.included ? platformDir : null;
-    let platformVersion = manifest.content.platform?.version || null;
+    const platformContent = manifest.content.platform || manifest.content.napcat || null;
+    let platformRoot = platformContent?.included ? platformDir : null;
+    let platformVersion = platformContent?.version || null;
 
     // 执行每个步骤
     this._installStepPhaseActive = true;

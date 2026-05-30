@@ -17,6 +17,7 @@ const SYSTEM_PLUGINS = ['default_chatter', 'napcat_adapter', 'booku_memory', 'em
 let currentPlugins = [];
 let currentPluginConfigs = [];
 let isExporting = false;
+let availablePlatforms = [];
 
 // ─── Elements ─────────────────────────────────────────────────────────
 
@@ -32,6 +33,10 @@ const exportElements = {
   napcatOptionItem: null,
   installNapcatOnImport: null,
   installNapcatOptionItem: null,
+  installPlatformWrap: null,
+  installPlatformSelect: null,
+  installPlatformTrigger: null,
+  installPlatformMenu: null,
   includeConfig: null,
   includePlugins: null,
   includeData: null,
@@ -65,6 +70,10 @@ export function initExportTab() {
   exportElements.napcatOptionItem = document.getElementById('napcat-option-item');
   exportElements.installNapcatOnImport = document.getElementById('export-install-napcat-on-import');
   exportElements.installNapcatOptionItem = document.getElementById('install-napcat-option-item');
+  exportElements.installPlatformWrap = document.getElementById('export-install-platform-wrap');
+  exportElements.installPlatformSelect = document.getElementById('export-install-platform');
+  exportElements.installPlatformTrigger = document.getElementById('export-install-platform-trigger');
+  exportElements.installPlatformMenu = document.getElementById('export-install-platform-menu');
   exportElements.includeConfig = document.getElementById('export-include-config');
   exportElements.includePlugins = document.getElementById('export-include-plugins');
   exportElements.includeData = document.getElementById('export-include-data');
@@ -116,6 +125,8 @@ export function initExportTab() {
     exportElements.selectAllPluginConfigs.addEventListener('change', toggleSelectAllPluginConfigs);
   }
 
+  initPlatformSelectDropdown();
+
   if (exportElements.btnStartExport) {
     exportElements.btnStartExport.addEventListener('click', startExport);
   }
@@ -148,7 +159,8 @@ export async function onExportTabOpened(instanceId) {
   // 加载实例信息并填充元数据
   loadInstanceMetadata(instanceId);
 
-  // 检查 NapCat 是否存在
+  // 检查平台是否存在
+  await loadInstallablePlatforms();
   await checkNapcatAvailability(instanceId);
 
   // 扫描插件
@@ -182,15 +194,138 @@ function loadInstanceMetadata(instanceId) {
   }
 }
 
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getPlatformLabel(platform) {
+  const label = platform.displayName || platform.name || platform.id;
+  const requirement = platform.systemRequirement?.label;
+  return requirement ? `${label} · ${requirement}` : label;
+}
+
+function closePlatformSelectDropdown() {
+  exportElements.installPlatformWrap?.classList.remove('is-open');
+  exportElements.installPlatformTrigger?.setAttribute('aria-expanded', 'false');
+}
+
+function updatePlatformSelectTrigger() {
+  const select = exportElements.installPlatformSelect;
+  const trigger = exportElements.installPlatformTrigger;
+  if (!select || !trigger) return;
+
+  const text = trigger.querySelector('.export-platform-trigger-text');
+  if (!text) return;
+  const selected = availablePlatforms.find(platform => platform.id === select.value);
+  text.textContent = selected ? getPlatformLabel(selected) : (select.options[select.selectedIndex]?.textContent || '暂无可选平台');
+  trigger.disabled = select.disabled;
+}
+
+function renderPlatformSelectDropdown() {
+  const select = exportElements.installPlatformSelect;
+  const menu = exportElements.installPlatformMenu;
+  if (!select || !menu) return;
+
+  menu.innerHTML = '';
+  availablePlatforms.forEach(platform => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'export-platform-option';
+    option.dataset.value = platform.id;
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(platform.id === select.value));
+    option.innerHTML = `
+      <span class="material-symbols-rounded export-platform-option-icon">hub</span>
+      <span class="export-platform-option-main">
+        <span class="export-platform-option-name">${escapeHtml(platform.displayName || platform.name || platform.id)}</span>
+        <span class="export-platform-option-desc">${escapeHtml(platform.systemRequirement?.label || platform.description || '跨系统导出可选平台')}</span>
+      </span>
+      <span class="material-symbols-rounded export-platform-option-check">check</span>
+    `;
+    option.addEventListener('click', () => {
+      select.value = platform.id;
+      select.dispatchEvent(new Event('change'));
+      closePlatformSelectDropdown();
+    });
+    menu.appendChild(option);
+  });
+
+  updatePlatformSelectTrigger();
+}
+
+function initPlatformSelectDropdown() {
+  const select = exportElements.installPlatformSelect;
+  const trigger = exportElements.installPlatformTrigger;
+  const wrap = exportElements.installPlatformWrap;
+  if (!select || !trigger || !wrap) return;
+
+  trigger.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (trigger.disabled) return;
+    const willOpen = !wrap.classList.contains('is-open');
+    wrap.classList.toggle('is-open', willOpen);
+    trigger.setAttribute('aria-expanded', String(willOpen));
+  });
+
+  select.addEventListener('change', () => {
+    renderPlatformSelectDropdown();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!wrap.contains(event.target)) {
+      closePlatformSelectDropdown();
+    }
+  });
+}
+
 /**
- * 检查 NapCat 是否存在并动态显示选项
+ * 加载可安装平台列表。
+ */
+async function loadInstallablePlatforms() {
+  try {
+    availablePlatforms = await window.mofoxAPI.installGetPlatforms?.() || [];
+    const select = exportElements.installPlatformSelect;
+    if (!select) return;
+
+    // 整合包导出是跨系统分发场景，平台列表不按当前系统可安装性过滤。
+    // 这样用户可以在任意系统上导出面向目标系统的整合包安装选项。
+    select.innerHTML = availablePlatforms.map(platform => `
+      <option value="${platform.id}">${getPlatformLabel(platform)}</option>
+    `).join('');
+    select.disabled = availablePlatforms.length === 0;
+
+    if (availablePlatforms.length === 0) {
+      select.innerHTML = '<option value="">暂无可选平台</option>';
+    }
+    renderPlatformSelectDropdown();
+  } catch (error) {
+    console.error('[ExportTab] 加载平台列表失败:', error);
+    availablePlatforms = [];
+    const select = exportElements.installPlatformSelect;
+    if (select) {
+      select.innerHTML = '<option value="">平台列表加载失败</option>';
+      select.disabled = true;
+    }
+    renderPlatformSelectDropdown();
+  }
+}
+
+/**
+ * 检查平台是否存在并动态显示选项
  */
 async function checkNapcatAvailability(instanceId) {
   try {
-    const napcatExists = await window.mofoxAPI.checkPlatformExists(instanceId);
+    const platformExists = await window.mofoxAPI.checkPlatformExists(instanceId);
     
-    if (napcatExists) {
-      // 实例有 NapCat，显示两个选项，允许用户选择
+    if (platformExists) {
+      // 实例有平台，显示两个选项，允许用户选择
       if (exportElements.napcatOptionItem) {
         exportElements.napcatOptionItem.style.display = 'flex';
       }
@@ -198,7 +333,7 @@ async function checkNapcatAvailability(instanceId) {
         exportElements.installNapcatOptionItem.style.display = 'flex';
       }
     } else {
-      // 实例没有 NapCat，隐藏打包选项，仅显示安装选项
+      // 实例没有平台，隐藏打包选项，仅显示安装选项
       if (exportElements.napcatOptionItem) {
         exportElements.napcatOptionItem.style.display = 'none';
       }
@@ -207,7 +342,7 @@ async function checkNapcatAvailability(instanceId) {
       }
     }
   } catch (err) {
-    console.error('[ExportTab] 检查 NapCat 失败:', err);
+    console.error('[ExportTab] 检查平台失败:', err);
     // 出错时隐藏两个选项
     if (exportElements.napcatOptionItem) {
       exportElements.napcatOptionItem.style.display = 'none';
@@ -219,21 +354,25 @@ async function checkNapcatAvailability(instanceId) {
 }
 
 /**
- * 切换 NapCat 选项的互斥状态
+ * 切换平台打包选项的互斥状态
  */
 function toggleInstallNapcatOption() {
-  // 如果勾选了打包 NapCat，则禁用"导入时安装"选项
+  // 如果勾选了打包平台，则禁用"导入时安装"选项
   if (exportElements.includeNapcat?.checked) {
     if (exportElements.installNapcatOnImport) {
       exportElements.installNapcatOnImport.disabled = true;
       exportElements.installNapcatOnImport.checked = false;
+    }
+    if (exportElements.installPlatformWrap) {
+      exportElements.installPlatformWrap.style.display = 'none';
+      closePlatformSelectDropdown();
     }
     if (exportElements.installNapcatOptionItem) {
       exportElements.installNapcatOptionItem.style.opacity = '0.5';
       exportElements.installNapcatOptionItem.style.pointerEvents = 'none';
     }
   } else {
-    // 取消勾选打包 NapCat，恢复"导入时安装"选项
+    // 取消勾选打包平台，恢复"导入时安装"选项
     if (exportElements.installNapcatOnImport) {
       exportElements.installNapcatOnImport.disabled = false;
     }
@@ -248,8 +387,11 @@ function toggleInstallNapcatOption() {
  * 切换打包选项的互斥状态（当勾选"导入时安装"时）
  */
 function togglePackNapcatOption() {
-  // 如果勾选了"导入时安装"，则禁用打包选项
+  // 如果勾选了"导入时安装"，则禁用打包选项并显示平台选择
   if (exportElements.installNapcatOnImport?.checked) {
+    if (exportElements.installPlatformWrap) {
+      exportElements.installPlatformWrap.style.display = 'block';
+    }
     if (exportElements.includeNapcat) {
       exportElements.includeNapcat.disabled = true;
       exportElements.includeNapcat.checked = false;
@@ -259,6 +401,10 @@ function togglePackNapcatOption() {
       exportElements.napcatOptionItem.style.pointerEvents = 'none';
     }
   } else {
+    if (exportElements.installPlatformWrap) {
+      exportElements.installPlatformWrap.style.display = 'none';
+      closePlatformSelectDropdown();
+    }
     // 取消勾选"导入时安装"，恢复打包选项
     if (exportElements.includeNapcat) {
       exportElements.includeNapcat.disabled = false;
@@ -551,6 +697,15 @@ async function startExport() {
     return;
   }
 
+  const installPlatform = exportElements.installNapcatOnImport?.checked
+    ? exportElements.installPlatformSelect?.value
+    : null;
+  if (exportElements.installNapcatOnImport?.checked && !installPlatform) {
+    await window.customAlert('请选择导入时要安装的平台', '提示');
+    exportElements.installPlatformSelect?.focus();
+    return;
+  }
+
   // 收集导出选项
   const options = {
     // 元数据
@@ -565,6 +720,7 @@ async function startExport() {
     includePlugins: exportElements.includePlugins.checked,
     includeData: exportElements.includeData.checked,
     installNapcatOnImport: exportElements.installNapcatOnImport?.checked || false,
+    installPlatform,
     includePluginConfigs: exportElements.includePluginConfigs.checked,
     selectedPlugins: [],
     selectedPluginConfigs: [],
@@ -607,7 +763,7 @@ async function startExport() {
   }
 
   // 检查是否至少选择了一项内容
-  if (!options.includeNeoMofox && !options.includeNapcat && !options.includeConfig && !options.includePlugins && !options.includeData) {
+  if (!options.includeNeoMofox && !options.includeNapcat && !options.installNapcatOnImport && !options.includeConfig && !options.includePlugins && !options.includeData) {
     await window.customAlert('请至少选择一项要导出的内容', '提示');
     return;
   }
@@ -670,7 +826,10 @@ function disableExportOptions(disable) {
   exportElements.includeData.disabled = disable;
   exportElements.selectAllPlugins.disabled = disable;
   exportElements.selectAllPluginConfigs.disabled = disable;
-  exportElements.btnStartExport.disabled = disable;
+  if (exportElements.installPlatformSelect) {
+    exportElements.installPlatformSelect.disabled = availablePlatforms.length === 0;
+    updatePlatformSelectTrigger();
+  }
 
   const pluginCheckboxes = exportElements.pluginList.querySelectorAll('input[type="checkbox"]');
   pluginCheckboxes.forEach(cb => {
@@ -786,6 +945,10 @@ function resetExportState() {
   if (exportElements.installNapcatOptionItem) {
     exportElements.installNapcatOptionItem.style.opacity = '1';
     exportElements.installNapcatOptionItem.style.pointerEvents = 'auto';
+  }
+  if (exportElements.installPlatformWrap) {
+    exportElements.installPlatformWrap.style.display = 'none';
+    closePlatformSelectDropdown();
   }
   if (exportElements.selectAllPlugins) exportElements.selectAllPlugins.checked = false;
   if (exportElements.selectAllPluginConfigs) exportElements.selectAllPluginConfigs.checked = false;

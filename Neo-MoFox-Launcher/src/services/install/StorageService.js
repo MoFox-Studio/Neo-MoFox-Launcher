@@ -23,7 +23,7 @@ const TOML = require('@iarna/toml');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
-const INSTANCES_VERSION = 3;
+const INSTANCES_VERSION = 4;
 const INSTANCES_FILE = 'instances.json';
 const APP_NAME = 'Neo-MoFox-Launcher';
 
@@ -180,13 +180,49 @@ class StorageService {
   }
 
   /**
+   * 标准化实例平台字段。
+   * @param {object} instance - 原始实例对象
+   * @returns {object} 标准化后的实例对象
+   */
+  _normalizePlatformFields(instance) {
+    if (!instance || typeof instance !== 'object') {
+      return instance;
+    }
+
+    const platformDir = instance.platformDir || instance.napcatDir || null;
+    const platformVersion = platformDir
+      ? (instance.platformVersion || instance.napcatVersion || null)
+      : null;
+    const platform = platformDir
+      ? (instance.platform || 'napcat')
+      : (instance.platform || null);
+    const installSteps = Array.isArray(instance.installSteps)
+      ? instance.installSteps.map((step) => {
+          if (step === 'napcat') return 'platform-install';
+          if (step === 'napcat-config') return 'platform-config';
+          return step;
+        })
+      : instance.installSteps;
+
+    const { napcatDir, napcatVersion, ...normalized } = instance;
+    return {
+      ...normalized,
+      platform,
+      platformDir,
+      platformVersion,
+      installSteps,
+    };
+  }
+
+  /**
    * 添加实例
    */
   addInstance(instance) {
     const instances = this.getInstances();
-    instances.push(instance);
+    const normalizedInstance = this._normalizePlatformFields(instance);
+    instances.push(normalizedInstance);
     this.writeInstances(instances);
-    return instance;
+    return normalizedInstance;
   }
 
   /**
@@ -198,7 +234,7 @@ class StorageService {
     if (index === -1) {
       throw new Error(`实例不存在: ${instanceId}`);
     }
-    instances[index] = { ...instances[index], ...updates };
+    instances[index] = this._normalizePlatformFields({ ...instances[index], ...updates });
     this.writeInstances(instances);
     return instances[index];
   }
@@ -416,30 +452,8 @@ class StorageService {
         };
       }
 
-      // 从版本 2 迁移到版本 3：一次仅安装一个平台。
-      // 仅当旧数据原本存在 NapCat / 平台目录时才补齐平台字段；
-      // 如果原本 nc 路径为空，不应凭 neomofoxDir 推导并新增平台目录。
-      const originalPlatformDir = migrated.platformDir || migrated.napcatDir || null;
-      const platformVersion = originalPlatformDir
-        ? (migrated.platformVersion || migrated.napcatVersion || null)
-        : null;
-      const migratedSteps = Array.isArray(migrated.installSteps)
-        ? migrated.installSteps.map((step) => {
-            if (step === 'napcat') return 'platform-install';
-            if (step === 'napcat-config') return 'platform-config';
-            return step;
-          })
-        : migrated.installSteps;
-
-      const { napcatDir, napcatVersion, ...normalizedInstance } = migrated;
-
-      return {
-        ...normalizedInstance,
-        platform: originalPlatformDir ? (normalizedInstance.platform || 'napcat') : normalizedInstance.platform,
-        platformDir: originalPlatformDir,
-        platformVersion,
-        installSteps: migratedSteps,
-      };
+      // 从版本 2 迁移到版本 3/4：一次仅安装一个平台，并移除 NapCat 专用存储字段。
+      return this._normalizePlatformFields(migrated);
     });
     
 

@@ -33,6 +33,8 @@ const state = {
     webuiApiKey: '',
     installDir: '',
     installNapcat: true,
+    installPlatform: true,
+    platform: '',
     installWebui: true,
   },
   
@@ -103,6 +105,7 @@ const el = {
   checkInstallNapcat: document.getElementById('check-install-napcat'),
   cardNapcat: document.getElementById('card-napcat'),
   descNapcat: document.getElementById('desc-napcat'),
+  selectInstallPlatform: document.getElementById('select-install-platform'),
   
   // 步骤 7: 安装确认
   summaryPackName: document.getElementById('summary-pack-name'),
@@ -380,6 +383,8 @@ async function goNext() {
   if (state.currentStep === 6) {
     state.inputs.installWebui = el.checkInstallWebui?.checked ?? true;
     state.inputs.installNapcat = el.checkInstallNapcat?.checked ?? true;
+    state.inputs.installPlatform = state.inputs.installNapcat;
+    state.inputs.platform = el.selectInstallPlatform?.value || state.packManifest?.content?.platform?.id || '';
   }
   
   goToStep(state.currentStep + 1);
@@ -504,14 +509,16 @@ function generateContentItems(content) {
     `);
   }
   
-  if (content.napcat?.included) {
+  const platformContent = content.platform || content.napcat;
+  const platformName = platformContent?.displayName || platformContent?.name || platformContent?.id || '平台';
+  if (platformContent?.included) {
     if (state.isLinux) {
       items.push(`
         <div class="content-item" style="opacity: 0.5;">
-          <span class="material-symbols-rounded">chat</span>
+          <span class="material-symbols-rounded">extension</span>
           <div class="content-item-text">
-            <div class="content-item-name">NapCat (Linux 不支持)</div>
-            <div class="content-item-detail">${content.napcat.version ? `版本: ${content.napcat.version}` : ''}</div>
+            <div class="content-item-name">${platformName} (Linux 不支持)</div>
+            <div class="content-item-detail">${platformContent.version ? `版本: ${platformContent.version}` : ''}</div>
           </div>
           <span class="content-item-badge" style="background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-outline);">忽略安装</span>
         </div>
@@ -519,22 +526,22 @@ function generateContentItems(content) {
     } else {
       items.push(`
         <div class="content-item">
-          <span class="material-symbols-rounded">chat</span>
+          <span class="material-symbols-rounded">extension</span>
           <div class="content-item-text">
-            <div class="content-item-name">NapCat</div>
-            <div class="content-item-detail">${content.napcat.version ? `版本: ${content.napcat.version}` : ''}</div>
+            <div class="content-item-name">${platformName}</div>
+            <div class="content-item-detail">${platformContent.version ? `版本: ${platformContent.version}` : ''}</div>
           </div>
           <span class="content-item-badge">已内置</span>
         </div>
       `);
     }
-  } else if (content.napcat?.installOnImport && !state.isLinux) {
+  } else if (platformContent?.installOnImport && !state.isLinux) {
     items.push(`
       <div class="content-item">
         <span class="material-symbols-rounded">download</span>
         <div class="content-item-text">
-          <div class="content-item-name">NapCat</div>
-          <div class="content-item-detail">导入时自动下载安装</div>
+          <div class="content-item-name">平台</div>
+          <div class="content-item-detail">导入时可选择平台自动下载安装</div>
         </div>
         <span class="content-item-badge" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);">自动安装</span>
       </div>
@@ -994,27 +1001,70 @@ function collectInputs() {
 
 // ─── 步骤 6: 组件配置 ─────────────────────────────────────────────────
 
-function initComponentSelection() {
+async function initComponentSelection() {
   if (!state.packManifest) return;
   const content = state.packManifest.content || {};
+  const platformContent = content.platform || content.napcat;
 
-  // 根据整合包和系统属性处理 NapCat
+  if (!platformContent?.included && !platformContent?.installOnImport) {
+    el.cardNapcat.style.display = 'none';
+    return;
+  }
+
+  el.cardNapcat.style.display = '';
   if (state.isLinux) {
     el.cardNapcat.style.opacity = '0.5';
     el.checkInstallNapcat.disabled = true;
     el.checkInstallNapcat.checked = false;
-    el.descNapcat.textContent = 'Linux 不支持自动安装 NapCat';
-  } else if (content.napcat?.included || content.napcat?.installOnImport) {
-    el.cardNapcat.style.opacity = '1';
-    el.checkInstallNapcat.disabled = false;
-    el.checkInstallNapcat.checked = true;
-    if (content.napcat?.included) {
-      el.descNapcat.textContent = '整合包内置 NapCat，可选择是否安装。';
-    } else {
-      el.descNapcat.textContent = '整合包提供自动下载，可选择是否安装。Windows 系统强烈推荐安装。';
-    }
-  } else {
-    el.cardNapcat.style.display = 'none'; // 整合包既不内置也不自动下载
+    el.descNapcat.textContent = 'Linux 不支持自动安装平台';
+    if (el.selectInstallPlatform) el.selectInstallPlatform.style.display = 'none';
+    return;
+  }
+
+  el.cardNapcat.style.opacity = '1';
+  el.checkInstallNapcat.disabled = false;
+  el.checkInstallNapcat.checked = true;
+
+  if (platformContent.included) {
+    const platformName = platformContent.displayName || platformContent.name || platformContent.id || '平台';
+    el.descNapcat.textContent = `整合包内置 ${platformName}，可选择是否安装。`;
+    if (el.selectInstallPlatform) el.selectInstallPlatform.style.display = 'none';
+    state.inputs.platform = platformContent.id || '';
+    return;
+  }
+
+  el.descNapcat.textContent = '整合包提供导入时自动下载，可选择要安装的平台。';
+  await loadImportPlatforms(platformContent.id);
+}
+
+
+/**
+ * 加载导入时可安装平台列表。
+ * @param {string} preferredPlatformId 整合包建议的平台 ID
+ * @returns {Promise<void>}
+ */
+async function loadImportPlatforms(preferredPlatformId) {
+  const select = el.selectInstallPlatform;
+  if (!select) return;
+
+  try {
+    const platforms = await window.mofoxAPI.installGetPlatforms?.() || [];
+    const installable = platforms.filter(platform => platform.available);
+    select.style.display = 'block';
+    select.disabled = installable.length === 0;
+    select.innerHTML = installable.length > 0
+      ? installable.map(platform => `<option value="${platform.id}">${platform.displayName || platform.name}</option>`).join('')
+      : '<option value="">当前系统没有可安装平台</option>';
+
+    const preferred = installable.find(platform => platform.id === preferredPlatformId);
+    select.value = preferred?.id || installable[0]?.id || '';
+    state.inputs.platform = select.value;
+    select.onchange = () => { state.inputs.platform = select.value; };
+  } catch (error) {
+    console.error('[ImportWizard] 加载平台列表失败:', error);
+    select.style.display = 'block';
+    select.disabled = true;
+    select.innerHTML = '<option value="">平台列表加载失败</option>';
   }
 }
 
@@ -1035,17 +1085,19 @@ function updateSummary() {
   const contentTags = [];
   if (content.neoMofox?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">widgets</span>Neo-MoFox</div>');
   
-  if (content.napcat?.included) {
+  const platformContent = content.platform || content.napcat;
+  const platformName = platformContent?.displayName || platformContent?.name || platformContent?.id || inputs.platform || '平台';
+  if (platformContent?.included) {
     if (state.isLinux) {
-      contentTags.push('<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">chat</span>NapCat (已忽略)</div>');
+      contentTags.push(`<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">extension</span>${platformName} (已忽略)</div>`);
     } else {
-      contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">chat</span>NapCat</div>');
+      contentTags.push(`<div class="content-tag"><span class="material-symbols-rounded">extension</span>${platformName}</div>`);
     }
-  } else if (content.napcat?.installOnImport && !state.isLinux) {
+  } else if (platformContent?.installOnImport && !state.isLinux) {
     if (inputs.installNapcat) {
-      contentTags.push('<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 NapCat</div>');
+      contentTags.push(`<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 ${inputs.platform || '平台'}</div>`);
     } else {
-      contentTags.push('<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">chat</span>NapCat (已忽略)</div>');
+      contentTags.push('<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">extension</span>平台 (已忽略)</div>');
     }
   }
 
@@ -1094,14 +1146,15 @@ function generateInstallSteps(content) {
   
   steps.push('write-model', 'write-adapter');
   
+  const platformContent = content.platform || content.napcat;
   if (!state.isLinux) {
-    if (!content.napcat?.included) {
-      if (content.napcat?.installOnImport && state.inputs.installNapcat) {
-        steps.push('napcat');
+    if (!platformContent?.included) {
+      if (platformContent?.installOnImport && state.inputs.installNapcat) {
+        steps.push('platform-install');
       }
     }
-    if (content.napcat?.included || (content.napcat?.installOnImport && state.inputs.installNapcat)) {
-      steps.push('napcat-config');
+    if (platformContent?.included || (platformContent?.installOnImport && state.inputs.installNapcat)) {
+      steps.push('platform-config');
     }
   }
 
@@ -1124,8 +1177,10 @@ function getStepDescription(step) {
     'write-core': '写入 core.toml',
     'write-model': '写入 model.toml',
     'write-adapter': '写入适配器配置',
-    'napcat': '安装 NapCat',
-    'napcat-config': '配置 NapCat',
+    'platform-install': '安装平台',
+    'platform-config': '配置平台',
+    'napcat': '安装平台',
+    'napcat-config': '配置平台',
     'webui': '安装 WebUI',
     'register': '注册实例',
   };

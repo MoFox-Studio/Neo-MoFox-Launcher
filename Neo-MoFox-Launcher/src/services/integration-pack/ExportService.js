@@ -153,14 +153,15 @@ class ExportService {
    * @param {string} [options.packAuthor] - 整合包作者（可选，默认使用系统用户名）
    * @param {string} [options.packDescription] - 整合包描述（可选）
    * @param {boolean} [options.includeNeoMofox=false] - 是否包含 Neo-MoFox 主程序
-   * @param {boolean} [options.includeNapcat=false] - 是否包含 NapCat
+   * @param {boolean} [options.includePlatform=false] - 是否包含平台
    * @param {boolean} [options.includeConfig=false] - 是否包含配置文件
    * @param {boolean} [options.includePlugins=false] - 是否包含插件
    * @param {string[]} [options.selectedPlugins=[]] - 选中的插件列表（插件名称数组）
    * @param {boolean} [options.includePluginConfigs=false] - 是否包含插件配置文件
    * @param {string[]} [options.selectedPluginConfigs=[]] - 选中的插件配置列表（配置文件名称数组）
    * @param {boolean} [options.includeData=false] - 是否包含数据文件
-   * @param {boolean} [options.installNapcatOnImport=false] - 导入时是否安装平台（仅当未包含平台时有效，将存储在 content.platform.installOnImport）
+   * @param {boolean} [options.installPlatformOnImport=false] - 导入时是否安装平台（仅当未包含平台时有效，将存储在 content.platform.installOnImport）
+   * @param {string} [options.installPlatform] - 导入时安装的平台 ID
    * @param {string} destPath - 导出目标路径（完整文件路径，包含文件名）
    * @param {Function} [onProgress] - 进度回调 (percent, message)
    * @param {Function} [onOutput] - 输出回调 (message)
@@ -307,10 +308,12 @@ class ExportService {
             ...(options.includeNeoMofox && versions.neoMofox),
           },
           platform: {
-            id: instance.platform || 'napcat',
-            included: options.includeNapcat,
-            installOnImport: options.installNapcatOnImport || false,
-            ...(options.includeNapcat && versions.platform),
+            id: options.includePlatform
+              ? (instance.platform || 'napcat')
+              : (options.installPlatform || instance.platform || 'napcat'),
+            included: options.includePlatform,
+            installOnImport: options.installPlatformOnImport || false,
+            ...(options.includePlatform && versions.platform),
           },
           plugins: {
             included: options.includePlugins && exportedPlugins.length > 0,

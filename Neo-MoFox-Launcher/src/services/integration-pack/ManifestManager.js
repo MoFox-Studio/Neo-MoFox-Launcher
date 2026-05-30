@@ -142,7 +142,18 @@ class ManifestManager {
         }
       });
 
-      if (manifest.content.platform && manifest.content.platform.included && !manifest.content.platform.id) {
+      if (manifest.content.napcat && !manifest.content.platform) {
+        manifest.content.platform = {
+          id: 'napcat',
+          ...manifest.content.napcat,
+        };
+      }
+
+      if (
+        manifest.content.platform
+        && (manifest.content.platform.included || manifest.content.platform.installOnImport)
+        && !manifest.content.platform.id
+      ) {
         errors.push('content.platform.id 必须为非空字符串');
       }
 

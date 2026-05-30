@@ -2984,6 +2984,7 @@ ipcMain.handle('import-integration-pack', async (event, options) => {
       installDir: options.installDir,
       pythonCmd: options.pythonCmd,
       installPlatform: options.installPlatform ?? options.installNapcat,
+      platform: options.platform,
       installWebui: options.installWebui,
     });
     

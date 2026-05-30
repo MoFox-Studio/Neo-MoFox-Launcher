@@ -361,10 +361,10 @@
                 
                 <label class="export-option-item" id="napcat-option-item">
                   <div class="option-info">
-                    <span class="material-symbols-rounded">pets</span>
+                    <span class="material-symbols-rounded">extension</span>
                     <div class="option-text">
-                      <strong>NapCat</strong>
-                      <small>QQ 协议适配器程序</small>
+                      <strong>平台</strong>
+                      <small>平台适配器程序</small>
                     </div>
                   </div>
                   <div class="form-switch-wrapper">
@@ -379,8 +379,16 @@
                   <div class="option-info">
                     <span class="material-symbols-rounded">download</span>
                     <div class="option-text">
-                      <strong>导入时安装 NapCat</strong>
-                      <small>导入整合包时自动下载并安装 NapCat</small>
+                      <strong>导入时安装平台</strong>
+                      <small>导入整合包时允许用户选择并安装平台</small>
+                      <div class="export-platform-select-wrap" id="export-install-platform-wrap" style="display: none;">
+                        <select id="export-install-platform" class="export-platform-select" aria-label="导入时安装平台"></select>
+                        <button type="button" class="export-platform-trigger" id="export-install-platform-trigger" aria-haspopup="listbox" aria-expanded="false">
+                          <span class="export-platform-trigger-text">加载平台中...</span>
+                          <span class="material-symbols-rounded export-platform-trigger-icon">expand_more</span>
+                        </button>
+                        <div class="export-platform-menu" id="export-install-platform-menu" role="listbox"></div>
+                      </div>
                     </div>
                   </div>
                   <div class="form-switch-wrapper">

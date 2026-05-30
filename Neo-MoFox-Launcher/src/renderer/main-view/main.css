@@ -1557,6 +1557,180 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.export-platform-select-wrap {
+  position: relative;
+  width: min(100%, 380px);
+  min-width: 240px;
+  margin-top: 12px;
+  animation: exportPlatformSelectIn 0.22s ease-out;
+}
+
+.export-platform-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.export-platform-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px 10px 14px;
+  color: var(--md-sys-color-on-surface);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(103, 80, 164, 0.10), transparent 42%),
+    var(--md-sys-color-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.export-platform-trigger:hover:not(:disabled),
+.export-platform-select-wrap.is-open .export-platform-trigger {
+  transform: translateY(-1px);
+  border-color: var(--md-sys-color-primary);
+  background-color: var(--md-sys-color-surface-container-lowest);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+}
+
+.export-platform-trigger:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.export-platform-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.export-platform-trigger-icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+  transition: transform 0.22s ease;
+}
+
+.export-platform-select-wrap.is-open .export-platform-trigger-icon {
+  transform: rotate(180deg);
+}
+
+.export-platform-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  padding: 8px;
+  overflow-y: auto;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top center;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 14px;
+  background: var(--md-sys-color-surface);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.14);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+}
+
+.export-platform-select-wrap.is-open .export-platform-menu {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.export-platform-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  color: var(--md-sys-color-on-surface);
+  text-align: left;
+  cursor: pointer;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.export-platform-option:hover,
+.export-platform-option[aria-selected="true"] {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+  transform: translateX(2px);
+}
+
+.export-platform-option-icon {
+  font-size: 20px;
+  color: var(--md-sys-color-primary);
+}
+
+.export-platform-option-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.export-platform-option-name {
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-platform-option-desc {
+  overflow: hidden;
+  font-size: 0.72rem;
+  color: var(--md-sys-color-on-surface-variant);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-platform-option[aria-selected="true"] .export-platform-option-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.export-platform-option-check {
+  font-size: 18px;
+  color: var(--md-sys-color-primary);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+@keyframes exportPlatformSelectIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 插件选择器 */
 .plugin-selector {
   margin-top: 12px;
@@ -1741,6 +1915,8 @@
     transform: rotate(360deg);
   }
 }
+
+.credits-fox {
   display: block;
   margin-bottom: 8px;
   animation: creditsFloat 3s ease-in-out infinite;
