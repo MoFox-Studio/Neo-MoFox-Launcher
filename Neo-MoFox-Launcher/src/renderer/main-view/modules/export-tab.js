@@ -29,8 +29,6 @@ const exportElements = {
   packDescription: null,
   // 导出选项
   includeNeo: null,
-  includeNapcat: null,
-  napcatOptionItem: null,
   installNapcatOnImport: null,
   installNapcatOptionItem: null,
   installPlatformWrap: null,
@@ -66,8 +64,6 @@ export function initExportTab() {
   
   // 导出选项
   exportElements.includeNeo = document.getElementById('export-include-neo');
-  exportElements.includeNapcat = document.getElementById('export-include-napcat');
-  exportElements.napcatOptionItem = document.getElementById('napcat-option-item');
   exportElements.installNapcatOnImport = document.getElementById('export-install-napcat-on-import');
   exportElements.installNapcatOptionItem = document.getElementById('install-napcat-option-item');
   exportElements.installPlatformWrap = document.getElementById('export-install-platform-wrap');
@@ -101,12 +97,8 @@ export function initExportTab() {
   });
 
   // 绑定事件
-  if (exportElements.includeNapcat) {
-    exportElements.includeNapcat.addEventListener('change', toggleInstallNapcatOption);
-  }
-
   if (exportElements.installNapcatOnImport) {
-    exportElements.installNapcatOnImport.addEventListener('change', togglePackNapcatOption);
+    exportElements.installNapcatOnImport.addEventListener('change', toggleInstallPlatformSelector);
   }
 
   if (exportElements.includePlugins) {
@@ -159,9 +151,8 @@ export async function onExportTabOpened(instanceId) {
   // 加载实例信息并填充元数据
   loadInstanceMetadata(instanceId);
 
-  // 检查平台是否存在
+  // 加载导入时可下载的平台列表
   await loadInstallablePlatforms();
-  await checkNapcatAvailability(instanceId);
 
   // 扫描插件
   await scanPlugins(instanceId);
@@ -318,101 +309,16 @@ async function loadInstallablePlatforms() {
 }
 
 /**
- * 检查平台是否存在并动态显示选项
+ * 切换导入时下载平台选项。
  */
-async function checkNapcatAvailability(instanceId) {
-  try {
-    const platformExists = await window.mofoxAPI.checkPlatformExists(instanceId);
-    
-    if (platformExists) {
-      // 实例有平台，显示两个选项，允许用户选择
-      if (exportElements.napcatOptionItem) {
-        exportElements.napcatOptionItem.style.display = 'flex';
-      }
-      if (exportElements.installNapcatOptionItem) {
-        exportElements.installNapcatOptionItem.style.display = 'flex';
-      }
-    } else {
-      // 实例没有平台，隐藏打包选项，仅显示安装选项
-      if (exportElements.napcatOptionItem) {
-        exportElements.napcatOptionItem.style.display = 'none';
-      }
-      if (exportElements.installNapcatOptionItem) {
-        exportElements.installNapcatOptionItem.style.display = 'flex';
-      }
-    }
-  } catch (err) {
-    console.error('[ExportTab] 检查平台失败:', err);
-    // 出错时隐藏两个选项
-    if (exportElements.napcatOptionItem) {
-      exportElements.napcatOptionItem.style.display = 'none';
-    }
-    if (exportElements.installNapcatOptionItem) {
-      exportElements.installNapcatOptionItem.style.display = 'none';
-    }
-  }
-}
-
-/**
- * 切换平台打包选项的互斥状态
- */
-function toggleInstallNapcatOption() {
-  // 如果勾选了打包平台，则禁用"导入时安装"选项
-  if (exportElements.includeNapcat?.checked) {
-    if (exportElements.installNapcatOnImport) {
-      exportElements.installNapcatOnImport.disabled = true;
-      exportElements.installNapcatOnImport.checked = false;
-    }
-    if (exportElements.installPlatformWrap) {
-      exportElements.installPlatformWrap.style.display = 'none';
-      closePlatformSelectDropdown();
-    }
-    if (exportElements.installNapcatOptionItem) {
-      exportElements.installNapcatOptionItem.style.opacity = '0.5';
-      exportElements.installNapcatOptionItem.style.pointerEvents = 'none';
-    }
-  } else {
-    // 取消勾选打包平台，恢复"导入时安装"选项
-    if (exportElements.installNapcatOnImport) {
-      exportElements.installNapcatOnImport.disabled = false;
-    }
-    if (exportElements.installNapcatOptionItem) {
-      exportElements.installNapcatOptionItem.style.opacity = '1';
-      exportElements.installNapcatOptionItem.style.pointerEvents = 'auto';
-    }
-  }
-}
-
-/**
- * 切换打包选项的互斥状态（当勾选"导入时安装"时）
- */
-function togglePackNapcatOption() {
-  // 如果勾选了"导入时安装"，则禁用打包选项并显示平台选择
+function toggleInstallPlatformSelector() {
   if (exportElements.installNapcatOnImport?.checked) {
     if (exportElements.installPlatformWrap) {
       exportElements.installPlatformWrap.style.display = 'block';
     }
-    if (exportElements.includeNapcat) {
-      exportElements.includeNapcat.disabled = true;
-      exportElements.includeNapcat.checked = false;
-    }
-    if (exportElements.napcatOptionItem) {
-      exportElements.napcatOptionItem.style.opacity = '0.5';
-      exportElements.napcatOptionItem.style.pointerEvents = 'none';
-    }
-  } else {
-    if (exportElements.installPlatformWrap) {
-      exportElements.installPlatformWrap.style.display = 'none';
-      closePlatformSelectDropdown();
-    }
-    // 取消勾选"导入时安装"，恢复打包选项
-    if (exportElements.includeNapcat) {
-      exportElements.includeNapcat.disabled = false;
-    }
-    if (exportElements.napcatOptionItem) {
-      exportElements.napcatOptionItem.style.opacity = '1';
-      exportElements.napcatOptionItem.style.pointerEvents = 'auto';
-    }
+  } else if (exportElements.installPlatformWrap) {
+    exportElements.installPlatformWrap.style.display = 'none';
+    closePlatformSelectDropdown();
   }
 }
 
@@ -715,7 +621,6 @@ async function startExport() {
     packDescription,
     // 内容选项
     includeNeoMofox: exportElements.includeNeo.checked,
-    includeNapcat: exportElements.includeNapcat.checked,
     includeConfig: exportElements.includeConfig.checked,
     includePlugins: exportElements.includePlugins.checked,
     includeData: exportElements.includeData.checked,
@@ -763,7 +668,7 @@ async function startExport() {
   }
 
   // 检查是否至少选择了一项内容
-  if (!options.includeNeoMofox && !options.includeNapcat && !options.installNapcatOnImport && !options.includeConfig && !options.includePlugins && !options.includeData) {
+  if (!options.includeNeoMofox && !options.installNapcatOnImport && !options.includeConfig && !options.includePlugins && !options.includeData) {
     await window.customAlert('请至少选择一项要导出的内容', '提示');
     return;
   }
@@ -819,7 +724,7 @@ function showProgress(show) {
  */
 function disableExportOptions(disable) {
   exportElements.includeNeo.disabled = disable;
-  exportElements.includeNapcat.disabled = disable;
+  if (exportElements.installNapcatOnImport) exportElements.installNapcatOnImport.disabled = disable;
   exportElements.includeConfig.disabled = disable;
   exportElements.includePlugins.disabled = disable;
   exportElements.includePluginConfigs.disabled = disable;
@@ -923,14 +828,6 @@ function resetExportState() {
   currentPluginConfigs = [];
   
   if (exportElements.includeNeo) exportElements.includeNeo.checked = false;
-  if (exportElements.includeNapcat) {
-    exportElements.includeNapcat.checked = false;
-    exportElements.includeNapcat.disabled = false;
-  }
-  if (exportElements.napcatOptionItem) {
-    exportElements.napcatOptionItem.style.opacity = '1';
-    exportElements.napcatOptionItem.style.pointerEvents = 'auto';
-  }
   if (exportElements.includeConfig) exportElements.includeConfig.checked = false;
   if (exportElements.includePlugins) {
     exportElements.includePlugins.checked = true; // 默认勾选导出插件

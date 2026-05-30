@@ -510,32 +510,7 @@ function generateContentItems(content) {
   }
   
   const platformContent = content.platform || content.napcat;
-  const platformName = platformContent?.displayName || platformContent?.name || platformContent?.id || '平台';
-  if (platformContent?.included) {
-    if (state.isLinux) {
-      items.push(`
-        <div class="content-item" style="opacity: 0.5;">
-          <span class="material-symbols-rounded">extension</span>
-          <div class="content-item-text">
-            <div class="content-item-name">${platformName} (Linux 不支持)</div>
-            <div class="content-item-detail">${platformContent.version ? `版本: ${platformContent.version}` : ''}</div>
-          </div>
-          <span class="content-item-badge" style="background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-outline);">忽略安装</span>
-        </div>
-      `);
-    } else {
-      items.push(`
-        <div class="content-item">
-          <span class="material-symbols-rounded">extension</span>
-          <div class="content-item-text">
-            <div class="content-item-name">${platformName}</div>
-            <div class="content-item-detail">${platformContent.version ? `版本: ${platformContent.version}` : ''}</div>
-          </div>
-          <span class="content-item-badge">已内置</span>
-        </div>
-      `);
-    }
-  } else if (platformContent?.installOnImport && !state.isLinux) {
+  if (platformContent?.installOnImport && !state.isLinux) {
     items.push(`
       <div class="content-item">
         <span class="material-symbols-rounded">download</span>
@@ -1006,7 +981,7 @@ async function initComponentSelection() {
   const content = state.packManifest.content || {};
   const platformContent = content.platform || content.napcat;
 
-  if (!platformContent?.included && !platformContent?.installOnImport) {
+  if (!platformContent?.installOnImport) {
     el.cardNapcat.style.display = 'none';
     return;
   }
@@ -1024,14 +999,6 @@ async function initComponentSelection() {
   el.cardNapcat.style.opacity = '1';
   el.checkInstallNapcat.disabled = false;
   el.checkInstallNapcat.checked = true;
-
-  if (platformContent.included) {
-    const platformName = platformContent.displayName || platformContent.name || platformContent.id || '平台';
-    el.descNapcat.textContent = `整合包内置 ${platformName}，可选择是否安装。`;
-    if (el.selectInstallPlatform) el.selectInstallPlatform.style.display = 'none';
-    state.inputs.platform = platformContent.id || '';
-    return;
-  }
 
   el.descNapcat.textContent = '整合包提供导入时自动下载，可选择要安装的平台。';
   await loadImportPlatforms(platformContent.id);
@@ -1086,14 +1053,7 @@ function updateSummary() {
   if (content.neoMofox?.included) contentTags.push('<div class="content-tag"><span class="material-symbols-rounded">widgets</span>Neo-MoFox</div>');
   
   const platformContent = content.platform || content.napcat;
-  const platformName = platformContent?.displayName || platformContent?.name || platformContent?.id || inputs.platform || '平台';
-  if (platformContent?.included) {
-    if (state.isLinux) {
-      contentTags.push(`<div class="content-tag" style="opacity: 0.5;"><span class="material-symbols-rounded">extension</span>${platformName} (已忽略)</div>`);
-    } else {
-      contentTags.push(`<div class="content-tag"><span class="material-symbols-rounded">extension</span>${platformName}</div>`);
-    }
-  } else if (platformContent?.installOnImport && !state.isLinux) {
+  if (platformContent?.installOnImport && !state.isLinux) {
     if (inputs.installNapcat) {
       contentTags.push(`<div class="content-tag" style="background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container);"><span class="material-symbols-rounded">download</span>自动安装 ${inputs.platform || '平台'}</div>`);
     } else {
@@ -1147,15 +1107,8 @@ function generateInstallSteps(content) {
   steps.push('write-model', 'write-adapter');
   
   const platformContent = content.platform || content.napcat;
-  if (!state.isLinux) {
-    if (!platformContent?.included) {
-      if (platformContent?.installOnImport && state.inputs.installNapcat) {
-        steps.push('platform-install');
-      }
-    }
-    if (platformContent?.included || (platformContent?.installOnImport && state.inputs.installNapcat)) {
-      steps.push('platform-config');
-    }
+  if (!state.isLinux && platformContent?.installOnImport && state.inputs.installNapcat) {
+    steps.push('platform-install', 'platform-config');
   }
 
   if (state.inputs.installWebui) {

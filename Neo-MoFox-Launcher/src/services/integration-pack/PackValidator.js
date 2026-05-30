@@ -285,13 +285,10 @@ class PackValidator {
         }
       }
 
-      // 检查平台目录
-      if (manifest.content.platform.included) {
-        const platformId = manifest.content.platform.id;
-        const platformEntry = zip.getEntry(`platforms/${platformId}/`);
-        if (!platformEntry) {
-          errors.push(`manifest 声明包含平台 ${platformId}，但未找到 platforms/${platformId}/ 目录`);
-        }
+      // 平台目录已废弃，整合包不允许内置平台。
+      const hasPackedPlatform = zip.getEntries().some(entry => entry.entryName.startsWith('platforms/'));
+      if (hasPackedPlatform) {
+        errors.push('整合包不允许包含 platforms/ 平台目录，请改为导入时下载平台');
       }
 
       // 检查插件

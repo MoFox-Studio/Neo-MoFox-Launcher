@@ -181,9 +181,7 @@ class ImportService {
       this._emitOutput(`安装步骤: ${installSteps.join(', ')}`);
 
       const platformContent = manifest.content.platform || manifest.content.napcat || null;
-      const platformId = platformContent?.included
-        ? platformContent.id
-        : (userInputs.platform || platformContent?.id);
+      const platformId = userInputs.platform || platformContent?.id;
       if (!platformId) {
         throw new Error('整合包导入失败: 缺少平台 ID');
       }
@@ -483,17 +481,7 @@ class ImportService {
       this._emitOutput('Neo-MoFox 主程序复制完成');
     }
 
-    // 2. 复制平台目录
-    const platformContent = manifest.content.platform || manifest.content.napcat || null;
-    if (platformContent?.included) {
-      const platformId = platformContent.id || 'napcat';
-      const platform = platformRegistry.getPlatform(platformId);
-      this._emitOutput(`复制平台 ${platform.displayName || platform.name}...`);
-      const srcPath = path.join(tempDir, 'platforms', platformId);
-      const destPath = path.join(instanceRoot, platform.directoryName);
-      await this._copyDirRecursive(srcPath, destPath);
-      this._emitOutput('平台目录复制完成');
-    }
+    // 2. 平台目录不再允许从整合包复制，平台只能在导入时下载。
 
     // 3. 复制插件
     if (manifest.content.plugins.included) {
@@ -653,17 +641,11 @@ class ImportService {
     // 写入适配器配置
     steps.push('write-adapter');
 
-    // 平台处理：一次只允许一个平台。
+    // 平台处理：平台只能在导入时下载。
     const platformContent = manifest.content.platform || manifest.content.napcat;
     const shouldUsePlatform = userInputs.installPlatform !== false;
-    if (shouldUsePlatform && platformContent) {
-      if (!platformContent.included && platformContent.installOnImport) {
-        steps.push('platform-install');
-      }
-
-      if (platformContent.included || platformContent.installOnImport) {
-        steps.push('platform-config');
-      }
+    if (shouldUsePlatform && platformContent?.installOnImport) {
+      steps.push('platform-install', 'platform-config');
     }
 
     // WebUI
@@ -708,9 +690,8 @@ class ImportService {
       instanceName: userInputs.instanceName,
     };
 
-    const platformContent = manifest.content.platform || manifest.content.napcat || null;
-    let platformRoot = platformContent?.included ? platformDir : null;
-    let platformVersion = platformContent?.version || null;
+    let platformRoot = null;
+    let platformVersion = null;
 
     // 执行每个步骤
     this._installStepPhaseActive = true;

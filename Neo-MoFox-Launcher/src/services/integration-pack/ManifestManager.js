@@ -31,10 +31,8 @@ class ManifestManager {
    * @param {string} [params.content.neoMofox.version] - 主程序版本
    * @param {string} [params.content.neoMofox.commit] - Git commit hash
    * @param {Object} [params.content.platform] - 平台信息
-   * @param {boolean} params.content.platform.included - 是否包含平台
-   * @param {string} [params.content.platform.id] - 平台 ID
-   * @param {string} [params.content.platform.version] - 平台版本
-   * @param {boolean} [params.content.platform.installOnImport] - 导入时是否安装平台
+   * @param {string} [params.content.platform.id] - 导入时下载的平台 ID
+   * @param {boolean} [params.content.platform.installOnImport] - 导入时是否下载平台
    * @param {Object} [params.content.plugins] - 插件信息
    * @param {boolean} params.content.plugins.included - 是否包含插件
    * @param {string[]} [params.content.plugins.list] - 插件列表
@@ -63,7 +61,7 @@ class ManifestManager {
       launcherVersion,
       content: {
         neoMofox: content.neoMofox || { included: false },
-        platform: content.platform || { included: false, id: null, installOnImport: false },
+        platform: content.platform || { id: null, installOnImport: false },
         plugins: content.plugins || { included: false, list: [] },
         config: content.config || { included: false },
         data: content.data || { included: false },
@@ -132,15 +130,19 @@ class ManifestManager {
     if (!manifest.content || typeof manifest.content !== 'object') {
       errors.push('缺少 content 字段');
     } else {
-      // 检查 content 子字段
-      const requiredContentFields = ['neoMofox', 'platform', 'plugins', 'config', 'data'];
-      requiredContentFields.forEach(field => {
+      // 检查 content 子字段。platform 不再使用 included 字段，平台只能在导入时下载。
+      const requiredIncludedFields = ['neoMofox', 'plugins', 'config', 'data'];
+      requiredIncludedFields.forEach(field => {
         if (!manifest.content[field]) {
           errors.push(`content.${field} 缺失`);
         } else if (typeof manifest.content[field].included !== 'boolean') {
           errors.push(`content.${field}.included 必须为布尔值`);
         }
       });
+
+      if (!manifest.content.platform || typeof manifest.content.platform !== 'object') {
+        errors.push('content.platform 缺失');
+      }
 
       if (manifest.content.napcat && !manifest.content.platform) {
         manifest.content.platform = {
@@ -149,11 +151,15 @@ class ManifestManager {
         };
       }
 
-      if (
-        manifest.content.platform
-        && (manifest.content.platform.included || manifest.content.platform.installOnImport)
-        && !manifest.content.platform.id
-      ) {
+      if (Object.prototype.hasOwnProperty.call(manifest.content.platform || {}, 'included')) {
+        errors.push('content.platform.included 已废弃，整合包不允许声明或内置平台，请使用 installOnImport');
+      }
+
+      if (Object.prototype.hasOwnProperty.call(manifest.content.napcat || {}, 'included')) {
+        errors.push('content.napcat.included 已废弃，整合包不允许声明或内置平台，请使用 installOnImport');
+      }
+
+      if (manifest.content.platform?.installOnImport && !manifest.content.platform.id) {
         errors.push('content.platform.id 必须为非空字符串');
       }
 
