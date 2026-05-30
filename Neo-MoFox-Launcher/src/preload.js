@@ -219,6 +219,7 @@ const api = {
   parseIntegrationPack: (packPath) => ipcRenderer.invoke('parse-integration-pack', packPath),
   importIntegrationPack: (options) => ipcRenderer.invoke('import-integration-pack', options),
   importAbort: () => ipcRenderer.invoke('import-abort'),
+  importCleanup: (instanceId) => ipcRenderer.invoke('import-cleanup', instanceId),
   onImportProgress: (callback) => {
     ipcRenderer.on('import-progress', (_event, data) => callback(data));
   },

@@ -917,10 +917,14 @@ async function handleBackHome() {
   if (choice === 'cleanup') {
     const instanceId = state.activeInstanceId || state.resumeInstanceId;
     if (instanceId) {
-      appendLog('[INFO] 正在清理安装文件...');
+      appendLog('[INFO] 已请求清理安装文件，若当前步骤仍在运行，将在步骤结束后清理...');
       try {
-        await window.mofoxAPI.installCleanup(instanceId);
-        appendLog('[INFO] 清理完成');
+        const cleanupResult = await window.mofoxAPI.installCleanup(instanceId);
+        if (cleanupResult?.pending) {
+          appendLog('[INFO] 当前安装步骤仍在运行，已安排延迟清理');
+        } else {
+          appendLog('[INFO] 清理完成');
+        }
       } catch (error) {
         console.error('清理失败:', error);
         appendLog(`[ERROR] 清理失败: ${error.message}`);

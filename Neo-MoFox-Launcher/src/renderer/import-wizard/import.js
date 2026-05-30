@@ -1403,10 +1403,16 @@ async function handleBackHome() {
   if (choice === 'cleanup') {
     const instanceId = state.activeInstanceId;
     if (instanceId) {
-      appendLog('[INFO] 正在清理导入文件...');
+      appendLog('[INFO] 已请求清理导入文件，若当前步骤仍在运行，将在步骤结束后清理...');
       try {
-        await window.mofoxAPI.installCleanup(instanceId);
-        appendLog('[INFO] 清理完成');
+        const cleanupResult = await window.mofoxAPI.importCleanup?.(instanceId);
+        if (cleanupResult?.pending) {
+          appendLog('[INFO] 当前安装步骤仍在运行，已安排延迟清理');
+        } else if (cleanupResult?.success === false) {
+          appendLog(`[ERROR] 清理失败: ${cleanupResult.error || '未知错误'}`);
+        } else {
+          appendLog('[INFO] 清理完成');
+        }
       } catch (error) {
         console.error('[ImportWizard] 清理导入文件失败:', error);
         appendLog(`[ERROR] 清理失败: ${error.message}`);

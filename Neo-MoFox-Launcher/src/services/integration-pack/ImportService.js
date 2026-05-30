@@ -46,6 +46,8 @@ class ImportService {
     this._abortRequested = false;
     this._installStepPhaseActive = false;
     this._activeInstanceId = null;
+    this._activeInstallStep = null;
+    this._pendingCleanupInstanceId = null;
   }
 
   /**
@@ -61,6 +63,56 @@ class ImportService {
     this._abortRequested = true;
     this._emitOutput('已请求中止整合包导入');
     return { success: true };
+  }
+
+  /**
+   * 标记并执行单个整合包安装步骤。
+   * @param {string} instanceId - 当前导入实例 ID
+   * @param {string} stepName - 当前安装步骤名称
+   * @param {Function} executor - 实际步骤执行函数
+   * @returns {Promise<*>} 步骤执行结果
+   */
+  async _runTrackedInstallStep(instanceId, stepName, executor) {
+    this._activeInstallStep = { instanceId, stepName };
+    try {
+      return await executor();
+    } finally {
+      this._activeInstallStep = null;
+      await this._cleanupPendingInstallIfIdle(instanceId);
+    }
+  }
+
+  /**
+   * 没有安装步骤运行时执行延迟清理。
+   * @param {string} instanceId - 当前导入实例 ID
+   * @returns {Promise<void>}
+   */
+  async _cleanupPendingInstallIfIdle(instanceId) {
+    if (this._activeInstallStep || this._pendingCleanupInstanceId !== instanceId) {
+      return;
+    }
+
+    this._pendingCleanupInstanceId = null;
+    this._emitOutput('当前安装步骤已结束，开始执行延迟清理...');
+    const result = await this._cleanupImportedInstallNow(instanceId);
+    if (!result.success) {
+      this._emitOutput(`延迟清理失败: ${result.error || '未知错误'}`);
+    }
+  }
+
+  /**
+   * 请求清理导入过程中创建的实例与安装目录。
+   * @param {string} instanceId - 需要清理的实例 ID
+   * @returns {Promise<Object>} 清理结果
+   */
+  async cleanupImportedInstall(instanceId) {
+    if (this._activeInstallStep?.instanceId === instanceId) {
+      this._pendingCleanupInstanceId = instanceId;
+      this._emitOutput(`${this._activeInstallStep.stepName} 步骤仍在执行，清理将在该步骤结束后进行`);
+      return { success: true, pending: true };
+    }
+
+    return await this._cleanupImportedInstallNow(instanceId);
   }
 
   /**
@@ -707,62 +759,62 @@ class ImportService {
         try {
           switch (step) {
           case 'clone':
-            await installStepExecutor.executeStep('clone', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'clone', () => installStepExecutor.executeStep('clone', context, stepInputs));
             break;
 
           case 'venv':
             const pythonCmd = userInputs.pythonCmd || 'python';
-            await installStepExecutor.executeStep('venv', context, stepInputs, { pythonCmd });
+            await this._runTrackedInstallStep(instanceId, 'venv', () => installStepExecutor.executeStep('venv', context, stepInputs, { pythonCmd }));
             break;
 
           case 'deps':
-            await installStepExecutor.executeStep('deps', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'deps', () => installStepExecutor.executeStep('deps', context, stepInputs));
             break;
 
           case 'gen-config':
-            await installStepExecutor.executeStep('gen-config', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'gen-config', () => installStepExecutor.executeStep('gen-config', context, stepInputs));
             break;
 
           case 'write-core':
-            await installStepExecutor.executeStep('write-core', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'write-core', () => installStepExecutor.executeStep('write-core', context, stepInputs));
             break;
 
           case 'write-model':
-            await installStepExecutor.executeStep('write-model', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'write-model', () => installStepExecutor.executeStep('write-model', context, stepInputs));
             break;
 
           case 'write-webui-key':
-            await installStepExecutor.executeStep('write-webui-key', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'write-webui-key', () => installStepExecutor.executeStep('write-webui-key', context, stepInputs));
             break;
 
           case 'write-adapter':
-            await installStepExecutor.executeStep('write-adapter', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'write-adapter', () => installStepExecutor.executeStep('write-adapter', context, stepInputs));
             break;
 
           case 'platform-install':
-            const platformResult = await installStepExecutor.executeStep('platform-install', context, stepInputs);
+            const platformResult = await this._runTrackedInstallStep(instanceId, 'platform-install', () => installStepExecutor.executeStep('platform-install', context, stepInputs));
             platformRoot = platformResult.platformRoot || platformResult.rootPath || platformResult.platformDir || platformDir;
             platformVersion = platformResult.platformVersion || platformResult.version || null;
             stepInputs.platformDir = platformResult.platformDir || platformDir;
             break;
 
           case 'platform-config':
-            await installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot: platformRoot || platformDir });
+            await this._runTrackedInstallStep(instanceId, 'platform-config', () => installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot: platformRoot || platformDir }));
             break;
 
           case 'webui':
-            await installStepExecutor.executeStep('webui', context, stepInputs);
+            await this._runTrackedInstallStep(instanceId, 'webui', () => installStepExecutor.executeStep('webui', context, stepInputs));
             break;
 
           case 'register':
-            const result = await installStepExecutor.executeStep('register', context, stepInputs, {
+            await this._runTrackedInstallStep(instanceId, 'register', () => installStepExecutor.executeStep('register', context, stepInputs, {
               instanceId,
               neoMofoxDir,
               platformDir: stepInputs.platformDir || platformDir,
               platformRoot: platformRoot || platformDir,
               platformVersion,
               installSteps,
-            });
+            }));
             break;
 
           default:
@@ -779,6 +831,36 @@ class ImportService {
     } finally {
       this._installStepPhaseActive = false;
     }
+  }
+
+  /**
+   * 立即清理导入过程中创建的实例与安装目录。
+   * @param {string} instanceId - 需要清理的实例 ID
+   * @returns {Promise<Object>} 清理结果
+   */
+  async _cleanupImportedInstallNow(instanceId) {
+    const instance = storageService.getInstance(instanceId);
+    if (!instance) return { success: false, error: '实例不存在' };
+
+    const dirsToRemove = [];
+    if (instance.neomofoxDir && fs.existsSync(instance.neomofoxDir)) {
+      dirsToRemove.push({ path: instance.neomofoxDir, name: 'neo-mofox' });
+    }
+    if (instance.platformDir && fs.existsSync(instance.platformDir)) {
+      dirsToRemove.push({ path: instance.platformDir, name: instance.platform || 'platform' });
+    }
+
+    for (const dir of dirsToRemove) {
+      try {
+        fs.rmSync(dir.path, { recursive: true, force: true });
+        this._emitOutput(`已删除: ${dir.name}`);
+      } catch (error) {
+        this._emitOutput(`删除 ${dir.name} 失败: ${error.message}`);
+      }
+    }
+
+    storageService.deleteInstance(instanceId);
+    return { success: true };
   }
 
   /**

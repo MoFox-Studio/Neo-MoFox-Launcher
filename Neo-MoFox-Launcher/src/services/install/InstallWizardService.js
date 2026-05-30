@@ -42,6 +42,8 @@ class InstallWizardService {
     this._outputCallback = null;
     this._currentInstance = null;
     this._aborted = false;
+    this._activeInstallStep = null;
+    this._pendingCleanupInstanceId = null;
 
     // 启动时检测系统环境
     this._sysEnv = platformHelper.detectSystemEnv();
@@ -78,6 +80,42 @@ class InstallWizardService {
   _checkAborted() {
     if (this._aborted) {
       throw new Error('安装已被用户中止');
+    }
+  }
+
+  /**
+   * 标记并执行单个安装步骤。
+   * 安装步骤运行期间禁止立即清理，避免删除仍被当前步骤占用的文件。
+   * @param {string} instanceId - 当前安装实例 ID
+   * @param {string} stepName - 当前安装步骤名称
+   * @param {Function} executor - 实际步骤执行函数
+   * @returns {Promise<*>} 步骤执行结果
+   */
+  async _runTrackedInstallStep(instanceId, stepName, executor) {
+    this._activeInstallStep = { instanceId, stepName };
+    try {
+      return await executor();
+    } finally {
+      this._activeInstallStep = null;
+      await this._cleanupPendingInstallIfIdle(instanceId);
+    }
+  }
+
+  /**
+   * 当前没有安装步骤运行时，执行用户此前请求的清理。
+   * @param {string} instanceId - 当前安装实例 ID
+   * @returns {Promise<void>}
+   */
+  async _cleanupPendingInstallIfIdle(instanceId) {
+    if (this._activeInstallStep || this._pendingCleanupInstanceId !== instanceId) {
+      return;
+    }
+
+    this._pendingCleanupInstanceId = null;
+    this._emitOutput('[INFO] 当前安装步骤已结束，开始执行延迟清理...');
+    const result = await this._cleanupFailedInstallNow(instanceId);
+    if (!result.success) {
+      this._emitOutput(`[ERROR] 延迟清理失败: ${result.error || '未知错误'}`);
     }
   }
 
@@ -647,7 +685,7 @@ class InstallWizardService {
       if (shouldRun('clone')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'clone', substep: 0 } });
-        await installStepExecutor.executeStep('clone', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'clone', () => installStepExecutor.executeStep('clone', context, stepInputs));
       }
 
       // 3.2 创建虚拟环境
@@ -655,56 +693,56 @@ class InstallWizardService {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
         const pythonCmd = inputs.pythonCmd || 'python';
-        await installStepExecutor.executeStep('venv', context, stepInputs, { pythonCmd });
+        await this._runTrackedInstallStep(instanceId, 'venv', () => installStepExecutor.executeStep('venv', context, stepInputs, { pythonCmd }));
       }
 
       // 3.3 安装依赖
       if (shouldRun('deps')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'deps', substep: 0 } });
-        await installStepExecutor.executeStep('deps', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'deps', () => installStepExecutor.executeStep('deps', context, stepInputs));
       }
 
       // 3.4 生成配置文件
       if (shouldRun('gen-config')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'gen-config', substep: 0 } });
-        await installStepExecutor.executeStep('gen-config', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'gen-config', () => installStepExecutor.executeStep('gen-config', context, stepInputs));
       }
 
       // 3.5 写入 core.toml
       if (shouldRun('write-core')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-core', substep: 0 } });
-        await installStepExecutor.executeStep('write-core', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'write-core', () => installStepExecutor.executeStep('write-core', context, stepInputs));
       }
 
       // 3.6 写入 model.toml
       if (shouldRun('write-model')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-model', substep: 0 } });
-        await installStepExecutor.executeStep('write-model', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'write-model', () => installStepExecutor.executeStep('write-model', context, stepInputs));
       }
 
       // 3.6.1 写入 WebUI API 密钥
       if (shouldRun('write-webui-key')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-webui-key', substep: 0 } });
-        await installStepExecutor.executeStep('write-webui-key', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'write-webui-key', () => installStepExecutor.executeStep('write-webui-key', context, stepInputs));
       }
 
       // 3.6.2 写入适配器配置 (napcat_adapter/config.toml)
       if (shouldRun('write-adapter')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-adapter', substep: 0 } });
-        await installStepExecutor.executeStep('write-adapter', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'write-adapter', () => installStepExecutor.executeStep('write-adapter', context, stepInputs));
       }
 
       // 3.7 安装平台
       if (shouldRun('platform-install')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'platform-install', substep: 0 } });
-        const platformResult = await installStepExecutor.executeStep('platform-install', context, stepInputs);
+        const platformResult = await this._runTrackedInstallStep(instanceId, 'platform-install', () => installStepExecutor.executeStep('platform-install', context, stepInputs));
         platformDir = platformResult.platformDir || platformResult.path || null;
         platformRoot = platformResult.platformRoot || platformResult.rootPath || platformDir;
         platformVersion = platformResult.platformVersion || platformResult.version || null;
@@ -723,27 +761,27 @@ class InstallWizardService {
           platformRoot = platformDir;
         }
         stepInputs.platformDir = platformDir;
-        await installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot });
+        await this._runTrackedInstallStep(instanceId, 'platform-config', () => installStepExecutor.executeStep('platform-config', context, stepInputs, { platformRoot }));
       }
 
       // 3.9 安装 WebUI
       if (shouldRun('webui')) {
         this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'webui', substep: 0 } });
-        await installStepExecutor.executeStep('webui', context, stepInputs);
+        await this._runTrackedInstallStep(instanceId, 'webui', () => installStepExecutor.executeStep('webui', context, stepInputs));
       }
 
       // 3.10 注册实例
       this._checkAborted();
       storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
-      const result = await installStepExecutor.executeStep('register', context, stepInputs, {
+      const result = await this._runTrackedInstallStep(instanceId, 'register', () => installStepExecutor.executeStep('register', context, stepInputs, {
         instanceId,
         neoMofoxDir,
         platformDir,
         platformRoot,
         platformVersion,
         installSteps: configuredSteps,
-      });
+      }));
 
       this._emitProgress('complete', 100, '安装完成！');
       return result;
@@ -778,6 +816,21 @@ class InstallWizardService {
    * 只删除安装过程中创建的 neo-mofox 和 napcat 文件夹，保留父目录和其他文件
    */
   async cleanupFailedInstall(instanceId) {
+    if (this._activeInstallStep?.instanceId === instanceId) {
+      this._pendingCleanupInstanceId = instanceId;
+      this._emitOutput(`[INFO] ${this._activeInstallStep.stepName} 步骤仍在执行，清理将在该步骤结束后进行`);
+      return { success: true, pending: true };
+    }
+
+    return await this._cleanupFailedInstallNow(instanceId);
+  }
+
+  /**
+   * 立即清理失败的安装。调用方必须保证当前没有安装步骤仍在运行。
+   * @param {string} instanceId - 需要清理的实例 ID
+   * @returns {Promise<Object>} 清理结果
+   */
+  async _cleanupFailedInstallNow(instanceId) {
     const instance = storageService.getInstance(instanceId);
     if (!instance) return { success: false, error: '实例不存在' };
 

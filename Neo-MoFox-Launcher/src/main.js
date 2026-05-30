@@ -3010,6 +3010,17 @@ ipcMain.handle('import-abort', async () => {
   }
 });
 
+// import-cleanup: 清理整合包导入生成的实例与安装目录
+ipcMain.handle('import-cleanup', async (event, instanceId) => {
+  try {
+    const { importService } = require('./services/integration-pack/ImportService');
+    return await importService.cleanupImportedInstall(instanceId);
+  } catch (error) {
+    console.error('[IPC] importCleanup 失败:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // ─── TOML 验证（使用 @iarna/toml 完整解析）─────────────────────────────
 ipcMain.handle('validate-toml', async (event, content) => {
   try {
