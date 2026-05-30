@@ -118,6 +118,63 @@
   color: var(--md-sys-color-on-surface-variant, #615d59);
 }
 
+/* Choice dialog button variants */
+.dialog-actions .btn-tonal {
+  padding: 10px 24px;
+  border: none;
+  background: var(--md-sys-color-secondary-container, #e8def8);
+  color: var(--md-sys-color-on-secondary-container, #1d192b);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dialog-actions .btn-tonal:hover {
+  filter: brightness(0.95);
+}
+
+[data-theme="dark"] .dialog-actions .btn-tonal:hover {
+  filter: brightness(1.1);
+}
+
+.dialog-actions .btn-tonal:active {
+  transform: scale(0.97);
+}
+
+.dialog-actions .btn-tonal:focus {
+  outline: 2px solid var(--md-sys-color-primary, #0075de);
+  outline-offset: 2px;
+}
+
+.dialog-actions .btn-filled {
+  padding: 10px 24px;
+  border: none;
+  background: var(--md-sys-color-primary, #0075de);
+  color: var(--md-sys-color-on-primary, #ffffff);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dialog-actions .btn-filled:hover {
+  box-shadow: 0 2px 8px rgba(0, 117, 222, 0.3);
+}
+
+.dialog-actions .btn-filled:active {
+  transform: scale(0.97);
+}
+
+.dialog-actions .btn-filled:focus {
+  outline: 2px solid var(--md-sys-color-primary, #0075de);
+  outline-offset: 2px;
+}
+
 /* 动画 */
 @keyframes fadeIn {
   from { opacity: 0; }

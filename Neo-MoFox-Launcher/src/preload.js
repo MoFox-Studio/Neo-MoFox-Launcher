@@ -112,6 +112,7 @@ const api = {
   installCheckPort: (port) => ipcRenderer.invoke('install-check-port', port),
   installRun: (inputs) => ipcRenderer.invoke('install-run', inputs),
   installCleanup: (instanceId) => ipcRenderer.invoke('install-cleanup', instanceId),
+  installAbort: () => ipcRenderer.invoke('install-abort'),
 
   // ─── 实例进程控制 ───────────────────────────────────────────────────────────
   startInstance: (instanceId) => ipcRenderer.invoke('instance-start', instanceId),

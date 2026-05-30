@@ -40,6 +40,7 @@ class InstallWizardService {
     this._progressCallback = null;
     this._outputCallback = null;
     this._currentInstance = null;
+    this._aborted = false;
 
     // 启动时检测系统环境
     this._sysEnv = platformHelper.detectSystemEnv();
@@ -58,6 +59,25 @@ class InstallWizardService {
    */
   setOutputCallback(callback) {
     this._outputCallback = callback;
+  }
+
+  /**
+   * 中止当前安装流程
+   * 设置中止标志，当前步骤完成后将停止执行后续步骤
+   */
+  abortInstall() {
+    this._aborted = true;
+    console.log('[InstallWizard] 安装已被用户中止');
+  }
+
+  /**
+   * 检查是否已中止，若已中止则抛出错误
+   * @throws {Error} 安装被中止时抛出
+   */
+  _checkAborted() {
+    if (this._aborted) {
+      throw new Error('安装已被用户中止');
+    }
   }
 
   /**
@@ -514,6 +534,9 @@ class InstallWizardService {
       this.setOutputCallback(outputCallback);
     }
 
+    // 重置中止标志
+    this._aborted = false;
+
     const instanceId = this._resolveInstallInstanceId(inputs.qqNumber);
     const neoMofoxDir = path.join(inputs.installDir, instanceId, 'neo-mofox');
     
@@ -608,12 +631,14 @@ class InstallWizardService {
       
       // 3.1 克隆仓库
       if (shouldRun('clone')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'clone', substep: 0 } });
         await installStepExecutor.executeStep('clone', context, stepInputs);
       }
 
       // 3.2 创建虚拟环境
       if (shouldRun('venv')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'venv', substep: 0 } });
         const pythonCmd = inputs.pythonCmd || 'python';
         await installStepExecutor.executeStep('venv', context, stepInputs, { pythonCmd });
@@ -621,42 +646,49 @@ class InstallWizardService {
 
       // 3.3 安装依赖
       if (shouldRun('deps')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'deps', substep: 0 } });
         await installStepExecutor.executeStep('deps', context, stepInputs);
       }
 
       // 3.4 生成配置文件
       if (shouldRun('gen-config')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'gen-config', substep: 0 } });
         await installStepExecutor.executeStep('gen-config', context, stepInputs);
       }
 
       // 3.5 写入 core.toml
       if (shouldRun('write-core')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-core', substep: 0 } });
         await installStepExecutor.executeStep('write-core', context, stepInputs);
       }
 
       // 3.6 写入 model.toml
       if (shouldRun('write-model')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-model', substep: 0 } });
         await installStepExecutor.executeStep('write-model', context, stepInputs);
       }
 
       // 3.6.1 写入 WebUI API 密钥
       if (shouldRun('write-webui-key')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-webui-key', substep: 0 } });
         await installStepExecutor.executeStep('write-webui-key', context, stepInputs);
       }
 
       // 3.6.2 写入适配器配置 (napcat_adapter/config.toml)
       if (shouldRun('write-adapter')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'write-adapter', substep: 0 } });
         await installStepExecutor.executeStep('write-adapter', context, stepInputs);
       }
 
       // 3.7 安装 NapCat
       if (shouldRun('napcat')) {
+        this._checkAborted();
         if (!napcatDir) {
           napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
         }
@@ -669,6 +701,7 @@ class InstallWizardService {
 
       // 3.8 写入 NapCat 配置
       if (shouldRun('napcat-config')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'napcat-config', substep: 0 } });
         if (!napcatDir) {
           napcatDir = path.join(inputs.installDir, instanceId, 'napcat');
@@ -683,11 +716,13 @@ class InstallWizardService {
 
       // 3.9 安装 WebUI
       if (shouldRun('webui')) {
+        this._checkAborted();
         storageService.updateInstance(instanceId, { installProgress: { step: 'webui', substep: 0 } });
         await installStepExecutor.executeStep('webui', context, stepInputs);
       }
 
       // 3.10 注册实例
+      this._checkAborted();
       storageService.updateInstance(instanceId, { installProgress: { step: 'register', substep: 0 } });
       const result = await installStepExecutor.executeStep('register', context, stepInputs, {
         instanceId,

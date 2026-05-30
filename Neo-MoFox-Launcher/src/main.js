@@ -936,6 +936,11 @@ ipcMain.handle('install-cleanup', async (event, instanceId) => {
   return await installWizardService.cleanupFailedInstall(instanceId);
 });
 
+ipcMain.handle('install-abort', async () => {
+  installWizardService.abortInstall();
+  return { success: true };
+});
+
 // ─── 用户设置 IPC ──────────────────────────────────────────────────────────
 const { settingsService } = require('./services/settings/SettingsService');
 

@@ -123,6 +123,7 @@ const el = {
   btnBack: document.getElementById('btn-back'),
   btnNext: document.getElementById('btn-next'),
   btnCancel: document.getElementById('btn-cancel'),
+  btnBackHome: document.getElementById('btn-back-home'),
   btnRetry: document.getElementById('btn-retry'),
   btnCleanup: document.getElementById('btn-cleanup'),
   btnFinish: document.getElementById('btn-finish'),
@@ -237,6 +238,7 @@ function goToStep(step) {
   el.btnBack.classList.toggle('hidden', step === 1 || step === 11);
   el.btnNext.classList.toggle('hidden', step === 11);
   el.btnCancel.classList.toggle('hidden', step !== 1);
+  el.btnBackHome.classList.toggle('hidden', step !== 11);
   
   if (step === 2 && !state.networkCheckPassed) {
     runNetworkCheck();
@@ -811,6 +813,7 @@ async function startInstall() {
     el.btnFinish.classList.remove('hidden');
     el.btnRetry.classList.add('hidden');
     el.btnCleanup.classList.add('hidden');
+    el.btnBackHome.classList.add('hidden');
     
     if (carouselInterval) clearInterval(carouselInterval);
     
@@ -853,6 +856,51 @@ async function cleanupAndRestart() {
     console.error('清理失败:', error);
     appendLog(`[ERROR] 清理失败: ${error.message}`);
   }
+}
+
+/**
+ * 安装过程中返回主界面
+ * 弹出选项对话框：直接停止安装 / 清理文件后返回
+ */
+async function handleBackHome() {
+  const choice = await window.customDialog.choice(
+    '安装正在进行中，请选择返回方式：\n\n• 直接返回：停止安装并保留已下载的文件（下次可续装）\n• 清理后返回：删除已安装的目录和注册信息后返回',
+    '返回主界面',
+    [
+      { label: '直接返回', value: 'stop', variant: 'text' },
+      { label: '清理后返回', value: 'cleanup', variant: 'tonal' },
+    ]
+  );
+
+  if (choice === null) {
+    // 用户取消，继续安装
+    return;
+  }
+
+  // 先中止安装流程
+  try {
+    await window.mofoxAPI.installAbort();
+    appendLog('[INFO] 安装已中止');
+  } catch (error) {
+    console.error('中止安装失败:', error);
+  }
+
+  if (choice === 'cleanup') {
+    const instanceId = state.activeInstanceId || state.resumeInstanceId;
+    if (instanceId) {
+      appendLog('[INFO] 正在清理安装文件...');
+      try {
+        await window.mofoxAPI.installCleanup(instanceId);
+        appendLog('[INFO] 清理完成');
+      } catch (error) {
+        console.error('清理失败:', error);
+        appendLog(`[ERROR] 清理失败: ${error.message}`);
+      }
+    }
+  }
+
+  // 返回主界面
+  window.location.href = '../index.html';
 }
 
 /**
@@ -948,6 +996,8 @@ function bindEvents() {
       window.location.href = '../index.html';
     }
   });
+  
+  el.btnBackHome.addEventListener('click', handleBackHome);
   
   // License tab switching
   el.licenseTabs.forEach(tab => {
