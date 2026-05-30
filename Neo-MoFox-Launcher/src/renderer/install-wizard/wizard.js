@@ -672,6 +672,7 @@ function switchLicenseTab(tabName) {
 function collectInputs() {
   const previousInstallSteps = state.inputs.installSteps;
   const installWebui = el.inputInstallWebui ? el.inputInstallWebui.checked : true;
+  const platform = el.inputInstallPlatform ? el.inputInstallPlatform.value : state.inputs.platform;
   state.inputs = {
     instanceName: el.inputInstanceName.value.trim(),
     qqNumber: el.inputQqNumber.value.trim(),
@@ -681,8 +682,8 @@ function collectInputs() {
     wsPort: parseInt(el.inputWsPort.value, 10) || 8095,
     channel: el.inputChannel.value,
     installDir: el.inputInstallDir.value.trim(),
-    platform: state.inputs.platform || (state.availablePlatforms?.find(p => p.available)?.id || ''),
-    installNapcat: !!(state.inputs.platform || state.availablePlatforms?.find(p => p.available)),
+    platform,
+    installNapcat: !!platform,
     installWebui,
     webuiApiKey: el.inputWebuiApiKey.value.trim(),
   };
@@ -739,7 +740,6 @@ function validateInputs() {
   if (!state.inputs.qqNickname) errors.push('Bot QQ 昵称不能为空');
   if (!state.inputs.ownerQQNumber || !/^\d{5,12}$/.test(state.inputs.ownerQQNumber)) errors.push('主人 QQ 号格式错误');
   if (!state.inputs.apiKey) errors.push('API Key 不能为空');
-  if (!state.inputs.platform) errors.push('请选择一个可安装平台');
   if (!state.inputs.installDir) errors.push('安装目录不能为空');
   
   if (errors.length > 0) {
@@ -1210,6 +1210,16 @@ async function loadInstallPlatforms() {
     if (optionsPlatform && selectedPlatform && inputPlatform) {
       optionsPlatform.innerHTML = '';
       
+      const noPlatformOption = document.createElement('div');
+      noPlatformOption.setAttribute('data-value', '');
+      noPlatformOption.textContent = '不安装平台';
+      optionsPlatform.appendChild(noPlatformOption);
+
+      if (formGroup) {
+        formGroup.style.opacity = '';
+        formGroup.style.pointerEvents = '';
+      }
+      
       if (state.availablePlatforms.length > 0) {
         let hasSelected = false;
         state.availablePlatforms.forEach(platform => {
@@ -1240,32 +1250,38 @@ async function loadInstallPlatforms() {
         });
         
         if (!hasSelected) {
-          selectedPlatform.textContent = '没有可安装平台';
+          noPlatformOption.classList.add('same-as-selected');
+          selectedPlatform.textContent = '不安装平台';
           inputPlatform.value = '';
           if (platformHint) {
-            platformHint.textContent = '当前系统没有可安装平台';
+            platformHint.textContent = '不安装任何平台适配器，仅安装 Neo-MoFox 核心与已选择组件';
           }
         }
-        
-        // Handle change event to update hint
-        inputPlatform.addEventListener('change', () => {
-          const selectedId = inputPlatform.value;
-          const platform = state.availablePlatforms.find(p => p.id === selectedId);
-          if (platform && platformHint) {
-            platformHint.textContent = `${platform.description || ''}（${platform.systemRequirement?.label || '系统要求未声明'}）`;
-          }
-        });
         
       } else {
-        selectedPlatform.textContent = '没有可安装平台';
+        noPlatformOption.classList.add('same-as-selected');
+        selectedPlatform.textContent = '不安装平台';
+        inputPlatform.value = '';
         if (platformHint) {
-          platformHint.textContent = '当前系统没有可安装平台';
-        }
-        if (formGroup) {
-          formGroup.style.opacity = '0.5';
-          formGroup.style.pointerEvents = 'none';
+          platformHint.textContent = '当前系统没有可安装平台，可选择仅安装 Neo-MoFox 核心与已选择组件';
         }
       }
+
+      // Handle change event to update hint
+      inputPlatform.addEventListener('change', () => {
+        const selectedId = inputPlatform.value;
+        state.inputs.platform = selectedId;
+        if (!platformHint) return;
+        if (!selectedId) {
+          platformHint.textContent = '不安装任何平台适配器，仅安装 Neo-MoFox 核心与已选择组件';
+          return;
+        }
+
+        const platform = state.availablePlatforms.find(p => p.id === selectedId);
+        if (platform) {
+          platformHint.textContent = `${platform.description || ''}（${platform.systemRequirement?.label || '系统要求未声明'}）`;
+        }
+      });
     }
   } catch (error) {
     console.error('加载安装平台失败:', error);

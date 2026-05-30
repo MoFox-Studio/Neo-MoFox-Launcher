@@ -421,6 +421,17 @@ function showAddInstanceDialog() {
 }
 
 // ─── 🧪 手动添加实例对话框 ────────────────────────────────────────────
+function generateRandomQqNumber() {
+  /**
+   * 生成符合 QQ 号格式校验的随机号码。
+   *
+   * @returns {string} 5-12 位数字字符串，首位不为 0。
+   */
+  const min = 10000;
+  const max = 999999999999;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
 function openManualAddInstanceDialog() {
   // 创建对话框容器
   const dialogOverlay = document.createElement('div');
@@ -1025,9 +1036,10 @@ function openManualAddInstanceDialog() {
     }
 
     // 构建实例配置
+    const randomQqNumber = generateRandomQqNumber();
     const instanceConfig = {
-      qqNumber: '114514',
-      ownerQQNumber: '114514',
+      qqNumber: randomQqNumber,
+      ownerQQNumber: randomQqNumber,
       apiKey: '114514',
       wsPort: 8080,
       neomofoxDir,
