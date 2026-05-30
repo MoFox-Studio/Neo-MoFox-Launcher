@@ -711,3 +711,141 @@ input:disabled + .switch-slider {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ===== 许可查看 ===== */
+.license-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.license-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 999px;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  font: inherit;
+  transition: all 0.2s ease;
+}
+
+.license-tab.active {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.license-content-wrapper {
+  min-height: 320px;
+  max-height: 48vh;
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.license-loading,
+.license-error {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.license-error {
+  flex-direction: column;
+  color: var(--md-sys-color-error);
+}
+
+.license-content {
+  color: var(--md-sys-color-on-surface);
+  line-height: 1.7;
+}
+
+.license-content h1,
+.license-content h2,
+.license-content h3 {
+  margin: 18px 0 10px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.license-content p,
+.license-content li {
+  font-size: 14px;
+}
+
+.license-agreement {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  background: var(--md-sys-color-surface);
+}
+
+.license-agreement.error {
+  border-color: var(--md-sys-color-error);
+  background: rgba(var(--md-sys-color-error-rgb, 211, 47, 47), 0.08);
+  animation: errorShake 0.4s;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  color: var(--md-sys-color-on-surface);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rotating,
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* ===== 安装进度条增强 ===== */
+.install-progress {
+  padding: 20px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.install-progress .progress-bar {
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--md-sys-color-surface-variant);
+}
+
+.install-progress .progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary, var(--md-sys-color-primary)));
+  transition: width 0.25s ease;
+}
+
+.install-progress .progress-info {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+}
+
+.progress-percent.hidden {
+  display: none !important;
+}

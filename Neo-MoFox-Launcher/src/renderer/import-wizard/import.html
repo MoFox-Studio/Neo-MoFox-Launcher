@@ -41,7 +41,7 @@
       <nav class="wizard-steps">
         <div class="step-item active" data-step="1">
           <div class="step-indicator">1</div>
-          <div class="step-content"><span class="step-title">选择整合包</span></div>
+          <div class="step-content"><span class="step-title">环境检测</span></div>
         </div>
         <div class="step-item" data-step="2">
           <div class="step-indicator">2</div>
@@ -49,22 +49,26 @@
         </div>
         <div class="step-item" data-step="3">
           <div class="step-indicator">3</div>
-          <div class="step-content"><span class="step-title">环境检测</span></div>
+          <div class="step-content"><span class="step-title">许可协议</span></div>
         </div>
         <div class="step-item" data-step="4">
           <div class="step-indicator">4</div>
-          <div class="step-content"><span class="step-title">用户配置</span></div>
+          <div class="step-content"><span class="step-title">选择整合包</span></div>
         </div>
         <div class="step-item" data-step="5">
           <div class="step-indicator">5</div>
-          <div class="step-content"><span class="step-title">组件配置</span></div>
+          <div class="step-content"><span class="step-title">用户配置</span></div>
         </div>
         <div class="step-item" data-step="6">
           <div class="step-indicator">6</div>
-          <div class="step-content"><span class="step-title">安装确认</span></div>
+          <div class="step-content"><span class="step-title">组件配置</span></div>
         </div>
         <div class="step-item" data-step="7">
           <div class="step-indicator">7</div>
+          <div class="step-content"><span class="step-title">安装确认</span></div>
+        </div>
+        <div class="step-item" data-step="8">
+          <div class="step-indicator">8</div>
           <div class="step-content"><span class="step-title">安装执行</span></div>
         </div>
       </nav>
@@ -76,8 +80,131 @@
     
     <main class="wizard-main">
       <div class="wizard-content">
-        <!-- Step 1: 选择整合包 -->
+        <!-- Step 1: 环境检测 -->
         <section class="wizard-step" id="step-1">
+          <div class="step-header">
+            <h1>环境检测</h1>
+            <p>检查系统环境是否满足安装要求</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-python">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">Python</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-uv">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">uv (Python 包管理器)</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+            <div class="env-check-item" id="check-git">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+              </div>
+              <div class="check-info">
+                <div class="check-name">Git</div>
+                <div class="check-detail">检测中...</div>
+              </div>
+            </div>
+          </div>
+          <div class="env-check-result hidden" id="env-check-result">
+            <div class="result-icon">
+              <span class="material-symbols-rounded">error</span>
+            </div>
+            <div class="result-text">
+              <p>环境检测未通过，请先安装缺失的依赖。</p>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 2: 网络检测 -->
+        <section class="wizard-step hidden" id="step-2">
+          <div class="step-header">
+            <h1>网络环境检测</h1>
+            <p>正在检测网络连通性并选择最佳下载源...</p>
+          </div>
+          <div class="env-check-list">
+            <div class="env-check-item" id="check-network">
+              <div class="check-icon">
+                <span class="material-symbols-rounded loading">progress_activity</span>
+                <span class="material-symbols-rounded success hidden">check_circle</span>
+                <span class="material-symbols-rounded error hidden">cancel</span>
+              </div>
+              <div class="check-info">
+                <span class="check-name">网络连通性</span>
+                <span class="check-requirement">检测镜像源可达性</span>
+              </div>
+              <div class="check-status">
+                <span class="status-text">检测中...</span>
+              </div>
+            </div>
+          </div>
+          <div class="mirror-results hidden" id="mirror-results">
+            <h3>镜像源延迟检测结果</h3>
+            <div class="mirror-list" id="mirror-list"></div>
+          </div>
+          <div class="env-check-result hidden" id="network-check-result">
+            <div class="result-success hidden">
+              <span class="material-symbols-rounded">verified</span>
+              <span class="network-result-text">网络检测通过，已选择最佳镜像源</span>
+            </div>
+            <div class="result-error hidden">
+              <span class="material-symbols-rounded">error</span>
+              <span class="error-message">所有镜像源均不可达，请检查网络连接</span>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Step 3: EULA & Privacy -->
+        <section class="wizard-step hidden" id="step-3">
+          <div class="step-header">
+            <h1>许可协议</h1>
+            <p>请仔细阅读以下条款并同意后继续</p>
+          </div>
+          <div class="license-tabs">
+            <button class="license-tab active" data-tab="eula">
+              <span class="material-symbols-rounded">gavel</span>
+              最终用户许可协议
+            </button>
+            <button class="license-tab" data-tab="privacy">
+              <span class="material-symbols-rounded">privacy_tip</span>
+              隐私政策
+            </button>
+          </div>
+          <div class="license-content-wrapper">
+            <div class="license-loading" id="license-loading">
+              <span class="material-symbols-rounded rotating">progress_activity</span>
+              <span>正在加载许可协议...</span>
+            </div>
+            <div class="license-error hidden" id="license-error">
+              <span class="material-symbols-rounded">error</span>
+              <span class="error-text">加载失败，请检查网络连接后重试</span>
+              <button class="md3-btn md3-btn-tonal" id="btn-reload-license">
+                <span class="material-symbols-rounded">refresh</span>
+                重新加载
+              </button>
+            </div>
+            <div class="license-content hidden" id="license-content-eula"></div>
+            <div class="license-content hidden" id="license-content-privacy"></div>
+          </div>
+          <div class="license-agreement">
+            <label class="checkbox-group">
+              <input type="checkbox" id="input-agree-license">
+              <span class="checkbox-label">我已阅读并同意以上条款（包括 EULA 和隐私政策）</span>
+            </label>
+          </div>
+        </section>
+        
+        <!-- Step 4: 选择整合包 -->
+        <section class="wizard-step hidden" id="step-4">
           <div class="step-header">
             <h1>选择整合包文件</h1>
             <p>请选择要导入的 .mfpack 整合包文件</p>
@@ -137,91 +264,8 @@
           </div>
         </section>
         
-        <!-- Step 2: 网络检测 -->
-        <section class="wizard-step hidden" id="step-2">
-          <div class="step-header">
-            <h1>网络环境检测</h1>
-            <p>正在检测网络连通性并选择最佳下载源...</p>
-          </div>
-          <div class="env-check-list">
-            <div class="env-check-item" id="check-network">
-              <div class="check-icon">
-                <span class="material-symbols-rounded loading">progress_activity</span>
-                <span class="material-symbols-rounded success hidden">check_circle</span>
-                <span class="material-symbols-rounded error hidden">cancel</span>
-              </div>
-              <div class="check-info">
-                <span class="check-name">网络连通性</span>
-                <span class="check-requirement">检测镜像源可达性</span>
-              </div>
-              <div class="check-status">
-                <span class="status-text">检测中...</span>
-              </div>
-            </div>
-          </div>
-          <div class="mirror-results hidden" id="mirror-results">
-            <h3>镜像源延迟检测结果</h3>
-            <div class="mirror-list" id="mirror-list"></div>
-          </div>
-          <div class="env-check-result hidden" id="network-check-result">
-            <div class="result-success hidden">
-              <span class="material-symbols-rounded">verified</span>
-              <span class="network-result-text">网络检测通过，已选择最佳镜像源</span>
-            </div>
-            <div class="result-error hidden">
-              <span class="material-symbols-rounded">error</span>
-              <span class="error-message">所有镜像源均不可达，请检查网络连接</span>
-            </div>
-          </div>
-        </section>
-        
-        <!-- Step 3: 环境检测 -->
-        <section class="wizard-step hidden" id="step-3">
-          <div class="step-header">
-            <h1>环境检测</h1>
-            <p>检查系统环境是否满足安装要求</p>
-          </div>
-          <div class="env-check-list">
-            <div class="env-check-item" id="check-python">
-              <div class="check-icon">
-                <span class="material-symbols-rounded loading">progress_activity</span>
-              </div>
-              <div class="check-info">
-                <div class="check-name">Python</div>
-                <div class="check-detail">检测中...</div>
-              </div>
-            </div>
-            <div class="env-check-item" id="check-uv">
-              <div class="check-icon">
-                <span class="material-symbols-rounded loading">progress_activity</span>
-              </div>
-              <div class="check-info">
-                <div class="check-name">uv (Python 包管理器)</div>
-                <div class="check-detail">检测中...</div>
-              </div>
-            </div>
-            <div class="env-check-item" id="check-git">
-              <div class="check-icon">
-                <span class="material-symbols-rounded loading">progress_activity</span>
-              </div>
-              <div class="check-info">
-                <div class="check-name">Git</div>
-                <div class="check-detail">检测中...</div>
-              </div>
-            </div>
-          </div>
-          <div class="env-check-result hidden" id="env-check-result">
-            <div class="result-icon">
-              <span class="material-symbols-rounded">error</span>
-            </div>
-            <div class="result-text">
-              <p>环境检测未通过，请先安装缺失的依赖。</p>
-            </div>
-          </div>
-        </section>
-        
-        <!-- Step 4: 用户配置 -->
-        <section class="wizard-step hidden" id="step-4">
+        <!-- Step 5: 用户配置 -->
+        <section class="wizard-step hidden" id="step-5">
           <div class="step-header">
             <h1>配置实例参数</h1>
             <p>请填写实例的基本信息和配置参数</p>
@@ -313,8 +357,8 @@
           </div>
         </section>
         
-        <!-- Step 5: 组件配置 -->
-        <section class="wizard-step hidden" id="step-5">
+        <!-- Step 6: 组件配置 -->
+        <section class="wizard-step hidden" id="step-6">
           <div class="step-header">
             <h1>选择安装组件</h1>
             <p>请选择需要安装的附加组件</p>
@@ -351,8 +395,8 @@
           </div>
         </section>
         
-        <!-- Step 6: 安装确认 -->
-        <section class="wizard-step hidden" id="step-6">
+        <!-- Step 7: 安装确认 -->
+        <section class="wizard-step hidden" id="step-7">
           <div class="step-header">
             <h1>确认安装信息</h1>
             <p>请检查以下配置是否正确</p>
@@ -427,11 +471,11 @@
           </div>
         </section>
         
-        <!-- Step 7: 安装执行 -->
-        <section class="wizard-step hidden" id="step-7">
+        <!-- Step 8: 安装执行 -->
+        <section class="wizard-step hidden" id="step-8">
           <div class="step-header">
             <h1>正在安装</h1>
-            <p>请稍候，正在导入整合包...</p>
+            <p>请稍候，正在导入整合包，进度条会显示当前安装进度...</p>
           </div>
           
           <div class="install-progress">
@@ -440,7 +484,7 @@
             </div>
             <div class="progress-info">
               <span class="progress-step" id="progress-step">准备中...</span>
-              <span class="progress-percent" id="progress-percent">0%</span>
+              <span class="progress-percent hidden" id="progress-percent" aria-hidden="true"></span>
             </div>
           </div>
           
@@ -468,7 +512,7 @@
             </div>
           </div>
         </section>
-      </div>
+            </div>
       
       <div class="wizard-actions">
         <button class="md3-btn md3-btn-text" id="btn-back">

@@ -7,7 +7,7 @@
 
 const state = {
   currentStep: 1,
-  totalSteps: 7,
+  totalSteps: 8,
   
   // 整合包信息
   packPath: null,
@@ -17,6 +17,10 @@ const state = {
   envCheckPassed: false,
   networkCheckPassed: false,
   pythonCmd: null,
+
+  // 许可协议
+  licenseLoaded: false,
+  licenseAgreed: false,
   
   // 用户输入
   inputs: {
@@ -54,20 +58,29 @@ const el = {
   btnRetry: document.getElementById('btn-retry'),
   btnFinish: document.getElementById('btn-finish'),
   
-  // 步骤 1: 选择整合包
+  // 步骤 4: 选择整合包
   btnSelectPack: document.getElementById('btn-select-pack'),
   packSelector: document.getElementById('pack-selector'),
   selectedPackInfo: document.getElementById('selected-pack-info'),
   packFilename: document.getElementById('pack-filename'),
   packInfoBody: document.getElementById('pack-info-body'),
   
-  // 步骤 2: 环境检测
+  // 步骤 1: 环境检测
   checkPython: document.getElementById('check-python'),
   checkUv: document.getElementById('check-uv'),
   checkGit: document.getElementById('check-git'),
   envCheckResult: document.getElementById('env-check-result'),
   
-  // 步骤 3: 用户配置
+  // 步骤 3: 许可查看
+  licenseTabs: document.querySelectorAll('.license-tab'),
+  licenseLoading: document.getElementById('license-loading'),
+  licenseError: document.getElementById('license-error'),
+  licenseContentEula: document.getElementById('license-content-eula'),
+  licenseContentPrivacy: document.getElementById('license-content-privacy'),
+  btnReloadLicense: document.getElementById('btn-reload-license'),
+  inputAgreeLicense: document.getElementById('input-agree-license'),
+
+  // 步骤 5: 用户配置
   inputInstanceName: document.getElementById('input-instance-name'),
   inputQqNumber: document.getElementById('input-qq-number'),
   inputQqNickname: document.getElementById('input-qq-nickname'),
@@ -85,13 +98,13 @@ const el = {
   inputInstallDir: document.getElementById('input-install-dir'),
   btnBrowseDir: document.getElementById('btn-browse-dir'),
   
-  // 步骤 4: 组件配置
+  // 步骤 6: 组件配置
   checkInstallWebui: document.getElementById('check-install-webui'),
   checkInstallNapcat: document.getElementById('check-install-napcat'),
   cardNapcat: document.getElementById('card-napcat'),
   descNapcat: document.getElementById('desc-napcat'),
   
-  // 步骤 5: 安装确认
+  // 步骤 7: 安装确认
   summaryPackName: document.getElementById('summary-pack-name'),
   summaryPackVersion: document.getElementById('summary-pack-version'),
   summaryPackAuthor: document.getElementById('summary-pack-author'),
@@ -105,7 +118,7 @@ const el = {
   summaryInstallDir: document.getElementById('summary-install-dir'),
   summaryStepList: document.getElementById('summary-step-list'),
   
-  // 步骤 5: 安装执行
+  // 步骤 8: 安装执行
   progressFill: document.getElementById('progress-fill'),
   progressStep: document.getElementById('progress-step'),
   progressPercent: document.getElementById('progress-percent'),
@@ -152,11 +165,21 @@ function bindEvents() {
   el.btnRetry?.addEventListener('click', retryInstall);
   el.btnFinish?.addEventListener('click', finishAndClose);
   
-  // 步骤 1: 选择整合包
+  // 步骤 4: 选择整合包
   el.btnSelectPack?.addEventListener('click', selectPack);
   // 不绑定 packSelector，避免事件冒泡导致重复触发
   
-  // 步骤 3: 用户配置
+  // 步骤 3: 许可查看
+  el.licenseTabs?.forEach(tab => {
+    tab.addEventListener('click', () => switchLicenseTab(tab.getAttribute('data-tab')));
+  });
+  el.btnReloadLicense?.addEventListener('click', loadLicenseAgreements);
+  el.inputAgreeLicense?.addEventListener('change', () => {
+    state.licenseAgreed = el.inputAgreeLicense.checked;
+    clearLicenseError();
+  });
+
+  // 步骤 5: 用户配置
   el.btnToggleApiKey?.addEventListener('click', () => togglePasswordVisibility(el.inputApiKey, el.btnToggleApiKey));
   el.btnGetApiKey?.addEventListener('click', () => window.open('https://cloud.siliconflow.cn/account/ak', '_blank'));
   el.btnToggleWebuiKey?.addEventListener('click', () => togglePasswordVisibility(el.inputWebuiApiKey, el.btnToggleWebuiKey));
@@ -178,7 +201,7 @@ function bindEvents() {
     input?.addEventListener('input', () => clearFieldError(input));
   });
   
-  // 步骤 5: 安装日志折叠
+  // 步骤 8: 安装日志折叠
   el.btnToggleLog?.addEventListener('click', toggleLog);
   
   // 监听导入进度事件
@@ -236,34 +259,39 @@ function goToStep(step) {
   });
   
   // 更新按钮状态
-  el.btnBack.classList.toggle('hidden', step === 1 || step === 7);
-  el.btnNext.classList.toggle('hidden', step === 7);
+  el.btnBack.classList.toggle('hidden', step === 1 || step === 8);
+  el.btnNext.classList.toggle('hidden', step === 8);
   el.btnCancel.classList.toggle('hidden', step !== 1);
   el.btnBackHome?.classList.add('hidden');
   
+  // 步骤 1 自动运行环境检测，确保在所有导入操作前完成
+  if (step === 1 && !state.envCheckPassed) {
+    runEnvCheck();
+  }
+
   // 步骤 2 自动运行网络检测
   if (step === 2 && !state.networkCheckPassed) {
     runNetworkCheck();
   }
-  
-  // 步骤 3 自动运行环境检测
-  if (step === 3 && !state.envCheckPassed) {
-    runEnvCheck();
+
+  // 步骤 3 加载许可协议
+  if (step === 3 && !state.licenseLoaded) {
+    loadLicenseAgreements();
   }
   
-  // 步骤 5 组件配置处理
-  if (step === 5) {
+  // 步骤 6 组件配置处理
+  if (step === 6) {
     initComponentSelection();
   }
 
-  // 步骤 6 显示摘要
-  if (step === 6) {
+  // 步骤 7 显示摘要
+  if (step === 7) {
     updateSummary();
   }
   
-  // 步骤 7 开始安装
-  if (step === 7) {
-    console.log('[ImportWizard] 进入步骤 7，准备开始导入');
+  // 步骤 8 开始安装
+  if (step === 8) {
+    console.log('[ImportWizard] 进入步骤 8，准备开始导入');
     el.btnNext.classList.add('hidden');
     el.btnFinish.classList.add('hidden');
     el.btnBackHome?.classList.add('hidden');
@@ -287,11 +315,12 @@ function goToStep(step) {
 
 async function goNext() {
   clearAllErrors();
+  clearLicenseError();
   
-  // 步骤 1: 选择整合包
+  // 步骤 1: 环境检测
   if (state.currentStep === 1) {
-    if (!state.packPath || !state.packManifest) {
-      await showError('请先选择整合包文件');
+    if (!state.envCheckPassed) {
+      await showError('环境检测未通过，请先安装缺失的依赖');
       return;
     }
   }
@@ -303,17 +332,30 @@ async function goNext() {
       return;
     }
   }
-  
-  // 步骤 3: 环境检测
+
+  // 步骤 3: 许可查看
   if (state.currentStep === 3) {
-    if (!state.envCheckPassed) {
-      await showError('环境检测未通过，请先安装缺失的依赖');
+    if (!state.licenseLoaded) {
+      await showError('许可协议尚未加载完成，请稍候或重试加载');
+      return;
+    }
+    if (!el.inputAgreeLicense?.checked) {
+      showLicenseError();
+      return;
+    }
+    state.licenseAgreed = true;
+  }
+
+  // 步骤 4: 选择整合包
+  if (state.currentStep === 4) {
+    if (!state.packPath || !state.packManifest) {
+      await showError('请先选择整合包文件');
       return;
     }
   }
   
-  // 步骤 4: 用户配置
-  if (state.currentStep === 4) {
+  // 步骤 5: 用户配置
+  if (state.currentStep === 5) {
     if (!validateInputs()) {
       return;
     }
@@ -334,8 +376,8 @@ async function goNext() {
     collectInputs();
   }
   
-  // 步骤 5: 组件配置
-  if (state.currentStep === 5) {
+  // 步骤 6: 组件配置
+  if (state.currentStep === 6) {
     state.inputs.installWebui = el.checkInstallWebui?.checked ?? true;
     state.inputs.installNapcat = el.checkInstallNapcat?.checked ?? true;
   }
@@ -360,7 +402,7 @@ async function handleCancel() {
   }
 }
 
-// ─── 步骤 1: 选择整合包 ───────────────────────────────────────────────
+// ─── 步骤 4: 选择整合包 ───────────────────────────────────────────────
 
 async function selectPack() {
   try {
@@ -545,6 +587,92 @@ function generateContentItems(content) {
   return items.join('');
 }
 
+
+// ─── 步骤 3: 许可查看 ─────────────────────────────────────────────────
+
+function showLicenseError() {
+  const agreement = document.querySelector('.license-agreement');
+  if (agreement) {
+    agreement.classList.add('error');
+    agreement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function clearLicenseError() {
+  const agreement = document.querySelector('.license-agreement');
+  if (agreement) {
+    agreement.classList.remove('error');
+  }
+}
+
+// License agreements loading and rendering
+async function loadLicenseAgreements() {
+  el.licenseLoading.classList.remove('hidden');
+  el.licenseError.classList.add('hidden');
+  el.licenseContentEula.classList.add('hidden');
+  el.licenseContentPrivacy.classList.add('hidden');
+  
+  try {
+    // 从镜像服务获取许可证 URL 列表
+    const { eulaUrls, privacyUrls } = await window.mofoxAPI.mirrorGetLicenseUrls();
+
+    // 尝试从 URL 列表中获取内容（依次尝试直到成功）
+    const fetchFromUrls = async (urls) => {
+      let lastError = null;
+      for (const url of urls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) return await response.text();
+          lastError = new Error(`HTTP ${response.status}`);
+        } catch (e) {
+          lastError = e;
+        }
+      }
+      throw lastError || new Error('所有 URL 均不可达');
+    };
+
+    const [eulaText, privacyText] = await Promise.all([
+      fetchFromUrls(eulaUrls),
+      fetchFromUrls(privacyUrls),
+    ]);
+    
+    // Use marked.js to render markdown
+    if (typeof marked !== 'undefined') {
+      el.licenseContentEula.innerHTML = marked.parse(eulaText);
+      el.licenseContentPrivacy.innerHTML = marked.parse(privacyText);
+    } else {
+      // Fallback to plain text
+      el.licenseContentEula.innerHTML = `<pre>${eulaText}</pre>`;
+      el.licenseContentPrivacy.innerHTML = `<pre>${privacyText}</pre>`;
+    }
+    
+    el.licenseLoading.classList.add('hidden');
+    el.licenseContentEula.classList.remove('hidden');
+    state.licenseLoaded = true;
+    
+  } catch (error) {
+    console.error('加载许可协议失败:', error);
+    el.licenseLoading.classList.add('hidden');
+    el.licenseError.classList.remove('hidden');
+    state.licenseLoaded = false;
+  }
+}
+
+function switchLicenseTab(tabName) {
+  el.licenseTabs.forEach(tab => {
+    const isActive = tab.getAttribute('data-tab') === tabName;
+    tab.classList.toggle('active', isActive);
+  });
+  
+  if (tabName === 'eula') {
+    el.licenseContentEula.classList.remove('hidden');
+    el.licenseContentPrivacy.classList.add('hidden');
+  } else if (tabName === 'privacy') {
+    el.licenseContentEula.classList.add('hidden');
+    el.licenseContentPrivacy.classList.remove('hidden');
+  }
+}
+
 // ─── 步骤 2: 网络检测 ─────────────────────────────────────────────────
 
 async function runNetworkCheck() {
@@ -638,7 +766,7 @@ async function runNetworkCheck() {
   }
 }
 
-// ─── 步骤 3: 环境检测 ─────────────────────────────────────────────────
+// ─── 步骤 1: 环境检测 ─────────────────────────────────────────────────
 
 async function runEnvCheck() {
   try {
@@ -691,7 +819,7 @@ function updateCheckItem(itemEl, passed, version = '') {
   }
 }
 
-// ─── 步骤 4: 用户配置 ─────────────────────────────────────────────────
+// ─── 步骤 5: 用户配置 ─────────────────────────────────────────────────
 
 async function setDefaultInstallDir() {
   try {
@@ -864,7 +992,7 @@ function collectInputs() {
   };
 }
 
-// ─── 步骤 4: 组件配置 ─────────────────────────────────────────────────
+// ─── 步骤 6: 组件配置 ─────────────────────────────────────────────────
 
 function initComponentSelection() {
   if (!state.packManifest) return;
@@ -890,7 +1018,7 @@ function initComponentSelection() {
   }
 }
 
-// ─── 步骤 5: 安装确认 ─────────────────────────────────────────────────
+// ─── 步骤 7: 安装确认 ─────────────────────────────────────────────────
 
 function updateSummary() {
   const manifest = state.packManifest;
@@ -1033,7 +1161,7 @@ function initializeStepIndicators() {
   console.log('[ImportWizard] 步骤指示器初始化完成，共', state.installSteps.length, '个步骤');
 }
 
-// ─── 步骤 5: 安装执行 ─────────────────────────────────────────────────
+// ─── 步骤 8: 安装执行 ─────────────────────────────────────────────────
 
 async function startImport() {
   if (state.installing) {
@@ -1092,7 +1220,7 @@ function updateProgress(percent, message) {
   }
   
   if (el.progressPercent) {
-    el.progressPercent.textContent = `${Math.round(validPercent)}%`;
+    el.progressPercent.textContent = '';
   }
   
   if (el.progressStep && message) {
@@ -1205,9 +1333,9 @@ async function retryInstall() {
   el.btnRetry.classList.add('hidden');
   el.btnCancel.classList.add('hidden');
   el.installLogContent.innerHTML = '';
-  el.progressFill.style.width = '0%';
+  if (el.progressFill) el.progressFill.style.width = '0%';
   el.progressPercent.textContent = '0%';
-  el.progressStep.textContent = '准备中...';
+  if (el.progressStep) el.progressStep.textContent = '准备中...';
   
   // 重新开始安装
   await startImport();
