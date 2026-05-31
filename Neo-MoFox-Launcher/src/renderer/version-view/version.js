@@ -606,12 +606,18 @@ async function checkoutMofoxCommit(hash, message) {
     await window.mofoxAPI.versionCheckoutCommit(instanceId, hash);
     hideProgress();
     window.showToast?.(`已回退到 ${hash}`, 'success');
-    await loadVersionInfo();
-    await loadMofoxCommitHistory();
+    await refreshMofoxVersionState();
   } catch (error) {
     hideProgress();
     await window.customAlert(`回退失败: ${error.message}`, '错误');
   }
+}
+
+// ─── 刷新 MoFox 版本状态 ─────────────────────────────────────────────────
+async function refreshMofoxVersionState() {
+  await loadVersionInfo();
+  await loadBranches();
+  await loadMofoxCommitHistory();
 }
 
 // ─── 检查 MoFox 更新 ─────────────────────────────────────────────────────
@@ -678,7 +684,8 @@ async function handleSwitchBranch() {
     await window.mofoxAPI.versionSwitchBranch(instanceId, targetBranch);
     hideProgress();
     window.showToast?.(`已切换到 ${targetBranch} 分支`, 'success');
-    await loadVersionInfo();
+    branchSelectValue = '';
+    await refreshMofoxVersionState();
   } catch (error) {
     hideProgress();
     await window.customAlert(`切换分支失败: ${error.message}`, '错误');
@@ -706,7 +713,7 @@ async function handleUpdateMofox() {
     await window.mofoxAPI.versionUpdateMofox(instanceId);
     hideProgress();
     window.showToast?.('Neo-MoFox 更新完成', 'success');
-    await loadVersionInfo();
+    await refreshMofoxVersionState();
   } catch (error) {
     hideProgress();
     await window.customAlert(`更新失败: ${error.message}`, '错误');
@@ -721,7 +728,7 @@ async function installPlatformVersion(version) {
   try {
     await window.mofoxAPI.versionUpdatePlatform(instanceId, version);
     hideProgress();
-    window.showToast?.(`${platformName} 已更新到 ${version}`, 'success');
+    window.showToast?.(`${platformName} 已安装 ${version}`, 'success');
     await loadVersionInfo();
     await loadPlatformVersions();
   } catch (error) {

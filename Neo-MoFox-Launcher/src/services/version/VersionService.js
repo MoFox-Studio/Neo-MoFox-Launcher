@@ -256,16 +256,19 @@ class VersionService {
       );
       const currentBranch = branchOutput.trim();
 
-      // 比较本地分支和其远程跟踪分支
+      // 比较本地分支和其远程跟踪分支，只把远程领先数量视为可更新。
       const { stdout } = await this._execCommand(
-        'git', ['rev-list', `HEAD...origin/${currentBranch}`, '--count'],
+        'git', ['rev-list', '--left-right', '--count', `HEAD...origin/${currentBranch}`],
         { cwd: neoMofoxDir }
       );
 
-      const behindCount = parseInt(stdout.trim(), 10) || 0;
+      const [aheadText = '0', behindText = '0'] = stdout.trim().split(/\s+/);
+      const aheadCount = parseInt(aheadText, 10) || 0;
+      const behindCount = parseInt(behindText, 10) || 0;
       return {
         hasUpdate: behindCount > 0,
         behindCount,
+        aheadCount,
       };
     } catch (e) {
       console.error('[VersionService] 检查更新失败:', e);
