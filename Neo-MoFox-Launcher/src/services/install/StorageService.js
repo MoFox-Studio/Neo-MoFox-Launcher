@@ -181,11 +181,11 @@ class StorageService {
   }
 
   /**
-   * 标准化实例平台字段。
+   * 标准化实例数据字段。
    * @param {object} instance - 原始实例对象
    * @returns {object} 标准化后的实例对象
    */
-  _normalizePlatformFields(instance) {
+  _normalizeInstanceData(instance) {
     if (!instance || typeof instance !== 'object') {
       return instance;
     }
@@ -212,6 +212,10 @@ class StorageService {
       platformDir,
       platformVersion,
       installSteps,
+      components: {
+        ...(normalized.components || {}),
+        webuiInstalled: normalized.components?.webuiInstalled ?? false,
+      },
     };
   }
 
@@ -220,7 +224,7 @@ class StorageService {
    */
   addInstance(instance) {
     const instances = this.getInstances();
-    const normalizedInstance = this._normalizePlatformFields(instance);
+    const normalizedInstance = this._normalizeInstanceData(instance);
     instances.push(normalizedInstance);
     this.writeInstances(instances);
     return normalizedInstance;
@@ -235,7 +239,7 @@ class StorageService {
     if (index === -1) {
       throw new Error(`实例不存在: ${instanceId}`);
     }
-    instances[index] = this._normalizePlatformFields({ ...instances[index], ...updates });
+    instances[index] = this._normalizeInstanceData({ ...instances[index], ...updates });
     this.writeInstances(instances);
     return instances[index];
   }
@@ -466,7 +470,7 @@ class StorageService {
       }
 
       // 从版本 2 迁移到版本 3/4：一次仅安装一个平台，并移除 NapCat 专用存储字段。
-      return this._normalizePlatformFields(migrated);
+      return this._normalizeInstanceData(migrated);
     });
     
 

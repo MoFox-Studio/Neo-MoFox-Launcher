@@ -261,6 +261,9 @@ class ImportService {
         installCompleted: false,
         installProgress: { step: 'prepare', substep: 0 },
         installSteps: installSteps,
+        components: {
+          webuiInstalled: userInputs.installWebui !== false,
+        },
         fromIntegrationPack: true,
         integrationPackInfo: {
           packName: manifest.packName,

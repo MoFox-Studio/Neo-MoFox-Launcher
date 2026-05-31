@@ -642,6 +642,9 @@ class InstallWizardService {
       installCompleted: false,
       installProgress: { step: resumeStep, substep: 0 },
       installSteps: configuredSteps, // 保存步骤配置
+      components: {
+        webuiInstalled: false,
+      },
       extra: {
         displayName: inputs.instanceName,
         description: '',

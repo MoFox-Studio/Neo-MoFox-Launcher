@@ -76,7 +76,7 @@ const ORIGIN_URLS = {
   // Git 仓库
   repo: {
     neoMofox: 'https://github.com/MoFox-Studio/Neo-MoFox.git',
-    webui: 'https://github.com/MoFox-Studio/MoFox-Core-Webui.git',
+    webui: 'https://github.com/ikun-1145141/Neo-MoFox-Webui.git',
   },
   // GitHub API
   api: {

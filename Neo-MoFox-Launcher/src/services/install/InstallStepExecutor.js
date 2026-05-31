@@ -580,7 +580,7 @@ class InstallStepExecutor {
    * @param {string} inputs.neoMofoxDir - Neo-MoFox 目录
    */
   async executeWebui(context, inputs, options = {}) {
-    context.emitProgress('webui', 0, '正在安装 WebUI...');
+    context.emitProgress('webui', 0, '正在安装 Neo-MoFox-WebUI...');
 
     const pluginsDir = path.join(inputs.neoMofoxDir, 'plugins');
     const webuiDir = path.join(pluginsDir, 'webui_backend');
@@ -588,13 +588,14 @@ class InstallStepExecutor {
     fs.mkdirSync(pluginsDir, { recursive: true });
     await this._removeExistingInstallDirectory(webuiDir, 'webui', context);
 
-    const WEBUI_BRANCH = 'webui-dist';
+    const WEBUI_BRANCH = 'webui-static';
     const webuiRepoUrls = await mirrorService.getWebuiRepoUrls();
 
     for (let retry = 0; retry < MAX_RETRY; retry++) {
       const url = webuiRepoUrls[retry % webuiRepoUrls.length];
-      context.emitProgress('webui', Math.floor(10 + (retry / MAX_RETRY) * 80), `尝试克隆 WebUI (${retry + 1}/${MAX_RETRY})`);
+      context.emitProgress('webui', Math.floor(10 + (retry / MAX_RETRY) * 80), `尝试克隆 Neo-MoFox-WebUI (${retry + 1}/${MAX_RETRY})`);
       context.emitOutput(`[webui] 正在尝试克隆仓库: ${url}`);
+      context.emitOutput(`[webui] 分支: ${WEBUI_BRANCH}`);
 
       try {
         await this._execCommand(
@@ -606,8 +607,8 @@ class InstallStepExecutor {
           }
         );
 
-        context.emitOutput('[webui] WebUI 克隆成功');
-        context.emitProgress('webui', 100, 'WebUI 安装完成');
+        context.emitOutput('[webui] Neo-MoFox-WebUI 克隆成功');
+        context.emitProgress('webui', 100, 'Neo-MoFox-WebUI 安装完成');
         return { success: true, path: webuiDir };
       } catch (error) {
         context.emitOutput(`[webui] 克隆失败: ${error.message}`);
@@ -622,7 +623,7 @@ class InstallStepExecutor {
         }
         
         if (retry === MAX_RETRY - 1) {
-          throw new Error(`WebUI 安装失败: ${error.message}`);
+          throw new Error(`Neo-MoFox-WebUI 安装失败: ${error.message}`);
         }
       }
     }
@@ -660,6 +661,7 @@ class InstallStepExecutor {
     }
 
     const hasPlatform = installSteps ? (installSteps.includes('platform-install') || installSteps.includes('platform-config')) : false;
+    const webuiInstalled = installSteps ? installSteps.includes('webui') : false;
 
     const updates = {
       qqNumber: inputs.qqNumber,
@@ -684,6 +686,9 @@ class InstallStepExecutor {
       installCompleted: true,
       installProgress: null,
       installSteps: installSteps,
+      components: {
+        webuiInstalled,
+      },
     };
 
     const instance = storageService.updateInstance(instanceId, updates);
