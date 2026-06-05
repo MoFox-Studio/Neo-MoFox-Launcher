@@ -390,6 +390,41 @@
   border-color: var(--md-sys-color-primary);
 }
 
+/* ─── 复制提示 ──────────────────────────────────────────────────────── */
+.copy-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  background-color: var(--md-sys-color-surface-container-low);
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.copy-hint .material-symbols-rounded {
+  font-size: 18px;
+  color: var(--md-sys-color-primary);
+}
+
+.copy-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 6px;
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  box-shadow: inset 0 -1px 0 var(--md-sys-color-outline-variant);
+}
+
 /* ─── 标签页内容 ─────────────────────────────────────────────────────── */
 .tabs-content {
   flex: 1;

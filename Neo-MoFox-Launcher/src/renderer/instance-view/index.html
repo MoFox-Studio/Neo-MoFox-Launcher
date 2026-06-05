@@ -102,7 +102,7 @@
             <button class="icon-button" id="btnSearch" title="搜索日志">
               <span class="material-symbols-rounded">search</span>
             </button>
-            <button class="icon-button" id="btnCopyLogs" title="复制日志">
+            <button class="icon-button" id="btnCopyLogs" title="复制日志 (Ctrl+Shift+C)">
               <span class="material-symbols-rounded">content_copy</span>
             </button>
             <button class="icon-button" id="btnAutoScroll" title="自动滚动">
@@ -112,7 +112,7 @@
               <span class="material-symbols-rounded">delete_sweep</span>
             </button>
             <button class="icon-button" id="btnExportLogs" title="导出日志">
-              <span class="material-symbols-rounded">download</span>
+              <span class="material-symbols-rounded">save</span>
             </button>
           </div>
         </div>
@@ -125,6 +125,12 @@
         <button class="icon-button small" id="btnCloseSearch">
           <span class="material-symbols-rounded">close</span>
         </button>
+      </div>
+
+      <!-- 复制提示 -->
+      <div class="copy-hint" role="note" aria-label="日志复制提示">
+        <span class="material-symbols-rounded">info</span>
+        <span>可先在日志中选中文字，再按 <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> 复制；也可以点击上方复制按钮。</span>
       </div>
 
       <!-- 标签页内容 -->
