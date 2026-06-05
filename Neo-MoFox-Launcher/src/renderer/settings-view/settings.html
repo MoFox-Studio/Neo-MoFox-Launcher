@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://avatars.githubusercontent.com https://github.com; connect-src 'self' https://api.github.com;">
   <title>设置 - Neo-MoFox Launcher</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../../assets/material-symbols/index.css">
@@ -78,6 +78,10 @@
         <button class="sidebar-item" data-section="section-about">
           <span class="material-symbols-rounded">info</span>
           <span class="sidebar-label">关于</span>
+        </button>
+        <button class="sidebar-item" data-section="section-credits">
+          <span class="material-symbols-rounded">volunteer_activism</span>
+          <span class="sidebar-label">致谢</span>
         </button>
       </nav>
       
@@ -162,6 +166,7 @@
             </div>
           </div>
         </div>
+
 
       </section>
 
@@ -471,6 +476,28 @@
               <span class="material-symbols-rounded">play_circle</span>
               <span>一闪女装珍贵视频</span>
             </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ══ 致谢 ══ -->
+      <section class="settings-section" id="section-credits">
+        <div class="section-heading">
+          <span class="material-symbols-rounded">volunteer_activism</span>
+          <h2>致谢</h2>
+        </div>
+
+        <div class="settings-card credits-card">
+          <div class="settings-card-header">
+            <span class="material-symbols-rounded">group</span>
+            <div>
+              <div class="card-title">致谢名单</div>
+              <div class="card-desc">感谢为 Neo-MoFox Launcher 提供帮助、支持与灵感的朋友们</div>
+            </div>
+          </div>
+          <div class="credits-list" id="credits-list">
+            <div class="credits-loading">正在加载致谢名单...</div>
           </div>
         </div>
 
