@@ -8,8 +8,8 @@ import { applyTheme } from '../theme.js';
  * 分类别致谢名单字典。
  *
  * 第一层字典键表示分类，用于渲染分类标题和分割线；第二层 entries 字典
- * 用于稳定排序和定位；每一项的 githubUrl 可后续补充为
- * https://github.com/<username>，note 用于展示致谢备注。
+ * 用于稳定排序和定位；每一项的 GitHub 元数据由 GitHub API 预拉取后
+ * 固化到代码中，避免设置页运行时请求 GitHub API 触发 403 限流。
  */
 const CREDIT_CATEGORIES = {
   core: {
@@ -18,52 +18,99 @@ const CREDIT_CATEGORIES = {
     entries: {
       yishan: {
         githubUrl: 'https://github.com/minecraft1024a',
+        displayName: 'yishan',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/140055845?v=4',
+        profileType: 'User',
+        location: 'china',
         note: '项目发起、维护与核心功能设计。',
       },
       mofox_studio: {
         githubUrl: 'https://github.com/MoFox-Studio',
+        displayName: 'MoFox-Studio',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/225730003?v=4',
+        profileType: 'Organization',
+        location: 'China  中国',
+        bio: '一个基于魔改麦麦而诞生的组织仓库',
         note: 'MoFox 工作室 - 设计与开发支持，项目管理。',
       },
       ikun: {
         githubUrl: 'https://github.com/ikun-1145141',
+        displayName: 'ikun两年半',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/265925499?v=4',
+        profileType: 'User',
+        blog: 'https://ikun114.top',
+        bio: '喵喵喵喵',
         note: '设计与开发支持',
       },
       sunbiz1024: {
         githubUrl: 'https://github.com/sunbiz1024',
+        displayName: 'Sunbiz',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/98442033?v=4',
+        profileType: 'User',
+        bio: '111',
         note: '计与开发支持，特别是 UI 设计与实现。',
-      }
+      },
+      uilyha56_wq: {
+        githubUrl: 'https://github.com/fuilyha56-wq',
+        displayName: 'Lycoris-flower',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/226964479?v=4',
+        profileType: 'User',
+        bio: 'Lycoris radiata\n一名纯废物的vibe coding享受者喵～',
+        note: '请支持Lycoris radiata喵',
+      },
     },
   },
   contributors: {
     title: '贡献与支持',
     description: '感谢对 Neo-MoFox Launcher 提供帮助、支持与灵感和测试 Neo-MoFox Launcher 开发版本的朋友们。',
     entries: {
-      uilyha56_wq: {
-        githubUrl: 'https://github.com/fuilyha56-wq',
-        note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
-      },
       luciferring: {
         githubUrl: 'https://github.com/luciferring',
+        displayName: 'luciferring',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/249419621?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
       diebaokeai: {
         githubUrl: 'https://github.com/diebaokeai',
+        displayName: '蝶宝可爱捏',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/244420175?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
       mofox_elysia: {
         githubUrl: 'https://github.com/MoFox-Elysia',
+        displayName: 'MoFox-Elysia',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/245707589?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
       jgfghuhgh: {
         githubUrl: 'https://github.com/jgfghuhgh',
+        displayName: '夢',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/126490325?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
       coldleg: {
         githubUrl: 'https://github.com/ColdLeg',
+        displayName: 'ColdLeg',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/251687745?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
       xiaoshi1234: {
         githubUrl: 'https://github.com/Xiaoshi1234',
+        displayName: '小识',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/179480621?v=4',
+        profileType: 'User',
+        note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
+      },
+      liyi3068238601_oss: {
+        githubUrl: 'https://github.com/liyi3068238601-oss',
+        displayName: 'liyi3068238601-oss',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/289515629?v=4',
+        profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
     },
@@ -193,9 +240,9 @@ function getCreditCategoryGroups() {
  * 将致谢对象配置标准化为可立即渲染的数据。
  *
  * @param {string} key 致谢对象键名。
- * @param {{ githubUrl: string, note: string }} credit 致谢对象配置。
- * @returns {{ key: string, username: string, displayName: string, avatarUrl: string, profileUrl: string, note: string, isLinked: boolean }}
- *   不依赖网络请求的致谢展示数据。
+ * @param {{ githubUrl: string, displayName?: string, avatarUrl?: string, profileType?: string, blog?: string, location?: string, bio?: string, note: string }} credit 致谢对象配置。
+ * @returns {{ key: string, username: string, displayName: string, avatarUrl: string, profileUrl: string, profileType: string, blog: string, location: string, bio: string, note: string, isLinked: boolean }}
+ *   不依赖运行时 API 请求的致谢展示数据。
  */
 function normalizeCreditEntry(key, credit) {
   const username = parseGithubUsername(credit.githubUrl || '');
@@ -203,42 +250,15 @@ function normalizeCreditEntry(key, credit) {
   return {
     key,
     username: username || key,
-    displayName: username || key,
-    avatarUrl: '',
+    displayName: credit.displayName || username || key,
+    avatarUrl: credit.avatarUrl || (username ? `https://github.com/${encodeURIComponent(username)}.png` : ''),
     profileUrl: credit.githubUrl || '',
+    profileType: credit.profileType || '',
+    blog: credit.blog || '',
+    location: credit.location || '',
+    bio: credit.bio || '',
     note: credit.note,
     isLinked: Boolean(username),
-  };
-}
-
-/**
- * 获取单个致谢对象对应的 GitHub 公开资料。
- *
- * @param {{ key: string, username: string, displayName: string, avatarUrl: string, profileUrl: string, note: string, isLinked: boolean }} credit
- *   首屏已渲染的致谢对象数据。
- * @returns {Promise<{ key: string, username: string, displayName: string, avatarUrl: string, profileUrl: string, note: string, isLinked: boolean }>}
- *   带 GitHub 资料和头像链接的致谢展示数据。
- */
-async function resolveCreditProfile(credit) {
-  const username = parseGithubUsername(credit.profileUrl || '');
-
-  if (!username) {
-    return credit;
-  }
-
-  const response = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`);
-  if (!response.ok) {
-    throw new Error(`GitHub 用户资料获取失败: ${username}`);
-  }
-
-  const profile = await response.json();
-  return {
-    ...credit,
-    username: profile.login || username,
-    displayName: profile.name || profile.login || username,
-    avatarUrl: profile.avatar_url || '',
-    profileUrl: profile.html_url || credit.profileUrl,
-    isLinked: true,
   };
 }
 
@@ -340,31 +360,16 @@ function updateCreditItemProfile(item, credit) {
 }
 
 /**
- * 延迟加载名单条目的 GitHub 资料和头像。
+ * 使用硬编码资料更新名单条目的头像和名称。
  *
  * @param {Array<{ item: HTMLButtonElement, credit: { key: string, username: string, displayName: string, avatarUrl: string, profileUrl: string, note: string, isLinked: boolean } }>} renderedCredits
  *   已进入页面的名单条目和对应基础数据。
  * @returns {void}
  */
-function scheduleCreditsProfileHydration(renderedCredits) {
-  const hydrate = () => {
-    renderedCredits.forEach(async ({ item, credit }) => {
-      try {
-        const profile = await resolveCreditProfile(credit);
-        updateCreditItemProfile(item, profile);
-      } catch (error) {
-        console.warn('[settings] 致谢头像延迟加载失败', credit.key, error);
-        item.querySelector('.credit-avatar')?.classList.remove('credit-avatar-pending');
-      }
-    });
-  };
-
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(hydrate, { timeout: 1200 });
-    return;
-  }
-
-  window.setTimeout(hydrate, 0);
+function hydrateCreditsFromStaticData(renderedCredits) {
+  renderedCredits.forEach(({ item, credit }) => {
+    updateCreditItemProfile(item, credit);
+  });
 }
 
 /**
@@ -419,7 +424,7 @@ async function renderCredits() {
       el.creditsList.appendChild(group);
     });
 
-    scheduleCreditsProfileHydration(renderedCredits);
+    hydrateCreditsFromStaticData(renderedCredits);
   } catch (error) {
     console.error('[settings] 致谢名单渲染失败', error);
     el.creditsList.innerHTML = '<div class="credits-loading">致谢名单加载失败</div>';
