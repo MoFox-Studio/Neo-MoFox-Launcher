@@ -113,6 +113,21 @@ const CREDIT_CATEGORIES = {
         profileType: 'User',
         note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
       },
+      kistiatsuki: {
+        githubUrl: 'https://github.com/Kistiatsuki',
+        displayName: '满月月',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/253261805?v=4',
+        profileType: 'User',
+        bio: '绝对意义上的区，由此而生的孤独，教会你构思的是......',
+        note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
+      },
+      yaoguai0701: {
+        githubUrl: 'https://github.com/yaoguai0701',
+        displayName: '一只无聊的妖怪',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/291200682?v=4',
+        profileType: 'User',
+        note: '感谢对 Neo-MoFox Launcher 的支持与贡献。',
+      },
     },
   },
 };

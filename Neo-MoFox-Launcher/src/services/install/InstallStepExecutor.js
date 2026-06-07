@@ -7,16 +7,21 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 const { storageService } = require('./StorageService');
 const { platformHelper } = require('../utils/PlatformHelper');
 const { mirrorService } = require('../utils/MirrorService');
 const { platformRegistry } = require('../platforms/PlatformRegistry');
 const { removePathSafe } = require('../utils/NativeFileRemover');
+const { downloadFile } = require('../utils/RangeDownloader');
 
 // ─── 常量定义 ───────────────────────────────────────────────────────────
 
 const MAX_RETRY = 3;
 const CONFIG_DETECT_TIMEOUT = 60000; // 60 秒
+const WEBUI_MARKET_PLUGIN_ID = 'neo-mofox-webui';
+const WEBUI_MARKET_INSTALL_URL = 'https://39.96.71.162/api/v1/plugins/neo-mofox-webui/install';
 
 // ─── InstallStepExecutor 类 ──────────────────────────────────────────────
 
@@ -82,6 +87,75 @@ class InstallStepExecutor {
         reject(err);
       });
     });
+  }
+
+  /**
+   * 发起 HTTP(S) GET 请求并解析 JSON 响应。
+   * @param {string} requestUrl - 请求地址
+   * @returns {Promise<Object>} JSON 响应对象
+   */
+  _requestJson(requestUrl) {
+    return new Promise((resolve, reject) => {
+      const url = new URL(requestUrl);
+      const client = url.protocol === 'https:' ? https : http;
+      const options = {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Neo-MoFox-Launcher',
+        },
+      };
+
+      if (url.protocol === 'https:') {
+        options.agent = new https.Agent({ rejectUnauthorized: false });
+      }
+
+      const req = client.get(url, options, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = new URL(res.headers.location, url).toString();
+          res.resume();
+          this._requestJson(redirectUrl).then(resolve, reject);
+          return;
+        }
+
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`请求失败，HTTP 状态码: ${res.statusCode}\n${body.substring(0, 500)}`));
+            return;
+          }
+
+          try {
+            resolve(JSON.parse(body));
+          } catch (error) {
+            reject(new Error(`解析 JSON 响应失败: ${error.message}`));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.setTimeout(120000, () => {
+        req.destroy(new Error('请求超时'));
+      });
+    });
+  }
+
+  /**
+   * 根据市场版本信息计算 WebUI 插件包保存文件名。
+   * @param {Object} installInfo - 插件市场安装信息
+   * @returns {string} 插件包文件名
+   */
+  _resolveWebuiPackageName(installInfo) {
+    const assetName = installInfo?.version?.asset_name;
+    if (assetName && typeof assetName === 'string') {
+      return assetName;
+    }
+
+    const version = installInfo?.version?.version || 'latest';
+    return `${WEBUI_MARKET_PLUGIN_ID}-${version}.mfp`;
   }
 
   /**
@@ -574,56 +648,76 @@ class InstallStepExecutor {
   }
 
   /**
-   * 步骤11：安装 WebUI
+   * 步骤11：从插件市场下载 WebUI 插件包。
    * @param {Object} context - 执行上下文
    * @param {Object} inputs - 用户输入
    * @param {string} inputs.neoMofoxDir - Neo-MoFox 目录
+   * @returns {Promise<Object>} 安装结果
    */
   async executeWebui(context, inputs, options = {}) {
-    context.emitProgress('webui', 0, '正在安装 Neo-MoFox-WebUI...');
+    context.emitProgress('webui', 0, '正在从插件市场安装 Neo-MoFox-WebUI...');
 
     const pluginsDir = path.join(inputs.neoMofoxDir, 'plugins');
-    const webuiDir = path.join(pluginsDir, 'webui_backend');
+    const oldWebuiDir = path.join(pluginsDir, 'webui_backend');
 
     fs.mkdirSync(pluginsDir, { recursive: true });
-    await this._removeExistingInstallDirectory(webuiDir, 'webui', context);
-
-    const WEBUI_BRANCH = 'webui-static';
-    const webuiRepoUrls = await mirrorService.getWebuiRepoUrls();
+    await this._removeExistingInstallDirectory(oldWebuiDir, 'webui', context);
 
     for (let retry = 0; retry < MAX_RETRY; retry++) {
-      const url = webuiRepoUrls[retry % webuiRepoUrls.length];
-      context.emitProgress('webui', Math.floor(10 + (retry / MAX_RETRY) * 80), `尝试克隆 Neo-MoFox-WebUI (${retry + 1}/${MAX_RETRY})`);
-      context.emitOutput(`[webui] 正在尝试克隆仓库: ${url}`);
-      context.emitOutput(`[webui] 分支: ${WEBUI_BRANCH}`);
-
       try {
-        await this._execCommand(
-          'git',
-          ['clone', '-b', WEBUI_BRANCH, '--depth', '1', url, webuiDir],
-          {
-            onStdout: (d) => context.emitOutput(d),
-            onStderr: (d) => context.emitOutput(d),
-          }
+        context.emitProgress('webui', Math.floor((retry / MAX_RETRY) * 15), `正在获取 WebUI 市场安装信息 (${retry + 1}/${MAX_RETRY})`);
+        context.emitOutput(`[webui] 插件市场页面: https://39.96.71.162/plugin/${WEBUI_MARKET_PLUGIN_ID}`);
+        context.emitOutput(`[webui] 安装信息接口: ${WEBUI_MARKET_INSTALL_URL}`);
+
+        const installInfo = await this._requestJson(WEBUI_MARKET_INSTALL_URL);
+        const downloadUrl = installInfo?.version?.asset_download_url;
+        if (!downloadUrl) {
+          throw new Error('插件市场响应缺少 version.asset_download_url');
+        }
+
+        const packageName = this._resolveWebuiPackageName(installInfo);
+        const packagePath = path.join(pluginsDir, packageName);
+
+        if (fs.existsSync(packagePath)) {
+          context.emitOutput(`[webui] 检测到已存在的插件包，正在删除: ${packagePath}`);
+          fs.rmSync(packagePath, { force: true });
+        }
+
+        context.emitOutput(`[webui] 插件 ID: ${installInfo?.plugin?.plugin_id || WEBUI_MARKET_PLUGIN_ID}`);
+        context.emitOutput(`[webui] 推荐版本: ${installInfo?.version?.version || '未知'}`);
+        context.emitOutput(`[webui] 下载地址: ${downloadUrl}`);
+        context.emitOutput(`[webui] 保存为插件包: ${packagePath}`);
+        context.emitOutput('[webui] 将保留下载包原样，不执行解压');
+
+        context.emitProgress('webui', 20, '正在下载 WebUI 插件包...');
+        await downloadFile(
+          downloadUrl,
+          packagePath,
+          (downloaded, total) => {
+            if (total > 0) {
+              const percent = Math.floor(20 + (downloaded / total) * 70);
+              context.emitProgress('webui', Math.min(percent, 90), `正在下载 WebUI 插件包 ${Math.min(percent, 90)}%`);
+              return;
+            }
+
+            context.emitOutput(`[webui] 已下载 ${downloaded} bytes`);
+          },
+          { userAgent: 'Neo-MoFox-Launcher' }
         );
 
-        context.emitOutput('[webui] Neo-MoFox-WebUI 克隆成功');
-        context.emitProgress('webui', 100, 'Neo-MoFox-WebUI 安装完成');
-        return { success: true, path: webuiDir };
+        context.emitProgress('webui', 100, 'Neo-MoFox-WebUI 插件包下载完成');
+        return {
+          success: true,
+          path: packagePath,
+          pluginId: installInfo?.plugin?.plugin_id || WEBUI_MARKET_PLUGIN_ID,
+          version: installInfo?.version?.version || null,
+          extracted: false,
+        };
       } catch (error) {
-        context.emitOutput(`[webui] 克隆失败: ${error.message}`);
-        
-        if (fs.existsSync(webuiDir)) {
-          try {
-            await removePathSafe(webuiDir, {
-              label: 'webui 克隆残留目录',
-              onOutput: (message) => context.emitOutput(message),
-            });
-          } catch (_) {}
-        }
-        
+        context.emitOutput(`[webui] 从插件市场下载失败: ${error.message}`);
+
         if (retry === MAX_RETRY - 1) {
-          throw new Error(`Neo-MoFox-WebUI 安装失败: ${error.message}`);
+          throw new Error(`Neo-MoFox-WebUI 插件市场安装失败: ${error.message}`);
         }
       }
     }
