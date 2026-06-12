@@ -577,7 +577,7 @@ ipcMain.handle('select-project-path', async () => {
   if (!result.canceled && result.filePaths.length > 0) {
     projectPath = result.filePaths[0];
     saveSettings();
-    sendLog('info', `◉ 项目路径已设置: ${projectPath}`);
+    console.log(`◉ 项目路径已设置: ${projectPath}`);
     return projectPath;
   }
   return null;
