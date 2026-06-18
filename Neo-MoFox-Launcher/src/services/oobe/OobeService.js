@@ -10,7 +10,6 @@
 
 'use strict';
 
-const { spawn } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
@@ -235,37 +234,30 @@ class OobeService {
   /**
    * 运行命令，返回 { installed, version, output, error }
    */
-  checkCommandVersion(command, args = ['--version']) {
-    return new Promise((resolve) => {
-      const proc = spawn(command, args, {
-        shell: platformHelper.config.shell,
+  /**
+   * 运行命令并返回 { installed, version, output, error }。
+   *
+   * 通过 {@link platformHelper.execCommand} 执行，所有平台差异、引号、env 由 PlatformHelper 处理。
+   */
+  async checkCommandVersion(command, args = ['--version']) {
+    try {
+      const { stdout, stderr } = await platformHelper.execCommand(command, args, {
         timeout: 15000,
-        env: platformHelper.buildSpawnEnv(),
       });
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (d) => { stdout += d.toString(); });
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          const output = stdout.trim() || stderr.trim();
-          const versionMatch = output.match(/(\d+\.\d+(\.\d+)?)/);
-          resolve({
-            installed: true,
-            version: versionMatch ? versionMatch[1] : output.split('\n')[0],
-            output,
-          });
-        } else {
-          resolve({ installed: false, version: null, error: stderr.trim() || '命令执行失败' });
-        }
-      });
-
-      proc.on('error', (err) => {
-        resolve({ installed: false, version: null, error: err.message });
-      });
-    });
+      const output = stdout.trim() || stderr.trim();
+      const versionMatch = output.match(/(\d+\.\d+(\.\d+)?)/);
+      return {
+        installed: true,
+        version: versionMatch ? versionMatch[1] : output.split('\n')[0],
+        output,
+      };
+    } catch (err) {
+      return {
+        installed: false,
+        version: null,
+        error: err.message || '命令执行失败',
+      };
+    }
   }
 
   // ─── 单项检测 ──────────────────────────────────────────────────────
@@ -472,32 +464,28 @@ class OobeService {
       return { valid: false, error: '密码不能为空' };
     }
 
-    return new Promise((resolve) => {
-      const proc = spawn('bash', ['-c', `echo "${password}" | sudo -S -v 2>&1`], {
-        shell: platformHelper.config.shell,
-        timeout: 10000,
-        env: platformHelper.buildSpawnEnv(),
-      });
-
-      let output = '';
-      proc.stdout?.on('data', (d) => { output += d.toString(); });
-      proc.stderr?.on('data', (d) => { output += d.toString(); });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ valid: true });
-        } else {
-          const error = output.toLowerCase().includes('sorry') || output.toLowerCase().includes('incorrect')
-            ? '密码错误'
-            : '验证失败: ' + output.trim();
-          resolve({ valid: false, error });
-        }
-      });
-
-      proc.on('error', (err) => {
-        resolve({ valid: false, error: err.message });
-      });
-    });
+    // 以 `bash -c <script>` 形式直接执行，不再走系统 shell，避免脚本被二次切分；
+    // 同时把整个脚本作为单个 arg 传入，PlatformHelper 不会对其做任何引号处理。
+    let output = '';
+    try {
+      await platformHelper.execCommand(
+        'bash',
+        ['-c', `echo "${password}" | sudo -S -v 2>&1`],
+        {
+          shell: false,
+          timeout: 10000,
+          onStdout: (text) => { output += text; },
+          onStderr: (text) => { output += text; },
+        },
+      );
+      return { valid: true };
+    } catch (err) {
+      const lower = output.toLowerCase();
+      const error = lower.includes('sorry') || lower.includes('incorrect')
+        ? '密码错误'
+        : '验证失败: ' + (output.trim() || err.message);
+      return { valid: false, error };
+    }
   }
 
   /**
@@ -623,11 +611,11 @@ class OobeService {
     return new Promise((resolve) => {
       onOutput(`[安装] 正在运行: ${path.basename(installerPath)} ${args.join(' ')}\n`);
 
-      const proc = spawn(installerPath, args, {
-        shell: platformHelper.config.shell,
+      // 这里需要识别安装程序的特殊退出码（3010 / 1641 表示需重启），
+      // 因此走 spawnProcess 拿原生 ChildProcess 自行处理 close 事件。
+      const proc = platformHelper.spawnProcess(installerPath, args, {
         detached: false,
         windowsHide: true,
-        env: platformHelper.buildSpawnEnv(),
       });
 
       proc.stdout?.on('data', (d) => {
@@ -689,12 +677,11 @@ class OobeService {
       // 使用原始命令进行日志输出，避免暴露密码
       onOutput(`[安装] 运行脚本: ${needsSudo && platformHelper.isLinux ? 'sudo ' : ''}${originalCmd} ${originalArgs.join(' ')}\n`);
 
-      const proc = spawn(cmd, args, {
-        shell: platformHelper.config.shell,
-        env: platformHelper.buildSpawnEnv({
+      const proc = platformHelper.spawnProcess(cmd, args, {
+        env: {
           LANG: 'en_US.UTF-8',
-          LC_ALL: 'en_US.UTF-8'
-        }),
+          LC_ALL: 'en_US.UTF-8',
+        },
         windowsHide: true,
         encoding: 'utf-8',
       });

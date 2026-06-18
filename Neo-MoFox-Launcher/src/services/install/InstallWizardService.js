@@ -3,7 +3,6 @@
  * 重构后负责流程控制和校验，具体步骤执行由 InstallStepExecutor 完成
  */
 
-const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
@@ -153,36 +152,30 @@ class InstallWizardService {
   /**
    * 检查命令是否可用
    */
+  /**
+   * 检查命令是否可用。
+   *
+   * 通过 {@link platformHelper.execCommand} 调用目标命令并捕获版本号；
+   * 任何错误都被吞掉转换为 `{installed: false}`，因此调用方无需 try/catch。
+   */
   async _checkCommand(command, args = ['--version']) {
-    return new Promise((resolve) => {
-      const proc = spawn(command, args, { 
-        shell: platformHelper.config.shell, 
+    try {
+      const { stdout, stderr } = await platformHelper.execCommand(command, args, {
         timeout: 10000,
-        env: platformHelper.buildSpawnEnv()
       });
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (d) => { stdout += d.toString(); });
-      proc.stderr.on('data', (d) => { stderr += d.toString(); });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          const output = stdout.trim() || stderr.trim();
-          const versionMatch = output.match(/(\d+\.\d+(\.\d+)?)/);
-          resolve({
-            installed: true,
-            version: versionMatch ? versionMatch[1] : output.split('\n')[0],
-          });
-        } else {
-          resolve({ installed: false, version: null, error: stderr.trim() || '命令执行失败' });
-        }
-      });
-
-      proc.on('error', (err) => {
-        resolve({ installed: false, version: null, error: err.message });
-      });
-    });
+      const output = stdout.trim() || stderr.trim();
+      const versionMatch = output.match(/(\d+\.\d+(\.\d+)?)/);
+      return {
+        installed: true,
+        version: versionMatch ? versionMatch[1] : output.split('\n')[0],
+      };
+    } catch (err) {
+      return {
+        installed: false,
+        version: null,
+        error: err.message || '命令执行失败',
+      };
+    }
   }
 
   /**

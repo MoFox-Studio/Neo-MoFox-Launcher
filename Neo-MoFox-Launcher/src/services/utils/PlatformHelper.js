@@ -12,6 +12,7 @@
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // ─── 平台配置表 ──────────────────────────────────────────────────────────
 
@@ -355,6 +356,166 @@ class PlatformHelper {
       // 合并后确保 env 包含基础变量
       ...(overrides.env ? { env: this.buildSpawnEnv(overrides.env) } : {}),
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 命令执行（统一入口）
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * 给单个 shell 参数加引号（按当前平台规则）。
+   *
+   * - Windows cmd.exe：使用双引号包裹，参数内的 `"` 转义为 `""`。
+   * - POSIX shell：使用单引号包裹，参数内的 `'` 转义为 `'\''`。
+   * 当参数已经被对应平台的引号包裹时，保持原样不变。
+   *
+   * @param {string} arg - 待引用参数
+   * @returns {string}
+   */
+  quoteShellArg(arg) {
+    const str = String(arg);
+    if (this.isWindows) {
+      if (/^".*"$/.test(str)) return str;
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    if (/^'.*'$/.test(str)) return str;
+    return `'${str.replace(/'/g, `'\\''`)}'`;
+  }
+
+  /**
+   * 仅在需要 shell 解析的场景下，对含空白/特殊字符的参数自动加引号。
+   * 如果不走 shell（spawn 直接 execve），则原样返回。
+   *
+   * @param {string[]} args - 原始参数数组
+   * @param {boolean} useShell - 是否启用 shell
+   * @returns {string[]}
+   */
+  prepareArgsForShell(args, useShell) {
+    if (!useShell) return args.map((a) => String(a));
+    return args.map((a) => {
+      const str = String(a);
+      // 没有空白字符且没有 shell 元字符时，无需加引号
+      if (!/[\s"'`$&|;<>(){}\\!*?[\]]/.test(str)) return str;
+      return this.quoteShellArg(str);
+    });
+  }
+
+  /**
+   * 启动一个子进程并返回原生 ChildProcess。
+   *
+   * 内部统一处理：
+   * - shell 默认值（取自当前平台配置，可被 options.shell 覆盖）；
+   * - env（自动注入 PYTHONIOENCODING 等基础变量）；
+   * - 当走 shell 时对含空白/特殊字符的参数自动加引号，避免被 shell 二次切分。
+   *
+   * 适用于需要长生命周期或自定义事件监听的命令（如启动机器人主进程）。
+   *
+   * @param {string} command - 命令名
+   * @param {string[]} [args=[]] - 参数列表
+   * @param {Object} [options={}] - spawn 选项（与 child_process.spawn 一致，附加 onStdout/onStderr 与 windowsUtf8）
+   * @returns {import('child_process').ChildProcess}
+   */
+  spawnProcess(command, args = [], options = {}) {
+    const useShell = options.shell ?? this._config.shell;
+    const env = this.buildSpawnEnv(options.env || {});
+    const safeArgs = this.prepareArgsForShell(args, useShell);
+
+    let finalCommand = command;
+    let finalArgs = safeArgs;
+
+    // windowsUtf8: 在 Windows 上以 shell 模式执行时，先切到 UTF-8 代码页再执行命令
+    if (options.windowsUtf8 && useShell && this.isWindows) {
+      const joined = safeArgs.join(' ');
+      finalCommand = `chcp 65001 >nul && ${command}${joined ? ' ' + joined : ''}`;
+      finalArgs = [];
+    }
+
+    const spawnOptions = {
+      ...options,
+      shell: useShell,
+      env,
+    };
+    // 这些是我们扩展的字段，不传给 spawn
+    delete spawnOptions.onStdout;
+    delete spawnOptions.onStderr;
+    delete spawnOptions.windowsUtf8;
+
+    return spawn(finalCommand, finalArgs, spawnOptions);
+  }
+
+  /**
+   * 执行命令并以 Promise 返回结果（一次性命令的统一入口）。
+   *
+   * 该方法在 {@link spawnProcess} 的基础上提供：
+   * - 收集 stdout / stderr 文本；
+   * - 通过 options.onStdout / options.onStderr 实时推送增量；
+   * - 退出码非 0 时抛错，带 stderr 信息；
+   * - 可选 options.timeout 超时杀进程。
+   *
+   * @param {string} command - 命令名
+   * @param {string[]} [args=[]] - 参数列表
+   * @param {Object} [options={}] - 选项
+   * @param {string} [options.cwd] - 工作目录
+   * @param {Object} [options.env] - 额外环境变量
+   * @param {boolean} [options.shell] - 覆盖默认 shell 行为
+   * @param {boolean} [options.windowsUtf8] - Windows 下自动前置 chcp 65001
+   * @param {(text: string) => void} [options.onStdout] - stdout 增量回调
+   * @param {(text: string) => void} [options.onStderr] - stderr 增量回调
+   * @param {number} [options.timeout] - 超时毫秒数
+   * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+   */
+  execCommand(command, args = [], options = {}) {
+    return new Promise((resolve, reject) => {
+      const { onStdout, onStderr } = options;
+      let timeoutHandle = null;
+      let timedOut = false;
+
+      const proc = this.spawnProcess(command, args, options);
+
+      let stdout = '';
+      let stderr = '';
+
+      if (proc.stdout) {
+        proc.stdout.on('data', (chunk) => {
+          const text = chunk.toString();
+          stdout += text;
+          if (onStdout) onStdout(text);
+        });
+      }
+
+      if (proc.stderr) {
+        proc.stderr.on('data', (chunk) => {
+          const text = chunk.toString();
+          stderr += text;
+          if (onStderr) onStderr(text);
+        });
+      }
+
+      if (typeof options.timeout === 'number' && options.timeout > 0) {
+        timeoutHandle = setTimeout(() => {
+          timedOut = true;
+          this.killProcessTree(proc, 'SIGKILL');
+        }, options.timeout);
+      }
+
+      proc.on('close', (code) => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        if (timedOut) {
+          reject(new Error(`命令执行超时（${options.timeout}ms）：${command}`));
+          return;
+        }
+        if (code === 0) {
+          resolve({ stdout, stderr, code });
+        } else {
+          reject(new Error(`命令退出码: ${code}\n${stderr}`));
+        }
+      });
+
+      proc.on('error', (err) => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        reject(err);
+      });
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════

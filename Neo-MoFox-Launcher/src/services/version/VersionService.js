@@ -3,7 +3,6 @@
  * 管理实例的 Neo-MoFox 分支切换、更新，以及 NapCat 版本管理
  */
 
-const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -70,64 +69,33 @@ class VersionService {
   }
 
   /**
-   * 执行命令（Promise 封装）
+   * 执行命令（Promise 封装）。
    *
-   * 注意：因为需要在 Windows 下先执行 `chcp 65001 >nul && ...` 来切换 UTF-8 代码页，
-   * 这里通过 shell 字符串方式调用，所以必须自行对参数做 shell 引用，
-   * 否则像 `--format=%H|||%s|||%ci` 中的 `|` 会被 shell 解析为管道符。
+   * 统一代理到 {@link platformHelper.execCommand}，由它负责：
+   * - 自动给 `--format=%H|||%s|||%ci` 等含 shell 元字符的参数加引号；
+   * - Windows 下通过 `windowsUtf8: true` 自动前置 `chcp 65001 >nul && ` 切换 UTF-8 代码页；
+   * - 注入 PYTHONIOENCODING / PATH 等基础环境变量。
+   *
+   * @param {string} command 命令名
+   * @param {string[]} args 参数列表
+   * @param {Object} [options] 选项（同 platformHelper.execCommand）
+   * @returns {Promise<{stdout: string, stderr: string, code: number}>}
    */
-  _execCommand(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-      const isWindows = platformHelper.isWindows;
-
-      // Windows cmd.exe：用双引号包裹，并把参数中的 `"` 转义为 `""`。
-      // POSIX shell：用单引号包裹，并把参数中的 `'` 转义为 `'\''`。
-      const quoteArg = (a) => {
-        const s = String(a);
-        if (isWindows) {
-          return `"${s.replace(/"/g, '""')}"`;
-        }
-        return `'${s.replace(/'/g, `'\\''`)}'`;
-      };
-
-      const quotedArgs = args.map(quoteArg).join(' ');
-      const fullCommand = isWindows
-        ? `chcp 65001 >nul && ${command} ${quotedArgs}`
-        : `${command} ${quotedArgs}`;
-
-      const proc = spawn(fullCommand, [], {
-        shell: platformHelper.config.shell,
+  async _execCommand(command, args, options = {}) {
+    try {
+      const result = await platformHelper.execCommand(command, args, {
         cwd: options.cwd || process.cwd(),
-        env: platformHelper.buildSpawnEnv(options.env || {}),
+        env: options.env || {},
+        onStdout: options.onStdout,
+        onStderr: options.onStderr,
+        // VersionService 需要在 Windows 下先切到 UTF-8 代码页，避免中文 commit 信息乱码
+        windowsUtf8: true,
       });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        const str = data.toString();
-        stdout += str;
-        if (options.onStdout) options.onStdout(str);
-      });
-
-      proc.stderr.on('data', (data) => {
-        const str = data.toString();
-        stderr += str;
-        if (options.onStderr) options.onStderr(str);
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-            console.log(`[VersionService] 命令执行成功: ${command} ${args.join(' ')}\n输出: ${stdout}`);
-          resolve({ stdout, stderr, code });
-        } else {
-          reject(new Error(`命令退出码: ${code}\n${stderr}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        reject(err);
-      });
+      console.log(`[VersionService] 命令执行成功: ${command} ${args.join(' ')}\n输出: ${result.stdout}`);
+      return result;
+    } catch (err) {
+      throw err;
+    }
     });
   }
 

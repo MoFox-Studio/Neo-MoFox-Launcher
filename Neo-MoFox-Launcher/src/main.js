@@ -1249,83 +1249,29 @@ ipcMain.handle('import-backup', async () => {
 // 获取 Git 仓库信息（版本和分支）
 ipcMain.handle('get-git-info', async (event, repoPath) => {
   try {
-    const { spawn } = require('child_process');
-    
     if (!fs.existsSync(repoPath)) {
       return { success: false, error: '目录不存在' };
     }
-    
+
     // 检查是否是 git 仓库
     const gitDir = path.join(repoPath, '.git');
     if (!fs.existsSync(gitDir)) {
       return { success: false, error: '该目录不是 Git 仓库' };
     }
-    
-    // 获取当前提交哈希
-    const getCommitHash = () => {
-      return new Promise((resolve, reject) => {
-        const gitProcess = spawn('git', ['rev-parse', 'HEAD'], { cwd: repoPath });
-        let output = '';
-        let errorOutput = '';
-        
-        gitProcess.stdout.on('data', (data) => {
-          output += data.toString();
-        });
-        
-        gitProcess.stderr.on('data', (data) => {
-          errorOutput += data.toString();
-        });
-        
-        gitProcess.on('close', (code) => {
-          if (code === 0) {
-            resolve(output.trim());
-          } else {
-            reject(new Error(errorOutput || '获取提交哈希失败'));
-          }
-        });
-        
-        gitProcess.on('error', (err) => {
-          reject(err);
-        });
-      });
+
+    // 通过 platformHelper.execCommand 统一执行，避免 repoPath 含空格 / 中文时被 shell 二次切分。
+    const runGit = async (args) => {
+      const { stdout } = await platformHelper.execCommand('git', args, { cwd: repoPath });
+      return stdout.trim();
     };
-    
-    // 获取当前分支名
-    const getBranchName = () => {
-      return new Promise((resolve, reject) => {
-        const gitProcess = spawn('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoPath });
-        let output = '';
-        let errorOutput = '';
-        
-        gitProcess.stdout.on('data', (data) => {
-          output += data.toString();
-        });
-        
-        gitProcess.stderr.on('data', (data) => {
-          errorOutput += data.toString();
-        });
-        
-        gitProcess.on('close', (code) => {
-          if (code === 0) {
-            resolve(output.trim());
-          } else {
-            reject(new Error(errorOutput || '获取分支名失败'));
-          }
-        });
-        
-        gitProcess.on('error', (err) => {
-          reject(err);
-        });
-      });
-    };
-    
+
     const [commitHash, branch] = await Promise.all([
-      getCommitHash(),
-      getBranchName()
+      runGit(['rev-parse', 'HEAD']),
+      runGit(['rev-parse', '--abbrev-ref', 'HEAD']),
     ]);
-    
+
     console.log(`[Git Info] 仓库: ${repoPath}, 提交: ${commitHash.substring(0, 8)}, 分支: ${branch}`);
-    
+
     return {
       success: true,
       commitHash,
@@ -1340,8 +1286,6 @@ ipcMain.handle('get-git-info', async (event, repoPath) => {
 // 手动添加实例
 ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
   try {
-    const { spawn } = require('child_process');
-    
     // 生成经过冲突检查的实例 ID
     const instanceId = generateInstanceId(instanceConfig.qqNumber);
     
@@ -1375,50 +1319,23 @@ ipcMain.handle('manual-add-instance', async (event, instanceConfig) => {
       // 检查是否是 git 仓库
       const gitDir = path.join(instanceConfig.neomofoxDir, '.git');
       if (fs.existsSync(gitDir)) {
-        // 获取提交哈希
-        const commitHash = await new Promise((resolve, reject) => {
-          const gitProcess = spawn('git', ['rev-parse', 'HEAD'], { cwd: instanceConfig.neomofoxDir });
-          let output = '';
-          
-          gitProcess.stdout.on('data', (data) => {
-            output += data.toString();
-          });
-          
-          gitProcess.on('close', (code) => {
-            if (code === 0) {
-              resolve(output.trim());
-            } else {
-              resolve('unknown');
-            }
-          });
-          
-          gitProcess.on('error', () => {
-            resolve('unknown');
-          });
-        });
-        
-        // 获取分支名
-        const branchName = await new Promise((resolve, reject) => {
-          const gitProcess = spawn('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: instanceConfig.neomofoxDir });
-          let output = '';
-          
-          gitProcess.stdout.on('data', (data) => {
-            output += data.toString();
-          });
-          
-          gitProcess.on('close', (code) => {
-            if (code === 0) {
-              resolve(output.trim());
-            } else {
-              resolve('unknown');
-            }
-          });
-          
-          gitProcess.on('error', () => {
-            resolve('unknown');
-          });
-        });
-        
+        // 通过 platformHelper.execCommand 统一执行，并把任何错误降级为 'unknown'
+        const safeRunGit = async (args) => {
+          try {
+            const { stdout } = await platformHelper.execCommand('git', args, {
+              cwd: instanceConfig.neomofoxDir,
+            });
+            return stdout.trim();
+          } catch (_) {
+            return 'unknown';
+          }
+        };
+
+        const [commitHash, branchName] = await Promise.all([
+          safeRunGit(['rev-parse', 'HEAD']),
+          safeRunGit(['rev-parse', '--abbrev-ref', 'HEAD']),
+        ]);
+
         neomofoxVersion = commitHash;
         branch = branchName;
       }

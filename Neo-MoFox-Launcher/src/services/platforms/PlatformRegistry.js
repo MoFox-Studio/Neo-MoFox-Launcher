@@ -5,7 +5,6 @@
 
 'use strict';
 
-const { spawn } = require('child_process');
 const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
@@ -51,40 +50,16 @@ class PlatformRegistry {
    * @param {Object} options 执行选项
    * @returns {Promise<{stdout: string, stderr: string}>} 命令执行结果
    */
+  /**
+   * 执行命令并返回 Promise（统一代理到 platformHelper.execCommand）。
+   *
+   * @param {string} command 命令名
+   * @param {string[]} args 参数列表
+   * @param {Object} options 执行选项
+   * @returns {Promise<{stdout: string, stderr: string}>} 命令执行结果
+   */
   _execCommand(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-      const spawnOptions = {
-        ...options,
-        shell: options.shell ?? platformHelper.config.shell,
-        env: platformHelper.buildSpawnEnv(options.env || {}),
-      };
-      const proc = spawn(command, args, spawnOptions);
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        const text = data.toString();
-        stdout += text;
-        if (options.onStdout) options.onStdout(text);
-      });
-
-      proc.stderr.on('data', (data) => {
-        const text = data.toString();
-        stderr += text;
-        if (options.onStderr) options.onStderr(text);
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr });
-          return;
-        }
-        reject(new Error(`命令退出码: ${code}\n${stderr}`));
-      });
-
-      proc.on('error', reject);
-    });
+    return platformHelper.execCommand(command, args, options);
   }
 
   /**

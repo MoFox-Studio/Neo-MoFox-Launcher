@@ -4,7 +4,6 @@
  * 供 InstallWizardService 和 IntegrationPackImportService 复用
  */
 
-const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -52,41 +51,19 @@ class InstallStepExecutor {
    * @param {Function} [options.onStdout] - stdout 回调
    * @param {Function} [options.onStderr] - stderr 回调
    */
+  /**
+   * 执行命令并返回 Promise（统一代理到 platformHelper.execCommand）。
+   *
+   * 该方法不再自行调用 spawn，所有平台差异、引号处理、env 注入都集中在 PlatformHelper 中，
+   * 任何下游服务想替换实现只需修改 PlatformHelper.execCommand 即可。
+   *
+   * @param {string} command 命令名
+   * @param {string[]} args 参数列表
+   * @param {Object} [options] 选项（同 platformHelper.execCommand）
+   * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+   */
   _execCommand(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-      const proc = spawn(command, args, {
-        shell: platformHelper.config.shell,
-        env: platformHelper.buildSpawnEnv(),
-        ...options,
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (d) => {
-        const text = d.toString();
-        stdout += text;
-        if (options.onStdout) options.onStdout(text);
-      });
-
-      proc.stderr.on('data', (d) => {
-        const text = d.toString();
-        stderr += text;
-        if (options.onStderr) options.onStderr(text);
-      });
-
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          reject(new Error(`命令退出码: ${code}\n${stderr}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        reject(err);
-      });
-    });
+    return platformHelper.execCommand(command, args, options);
   }
 
   /**
@@ -340,12 +317,13 @@ class InstallStepExecutor {
       context.emitOutput(`[gen-config] 配置目录: ${configDir}`);
       context.emitOutput(`[gen-config] 启动命令: uv run python main.py`);
 
-      const proc = spawn('uv', ['run', 'python', 'main.py'], {
+      // 这里需要拿到原生 ChildProcess 自行管理生命周期（超时、kill、stdin 自动确认协议）
+      // 因此走 platformHelper.spawnProcess，由它统一处理引号 / shell / env。
+      const proc = platformHelper.spawnProcess('uv', ['run', 'python', 'main.py'], {
         cwd: inputs.neoMofoxDir,
-        shell: platformHelper.config.shell,
         detached: false,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: platformHelper.buildSpawnEnv({ PYTHONUNBUFFERED: '1' }),
+        env: { PYTHONUNBUFFERED: '1' },
       });
 
       context.emitOutput(`[gen-config] 进程 PID: ${proc.pid}`);
