@@ -96,7 +96,6 @@ class VersionService {
     } catch (err) {
       throw err;
     }
-    });
   }
 
   // ─── Neo-MoFox Git 操作 ──────────────────────────────────────────────────
