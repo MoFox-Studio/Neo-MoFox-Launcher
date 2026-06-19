@@ -626,7 +626,7 @@ function getAutoInstallCommands(tool, sysEnv) {
     if (isWin) {
       return [
         { label: 'pip 安装 uv', cmd: 'pip', args: ['install', 'uv'] },
-        { label: '官方脚本安装 uv (PowerShell)', cmd: 'powershell', args: ['-ExecutionPolicy', 'ByPass', '-c', 'irm https://astral.sh/uv/install.ps1 | iex'] },
+        { label: '官方脚本安装 uv (PowerShell)', cmd: 'powershell', args: ['-ExecutionPolicy', 'ByPass', '-Command', 'irm https://astral.sh/uv/install.ps1 | iex'] },
       ];
     }
     return [

@@ -45,10 +45,17 @@ const PLATFORM_CONFIG = {
       args: ['/pid', String(pid), '/f', '/t'],
       shell: true,
     }),
-    unzipCmd: (zipPath, destDir) => ({
-      cmd: 'powershell',
-      args: ['-Command', `Expand-Archive -Path "${zipPath}" -DestinationPath "${destDir}" -Force`],
-    }),
+    unzipCmd: (zipPath, destDir) => {
+      // 使用单引号包裹路径，避免 PowerShell 双引号与 cmd.exe shell 层的双重解析冲突。
+      // 单引号在 PowerShell 中是字面字符串，内部不需要转义；
+      // 路径中的单引号（极端罕见）替换为 '' 完成 PowerShell 转义。
+      const psZip = zipPath.replace(/'/g, "''");
+      const psDest = destDir.replace(/'/g, "''");
+      return {
+        cmd: 'powershell',
+        args: ['-Command', `Expand-Archive -Path '${psZip}' -DestinationPath '${psDest}' -Force`],
+      };
+    },
   },
 
   // ──────────────── Linux (Ubuntu / Debian 等) ────────────────
