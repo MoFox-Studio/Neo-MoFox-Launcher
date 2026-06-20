@@ -19,7 +19,7 @@ const path = require('path');
 async function writeAdapterConfig({ context, inputs, storageService }) {
   context.emitProgress('write-adapter', 0, '正在写入 NapCat 适配器配置...');
 
-  const adapterDir = path.join(inputs.neoMofoxDir, 'config', 'plugins', 'napcat_adapter');
+  const adapterDir = path.join(inputs.neoMofoxDir, 'config', 'plugins', 'onebot_adapter');
   const adapterTomlPath = path.join(adapterDir, 'config.toml');
 
   try {
