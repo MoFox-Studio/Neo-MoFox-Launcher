@@ -140,6 +140,7 @@ class PlatformRegistry {
       execCommand: this._execCommand.bind(this),
       downloadFile: this._downloadFile.bind(this),
       computeFileSha256: this._computeFileSha256.bind(this),
+      extractZip: this._extractZip.bind(this),
       getMirroredUrls: mirrorService.getUrls.bind(mirrorService),
     };
   }

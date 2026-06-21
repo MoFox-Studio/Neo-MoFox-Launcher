@@ -7,7 +7,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { platformHelper } = require('../../utils/PlatformHelper');
 const { fetchLatestSnowLumaRelease, getRootPath, selectAssetForCurrentSystem } = require('./helpers');
 const { removePathSafe } = require('../../utils/NativeFileRemover');
 
@@ -137,7 +136,7 @@ async function install({ context, helpers, platformDir }) {
  */
 async function extractArchive(archivePath, destDir, helpers, context) {
   if (archivePath.endsWith('.zip')) {
-    await platformHelper.unzip(archivePath, destDir);
+    await helpers.extractZip(archivePath, destDir);
     return;
   }
 

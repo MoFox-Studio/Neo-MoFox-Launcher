@@ -7,7 +7,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { platformHelper } = require('../../utils/PlatformHelper');
 const { fetchLatestNapCatRelease } = require('./helpers');
 const { removePathSafe } = require('../../utils/NativeFileRemover');
 
@@ -111,7 +110,7 @@ async function install({ context, helpers, platformDir }) {
   }
 
   context.emitProgress('platform-install', 68, '正在解压...');
-  await platformHelper.unzip(zipPath, platformDir);
+  await helpers.extractZip(zipPath, platformDir);
   context.emitOutput('[napcat] 解压完成');
 
   await cleanupDownloadPath(zipPath, context);
