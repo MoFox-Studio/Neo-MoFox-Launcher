@@ -120,14 +120,13 @@ class PlatformRegistry {
   }
 
   /**
-   * 解压 ZIP 文件。
+   * 解压 ZIP 文件（使用 extract-zip JS 库，跨平台统一）。
    * @param {string} zipPath ZIP 文件路径
    * @param {string} destDir 目标目录
    * @returns {Promise<void>} 解压完成 Promise
    */
   async _extractZip(zipPath, destDir) {
-    const unzipInfo = platformHelper.getUnzipCommand(zipPath, destDir);
-    await this._execCommand(unzipInfo.cmd, unzipInfo.args);
+    await platformHelper.unzip(zipPath, destDir);
   }
 
   /**

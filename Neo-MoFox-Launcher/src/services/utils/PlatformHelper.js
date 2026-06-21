@@ -2,7 +2,8 @@
  * PlatformHelper - 多系统平台适配模块
  *
  * 统一封装 Windows / Linux (Ubuntu) / macOS 下的命令差异，
- * 包括 Python 可执行文件名、Shell 命令、解压命令等。
+ * 包括 Python 可执行文件名、Shell 命令等。
+ * 解压功能统一使用 extract-zip JS 库，不再依赖系统级 unzip 命令。
  *
  * 新增系统时只需在 PLATFORM_CONFIG 里加一个条目。
  */
@@ -13,6 +14,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const extractZip = require('extract-zip');
 
 // ─── 平台配置表 ──────────────────────────────────────────────────────────
 
@@ -25,7 +27,6 @@ const { spawn } = require('child_process');
  * @property {string}   uvBin           - uv 可执行文件名
  * @property {string}   shell           - 是否在 spawn 中启用 shell（=true 走系统 shell）
  * @property {Function} killCmd         - 生成"杀死进程树"的命令 (pid) => { cmd, args }
- * @property {Function} unzipCmd        - 生成解压命令 (zipPath, destDir) => { cmd, args }
  */
 
 const PLATFORM_CONFIG = {
@@ -45,17 +46,6 @@ const PLATFORM_CONFIG = {
       args: ['/pid', String(pid), '/f', '/t'],
       shell: true,
     }),
-    unzipCmd: (zipPath, destDir) => {
-      // 使用单引号包裹路径，避免 PowerShell 双引号与 cmd.exe shell 层的双重解析冲突。
-      // 单引号在 PowerShell 中是字面字符串，内部不需要转义；
-      // 路径中的单引号（极端罕见）替换为 '' 完成 PowerShell 转义。
-      const psZip = zipPath.replace(/'/g, "''");
-      const psDest = destDir.replace(/'/g, "''");
-      return {
-        cmd: 'powershell',
-        args: ['-Command', `Expand-Archive -Path '${psZip}' -DestinationPath '${psDest}' -Force`],
-      };
-    },
   },
 
   // ──────────────── Linux (Ubuntu / Debian 等) ────────────────
@@ -76,10 +66,6 @@ const PLATFORM_CONFIG = {
       args: ['-9', String(pid)],
       shell: true,
     }),
-    unzipCmd: (zipPath, destDir) => ({
-      cmd: 'unzip',
-      args: ['-o', zipPath, '-d', destDir],
-    }),
   },
 
   // ──────────────── macOS（预留） ────────────────
@@ -99,10 +85,6 @@ const PLATFORM_CONFIG = {
       cmd: 'kill',
       args: ['-9', String(pid)],
       shell: true,
-    }),
-    unzipCmd: (zipPath, destDir) => ({
-      cmd: 'unzip',
-      args: ['-o', zipPath, '-d', destDir],
     }),
   },
 };
@@ -298,13 +280,13 @@ class PlatformHelper {
   // ═══════════════════════════════════════════════════════════════════════
 
   /**
-   * 获取解压命令
-   * @param {string} zipPath
-   * @param {string} destDir
-   * @returns {{ cmd: string, args: string[] }}
+   * 使用 extract-zip 库解压 ZIP 文件（跨平台，无需系统级 unzip 命令）。
+   * @param {string} zipPath - ZIP 文件路径
+   * @param {string} destDir - 目标目录
+   * @returns {Promise<void>} 解压完成 Promise
    */
-  getUnzipCommand(zipPath, destDir) {
-    return this._config.unzipCmd(zipPath, destDir);
+  async unzip(zipPath, destDir) {
+    await extractZip(zipPath, { dir: destDir });
   }
 
   // ═══════════════════════════════════════════════════════════════════════

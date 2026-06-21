@@ -111,10 +111,7 @@ async function install({ context, helpers, platformDir }) {
   }
 
   context.emitProgress('platform-install', 68, '正在解压...');
-  const unzipInfo = platformHelper.getUnzipCommand(zipPath, platformDir);
-  await helpers.execCommand(unzipInfo.cmd, unzipInfo.args, {
-    onStderr: (data) => context.emitOutput(data),
-  });
+  await platformHelper.unzip(zipPath, platformDir);
   context.emitOutput('[napcat] 解压完成');
 
   await cleanupDownloadPath(zipPath, context);

@@ -137,10 +137,7 @@ async function install({ context, helpers, platformDir }) {
  */
 async function extractArchive(archivePath, destDir, helpers, context) {
   if (archivePath.endsWith('.zip')) {
-    const unzipInfo = platformHelper.getUnzipCommand(archivePath, destDir);
-    await helpers.execCommand(unzipInfo.cmd, unzipInfo.args, {
-      onStderr: (data) => context.emitOutput(data),
-    });
+    await platformHelper.unzip(archivePath, destDir);
     return;
   }
 
